@@ -1,0 +1,196 @@
+// أدوات بناء الواجهة. كل النصوص تُضاف كنصوص لا كـ HTML لمنع حقن الشيفرات.
+
+export function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  if (props) {
+    for (const [k, v] of Object.entries(props)) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'value') el.value = v;
+      else if (k === 'checked' || k === 'disabled' || k === 'selected') el[k] = !!v;
+      else el.setAttribute(k, v === true ? '' : String(v));
+    }
+  }
+  append(el, children);
+  return el;
+}
+
+function append(el, children) {
+  for (const c of children) {
+    if (c === null || c === undefined || c === false) continue;
+    if (Array.isArray(c)) append(el, c);
+    else if (c instanceof Node) el.appendChild(c);
+    else el.appendChild(document.createTextNode(String(c)));
+  }
+}
+
+export function mount(root, ...nodes) {
+  root.replaceChildren();
+  append(root, nodes);
+}
+
+// أيقونات ثابتة (نصوص موثوقة من داخل التطبيق فقط)
+const PATHS = {
+  drop: '<path d="M12 2.8c3.6 4.3 6.5 7.9 6.5 11.4a6.5 6.5 0 0 1-13 0c0-3.5 2.9-7.1 6.5-11.4z"/><path d="M12 11.5v5.5M9.25 14.25h5.5"/>',
+  back: '<path d="M9 5l7 7-7 7"/>',
+  bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.8c2 .7 3.2 2.5 3.5 5.2"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  book: '<path d="M4 4.5h6a2 2 0 0 1 2 2V20a1.5 1.5 0 0 0-1.5-1.5H4z"/><path d="M20 4.5h-6a2 2 0 0 0-2 2V20a1.5 1.5 0 0 1 1.5-1.5H20z"/>',
+  shield: '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l8.5-8.5M16.5 6.5l2.5 2.5M14.5 8.5l2 2"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.3"/>',
+  warn: '<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17v.3"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
+  logout: '<path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M10 8l-4 4 4 4M6 12h10"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
+  share: '<path d="M4 12v6.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V12"/><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  refresh: '<path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+};
+
+export function icon(name, size = 24, color = 'currentColor', width = 1.8) {
+  const t = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  t.setAttribute('width', size); t.setAttribute('height', size);
+  t.setAttribute('viewBox', '0 0 24 24'); t.setAttribute('fill', 'none');
+  t.setAttribute('stroke', color); t.setAttribute('stroke-width', width);
+  t.setAttribute('stroke-linecap', 'round'); t.setAttribute('stroke-linejoin', 'round');
+  t.setAttribute('aria-hidden', 'true');
+  t.innerHTML = PATHS[name] || '';
+  return t;
+}
+
+// الأدوار
+export const ROLES = {
+  specialist: 'طبيب اختصاص',
+  senior_resident: 'طبيب مقيم أقدم',
+  intern: 'طبيب دوري',
+  clinical_pharmacist: 'صيدلي سريري',
+  chief_clinical_pharmacist: 'مسؤول الصيادلة السريريين',
+  mixing_pharmacist: 'صيدلي المزج الكيميائي',
+  nurse: 'ممرض',
+};
+
+export const ROLE_GROUPS = [
+  { id: 'doc', label: 'طبيب', legend: 'نوع الطبيب', subs: [
+    { role: 'specialist', desc: 'يعتمد العلاج، ويوافق على تعديلات الصيادلة أو يرفضها.' },
+    { role: 'senior_resident', desc: 'يعدّل الأدوية والجرع والتشخيص ونوع البروتوكول.' },
+    { role: 'intern', desc: 'عرض فقط، دون إضافة أو تعديل أو حذف.' },
+  ] },
+  { id: 'pharm', label: 'صيدلاني', legend: 'نوع الصيدلاني', subs: [
+    { role: 'clinical_pharmacist', desc: 'تعديلات محددة تُرسل للطبيب المختص مع تقرير للموافقة.' },
+    { role: 'chief_clinical_pharmacist', desc: 'صلاحيات الطبيب المقيم الأقدم، وتُرسل تعديلاته للموافقة.' },
+    { role: 'mixing_pharmacist', desc: 'يحضّر الجرع ويعدّلها، وتُرسل تعديلاته للموافقة.' },
+  ] },
+  { id: 'nurse', label: 'ممرض', legend: null, subs: [
+    { role: 'nurse', desc: 'يسجّل إعطاء الجرع والعلامات الحيوية، ويرى الأوامر المعتمدة فقط.' },
+  ] },
+];
+
+// التاريخ والأرقام (أرقام لاتينية وأشهر عراقية)
+const LOCALE = 'ar-IQ-u-nu-latn';
+export function fmtDate(d, opts = { day: 'numeric', month: 'long', year: 'numeric' }) {
+  if (!d) return '—';
+  const date = typeof d === 'string' && d.length === 10 ? new Date(d + 'T00:00:00') : new Date(d);
+  return new Intl.DateTimeFormat(LOCALE, opts).format(date);
+}
+export function fmtDay(d) { return fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' }); }
+export function fmtTime(d) { return new Intl.DateTimeFormat(LOCALE, { hour: 'numeric', minute: '2-digit' }).format(new Date(d)); }
+export function relTime(d) {
+  const diff = (Date.now() - new Date(d).getTime()) / 60000;
+  if (diff < 1) return 'الآن';
+  if (diff < 60) return `قبل ${Math.round(diff)} دقيقة`;
+  if (diff < 1440) return `قبل ${Math.round(diff / 60)} ساعة`;
+  return fmtDate(d, { day: 'numeric', month: 'long' });
+}
+export function todayISO() {
+  const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+export function daysUntil(iso) {
+  if (!iso) return null;
+  return Math.round((new Date(iso + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000);
+}
+export function initials(name) {
+  const parts = String(name || '').replace(/^د\.\s*/, '').trim().split(/\s+/).filter(Boolean);
+  return parts.slice(0, 2).map((p) => p[0]).join(' ');
+}
+
+// الإشعار المنبثق
+let toastTimer;
+export function toast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('err', isError);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// زر يعرض مؤشر انتظار أثناء العملية
+export async function busy(btn, fn) {
+  if (btn.disabled) return;
+  const old = [...btn.childNodes];
+  btn.disabled = true;
+  btn.replaceChildren(h('span', { class: 'spinner sm', 'aria-hidden': 'true' }), ' يرجى الانتظار');
+  try { return await fn(); }
+  finally { btn.disabled = false; btn.replaceChildren(...old); }
+}
+
+// عناصر جاهزة
+export function topbar({ title, sub, back, dark, actions }) {
+  return h('header', { class: 'topbar' + (dark ? ' dark' : '') },
+    back ? h('a', { class: 'icon-btn', href: back, 'aria-label': 'رجوع' }, icon('back', 24, 'currentColor', 2)) : null,
+    h('div', { class: 'titles' }, h('h1', { text: title }), sub ? h('p', { class: 'sub', text: sub }) : null),
+    actions || null);
+}
+
+export function notice(kind, iconName, ...content) {
+  return h('div', { class: 'notice ' + kind, role: kind === 'err' ? 'alert' : null }, icon(iconName, 20), h('div', null, ...content));
+}
+
+export function field(label, input, hint) {
+  if (!input.id) input.id = 'f' + Math.random().toString(36).slice(2, 8);
+  return h('div', { class: 'field' }, h('label', { for: input.id, text: label }), input, hint ? h('p', { class: 'hint', text: hint }) : null);
+}
+
+export function empty(text, iconName = 'info') {
+  return h('div', { class: 'empty' }, icon(iconName, 28, '#8A929C'), h('p', { text }));
+}
+
+export function bottomNav(active) {
+  const items = [
+    ['home', '#/home', 'home', 'الرئيسية'],
+    ['patients', '#/patients', 'users', 'المرضى'],
+    ['appointments', '#/appointments', 'calendar', 'المواعيد'],
+    ['protocols', '#/protocols', 'book', 'البروتوكولات'],
+  ];
+  return h('nav', { class: 'bottom-nav', 'aria-label': 'التنقل الرئيسي' },
+    items.map(([id, href, ic, label]) =>
+      h('a', { href, 'aria-current': id === active ? 'page' : null }, icon(ic, 24), h('span', { text: label }))));
+}
+
+export function confirmDialog({ title, body, okText = 'تأكيد', danger = false, input }) {
+  return new Promise((resolve) => {
+    const dlg = h('dialog', null);
+    const inp = input ? h('textarea', { class: 'input', rows: 3, placeholder: input.placeholder || '' }) : null;
+    const done = (v) => { dlg.close(); dlg.remove(); resolve(v); };
+    dlg.append(h('div', { class: 'dlg' },
+      h('h2', { text: title }),
+      body ? h('p', { text: body, style: 'color: var(--muted); line-height: 1.7' }) : null,
+      inp ? field(input.label, inp) : null,
+      h('div', { class: 'grid-2' },
+        h('button', { type: 'button', class: 'btn secondary', onclick: () => done(null), text: 'إلغاء' }),
+        h('button', { type: 'button', class: 'btn ' + (danger ? 'danger' : 'primary'),
+          onclick: () => done(inp ? inp.value.trim() : true), text: okText }))));
+    document.body.append(dlg);
+    dlg.addEventListener('cancel', () => done(null));
+    dlg.showModal();
+  });
+}
