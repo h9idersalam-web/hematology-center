@@ -1,9 +1,9 @@
 // إنشاء خطة علاج: اختيار بروتوكول معتمد، ومعاينة الجرعات المحسوبة للمريض، ثم الحفظ
 import { sb, q, rpc } from '../api.js';
-import { h, mount, icon, topbar, field, notice, toast, busy, bsa, fmtDate, todayISO, addDaysISO, count } from '../ui.js';
+import { h, mount, icon, topbar, field, notice, toast, busy, bsa, fmtDate, todayISO, addDaysISO, count, latinDigits } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
-import { ROUTE_AR, OUT_UNITS, UNITS, calcDose, daysText, num, instrLine, withCycles } from '../dose.js';
+import { ROUTE_AR, OUT_UNITS, UNITS, calcDose, daysText, num, instrLine, withCycles, crclCG, ageYears, scrMgDl, ltrLine } from '../dose.js';
 import { NKDA } from './patient-form.js';
 import { protocolFileLink } from '../files.js';
 
@@ -15,11 +15,13 @@ export async function render(root, params) {
   if (!can('createPlan')) return shell(notice('info', 'lock', h('p', { text: 'إنشاء خطط العلاج لطبيب الاختصاص والمقيم الأقدم ومسؤول الصيادلة السريريين.' })));
   shell(h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
 
-  const [p, protocols, current] = await Promise.all([
-    q(sb.from('patients').select('id, full_name, file_no, height_cm, weight_kg, allergies, archived_at').eq('id', pid).maybeSingle()),
+  const [p, protocols, current, scrRows] = await Promise.all([
+    q(sb.from('patients').select('id, full_name, file_no, birth_date, sex, height_cm, weight_kg, allergies, archived_at').eq('id', pid).maybeSingle()),
     q(sb.from('protocols').select('id, name, disease, kind, cycle_length_days, total_cycles, notes, file_path, protocol_drugs(*)')
       .not('approved_at', 'is', null).is('archived_at', null).order('name')),
     q(sb.from('treatments').select('id').eq('patient_id', pid).in('status', ['active', 'pending_approval'])),
+    q(sb.from('lab_results').select('value, unit, test_date').eq('patient_id', pid).ilike('test_name', 'creatinine')
+      .gte('test_date', addDaysISO(todayISO(), -30)).order('test_date', { ascending: false }).order('created_at', { ascending: false }).limit(1)),
   ]);
   if (!p) throw new Error('المريض غير موجود');
   if (p.archived_at) return shell(notice('err', 'archive', h('p', { text: 'ملف المريض مؤرشف.' })));
@@ -36,6 +38,38 @@ export async function render(root, params) {
   const B = bsa(Number(p.height_cm), Number(p.weight_kg));
   const W = Number(p.weight_kg);
   let chosen = null;
+  // جرعات AUC: أحدث كرياتينين خلال 30 يوماً، والعمر والجنس من ملف المريض
+  const lastScr = scrRows[0] || null;
+  const age = ageYears(p.birth_date);
+  const scrIn = h('input', { class: 'input ltr', type: 'number', inputmode: 'decimal', step: 'any', min: 0.1, max: 20, style: 'text-align: right', placeholder: 'مثال: 0.9', value: lastScr ? String(scrMgDl(lastScr)) : '' });
+  const aucBox = h('div');
+  const hasAuc = () => !!chosen && chosen.protocol_drugs.some((d) => d.dose_unit === 'AUC');
+  const scrVal = () => Number(latinDigits(scrIn.value));
+  const crNow = () => crclCG({ age, sex: p.sex, weight: W, scr: scrVal() });
+  const crHint = h('p', { class: 'hint', style: 'font-weight: 600' });
+  const setCrHint = () => {
+    const cr = crNow();
+    crHint.replaceChildren(...(cr
+      ? [h('span', { text: 'Cockcroft-Gault (العمر ' + age + '):' }), h('br'),
+         ltrLine(`CrCl = (140 − ${age}) × ${num(W)} kg${p.sex === 'female' ? ' × 0.85' : ''} ÷ (72 × ${num(scrVal())}) = ${cr.raw} mL/min${cr.raw > 125 ? ' → 125' : ''}`)]
+      : [h('span', { text: 'اكتب قيمة الكرياتينين لحساب الجرعة.' })]));
+  };
+  scrIn.addEventListener('input', () => { setCrHint(); drawPreview(); });
+  function drawAuc() {
+    if (!hasAuc()) return aucBox.replaceChildren();
+    if (age == null || !p.sex) {
+      return aucBox.replaceChildren(notice('warn', 'warn', h('p', { text: 'في هذا البروتوكول Carboplatin بجرعة AUC، وحسابها يحتاج تاريخ ميلاد المريض وجنسه.' })),
+        h('a', { class: 'btn secondary block', href: '#/patient-edit?id=' + pid }, icon('edit', 22), 'إكمال ملف المريض'));
+    }
+    setCrHint();
+    aucBox.replaceChildren(h('div', { class: 'card' },
+      h('h2', { text: 'تصفية الكرياتينين لجرعة AUC' }),
+      field('كرياتينين المصل (mg/dL)', scrIn, lastScr
+        ? `آخر نتيجة مسجلة ${num(scrMgDl(lastScr))} mg/dL بتاريخ ${fmtDate(lastScr.test_date)}. إن غيّرتها تُحفظ نتيجة جديدة بتاريخ اليوم.`
+        : 'لا توجد نتيجة كرياتينين خلال آخر 30 يوماً. القيمة التي تكتبها تُحفظ في تحاليل المريض بتاريخ اليوم.'),
+      crHint,
+      h('p', { class: 'hint', text: 'Calvert: الجرعة = AUC × (CrCl + 25). قبل كل دورة لاحقة أعد حسابها بأحدث كرياتينين من شاشة الدورة.' })));
+  }
 
   const picker = h('div', { class: 'section', role: 'radiogroup', 'aria-label': 'البروتوكول' });
   const preview = h('div', { class: 'section' });
@@ -51,7 +85,7 @@ export async function render(root, params) {
   function drawPicker() {
     picker.replaceChildren(...protocols.map((pr) => h('button', {
       type: 'button', class: 'option', 'aria-pressed': chosen === pr ? 'true' : 'false',
-      onclick: () => { chosen = pr; if (!diagnosis.dataset.touched) diagnosis.value = pr.disease; drawPicker(); drawPreview(); drawSchedule(); submit.disabled = false; },
+      onclick: () => { chosen = pr; if (!diagnosis.dataset.touched) diagnosis.value = pr.disease; drawPicker(); drawAuc(); drawPreview(); drawSchedule(); submit.disabled = false; },
     }, h('span', { class: 'radio' }),
       h('span', null, h('span', { class: 'ot ltr', style: 'text-align: right', text: pr.name }),
         h('span', { class: 'od', text: `${pr.disease} · كل ${count(pr.cycle_length_days, 'day')} · ${count(pr.total_cycles, 'cycle')}` })))));
@@ -67,7 +101,7 @@ export async function render(root, params) {
       h('div', { class: 'section-head' }, h('h2', { text: 'معاينة الجرعات' }), h('span', { class: 'meta ltr', text: `BSA ${B} m²` })),
       clash.length ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'تحذير حساسية: ' + clash.map((d) => d.drug_name).join('، ') }), h('p', { text: 'المريض مسجّل بحساسية لدواء في هذا البروتوكول. راجع الطبيب المختص قبل المتابعة.' })) : null,
       h('div', { class: 'card flush' }, drugs.map((d) => {
-        const c = calcDose(Number(d.dose_value), d.dose_unit, B, W, d.max_dose);
+        const c = calcDose(Number(d.dose_value), d.dose_unit, B, W, d.max_dose, crNow()?.crcl);
         return h('div', { class: 'row', style: 'align-items: flex-start' },
           h('span', { class: 'grow' },
             h('span', { class: 't ltr', style: 'text-align: right', text: d.drug_name }),
@@ -82,6 +116,7 @@ export async function render(root, params) {
       protocolFileLink(chosen.file_path, 'مطابقة مع ملف البروتوكول ' + chosen.name));
   }
   function calcText(d, c) {
+    if (d.dose_unit === 'AUC') { const cr = crNow(); return cr ? `AUC ${num(d.dose_value)} × (CrCl ${cr.crcl} + 25) = ${num(c.calculated)} mg` : `AUC ${num(d.dose_value)}: تحتاج الكرياتينين`; }
     if (d.dose_unit === 'mg' || d.dose_unit === 'units') return `${num(d.dose_value)} ${d.dose_unit} (fixed)`;
     return `${num(d.dose_value)} ${d.dose_unit} × ${d.dose_unit.endsWith('/m2') ? B + ' m²' : W + ' kg'} = ${num(c.calculated)} ${c.finalUnit}`;
   }
@@ -102,7 +137,7 @@ export async function render(root, params) {
         h('span', { style: 'font-size: 14px; color: var(--muted-2)', text: `${p.file_no} · ${num(p.height_cm)} سم · ${num(p.weight_kg)} كغ · BSA ${B} م²` }))),
     p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { text: 'حساسية دوائية: ' + p.allergies })) : null,
     h('div', { class: 'section-head' }, h('h2', { text: 'البروتوكول' }), h('a', { href: '#/protocols', style: 'font-size: 14px; font-weight: 600', text: 'المكتبة' })),
-    picker, preview,
+    picker, aucBox, preview,
     h('div', { class: 'card' },
       h('h2', { text: 'التشخيص والبدء' }),
       field('التشخيص', diagnosis),
@@ -121,7 +156,17 @@ export async function render(root, params) {
       const code = icd.value.trim().toUpperCase();
       if (code && !/^[A-Z]\d{2}(\.\d{1,2})?$/.test(code)) return fail('رمز ICD-10 بصيغة حرف ثم رقمين، مثل C83.3');
       if (!start.value) return fail('اختر تاريخ الدورة الأولى');
+      const auc = hasAuc();
+      if (auc) {
+        if (age == null || !p.sex) return fail('جرعة AUC تحتاج تاريخ ميلاد المريض وجنسه');
+        if (!(scrVal() >= 0.1 && scrVal() <= 20)) return fail('اكتب كرياتينين المصل بوحدة mg/dL (مثل 0.9)');
+      }
       try {
+        if (auc && (!lastScr || scrVal() !== scrMgDl(lastScr))) {
+          const ref = p.sex === 'female' ? [0.6, 1.1] : [0.7, 1.3];
+          await rpc('add_lab_results', { p_patient: pid, p_test_date: todayISO(),
+            p_results: [{ test_name: 'Creatinine', value: scrVal(), unit: 'mg/dL', ref_low: ref[0], ref_high: ref[1] }] });
+        }
         await rpc('create_treatment', { p_patient: pid, p_protocol: chosen.id, p_diagnosis: diagnosis.value.trim(),
           p_icd10: code || null, p_stage: stage.value.trim() || null, p_start: start.value });
         toast(pending ? 'أُرسلت الخطة للطبيب المختص للموافقة' : 'أُنشئت خطة العلاج');

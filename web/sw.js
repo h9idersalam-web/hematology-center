@@ -1,6 +1,6 @@
 // يحفظ ملفات واجهة التطبيق فقط ليفتح بسرعة.
 // لا يحفظ أي بيانات مرضى: كل طلبات قاعدة البيانات تذهب إلى الخادم مباشرة.
-const VERSION = 'v7-2026-11-04-drug-cycles';
+const VERSION = 'v8-2026-11-04-auc-carboplatin';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'vendor/supabase-2.118.0.js',

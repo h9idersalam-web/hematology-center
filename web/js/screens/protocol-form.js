@@ -7,7 +7,7 @@ import { UNITS, ROUTES, ROUTE_AR, OUT_UNITS, calcDose, validDays, daysText, cycl
 import { uploadProtocolFile, checkFile } from '../files.js';
 
 const KINDS = [['iv', 'وريدي'], ['oral', 'فموي'], ['mixed', 'مختلط']];
-const EX = { bsa: 1.8, weight: 70 };
+const EX = { bsa: 1.8, weight: 70, crcl: 100 };
 
 export async function render(root) {
   if (!can('createProtocol')) {
@@ -105,8 +105,10 @@ function drugEditor(no, onRemove, cycleLen, totalCycles) {
     maxLabel.textContent = `سقف الجرعة (${OUT_UNITS[out]})`;
     const v = Number(latinDigits(value.value));
     if (v > 0) {
-      const c = calcDose(v, unit.value, EX.bsa, EX.weight, max.value ? Number(latinDigits(max.value)) : null);
-      preview.textContent = `مثال لمريض ${EX.bsa} م² و${EX.weight} كغ: ${num(c.final)} ${OUT_UNITS[c.finalUnit]}${c.capped ? ' (بالسقف)' : ''}`;
+      const c = calcDose(v, unit.value, EX.bsa, EX.weight, max.value ? Number(latinDigits(max.value)) : null, EX.crcl);
+      preview.textContent = unit.value === 'AUC'
+        ? `مثال لتصفية كرياتينين ${EX.crcl} مل/دقيقة: ${num(v)} × (${EX.crcl} + 25) = ${num(c.final)} ملغ${c.capped ? ' (بالسقف)' : ''}. تُحسب للمريض من أحدث كرياتينين وعمره وجنسه ووزنه.`
+        : `مثال لمريض ${EX.bsa} م² و${EX.weight} كغ: ${num(c.final)} ${OUT_UNITS[c.finalUnit]}${c.capped ? ' (بالسقف)' : ''}`;
     } else preview.textContent = '';
   };
   [value, unit, days, max, cyc].forEach((x) => x.addEventListener('input', redraw));
@@ -135,6 +137,7 @@ function drugEditor(no, onRemove, cycleLen, totalCycles) {
       const mx = max.value ? Number(latinDigits(max.value)) : null;
       if (!/^[A-Za-z][\w\s\-().,/+]*$/.test(nm)) return { error: 'اكتب اسم الدواء بالأحرف الإنجليزية' };
       if (!(v > 0)) return { error: 'الجرعة يجب أن تكون أكبر من صفر' };
+      if (unit.value === 'AUC' && !(v >= 1 && v <= 10)) return { error: 'قيمة AUC بين 1 و10 (مثل 5)' };
       if (!validDays(days.value, L)) return { error: `أيام الإعطاء غير صحيحة أو تتجاوز طول الدورة (${L} يوماً)` };
       if (mx !== null && !(mx > 0)) return { error: 'سقف الجرعة يجب أن يكون أكبر من صفر' };
       if (cyc.value.trim() && !validDays(cyc.value, T)) return { error: `الدورات غير صحيحة أو تتجاوز عدد الدورات (${T})` };

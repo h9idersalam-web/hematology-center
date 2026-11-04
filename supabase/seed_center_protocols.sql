@@ -1001,3 +1001,96 @@ do $do$ declare v uuid; begin
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
   values (v, $q$Dexamethasone$q$, 20, $q$mg$q$, $q$PO$q$, $q$1,15$q$, null, false, $q$فموي أو وريدي$q$, $q$2-12$q$, 5);
 end $do$;
+
+-- TEC  (الملف: tec_protocl)
+do $do$ declare v uuid; begin
+  if exists (select 1 from public.protocols where name = $q$TEC$q$) then return; end if;
+  insert into public.protocols(name, disease, kind, cycle_length_days, total_cycles, notes)
+  values ($q$TEC$q$, $q$لمفوما هودجكن الكلاسيكية المنتكسة أو المقاومة لثلاثة خطوط علاج على الأقل، فوق 18 سنة$q$, $q$iv$q$, 21, 4, $q$المصدر: ملف بروتوكول مركز الناصرية لأمراض الدم (TEC: Bendamustine + Etoposide + Carboplatin).
+⚠ الملف يكتب Bendamustine «60–120 mg/m²». أُدخل الحد الأدنى 60؛ عدّله إلى الجرعة التي يعتمدها المركز قبل الاعتماد.
+⚠ الملف لا يذكر طول الدورة ولا عددها؛ أُدخل 21 يوماً (جدول الملف) و4 دورات.
+Carboplatin بجرعة AUC: الجرعة = AUC × (CrCl + 25)، وCrCl بمعادلة Cockcroft-Gault من أحدث كرياتينين خلال 30 يوماً والعمر والجنس والوزن، مقصوص عند 125 مل/دقيقة (أعلى جرعة لـ AUC 5 = 750 ملغ). أعد حسابها قبل كل دورة من شاشة الدورة.
+Bendamustine مهيّج بخصائص شبيهة بالحارق. Etoposide وCarboplatin مهيّجان.$q$) returning id into v;
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Bendamustine$q$, 60, $q$mg/m2$q$, $q$IV$q$, $q$1,2$q$, null, true, $q$المدى في الملف 60–120 ملغ/م²؛ الجرعة يحددها الطبيب$q$, null, 1);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Etoposide$q$, 100, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 2);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Carboplatin$q$, 5, $q$AUC$q$, $q$IV$q$, $q$1$q$, 800, true, null, null, 3);
+end $do$;
+
+-- Pola-R-ICE  (الملف: pola-R_ice)
+do $do$ declare v uuid; begin
+  if exists (select 1 from public.protocols where name = $q$Pola-R-ICE$q$) then return; end if;
+  insert into public.protocols(name, disease, kind, cycle_length_days, total_cycles, notes)
+  values ($q$Pola-R-ICE$q$, $q$DLBCL منتكسة أو مقاومة أولياً: علاج إنقاذ$q$, $q$iv$q$, 21, 6, $q$المصدر: ملف بروتوكول مركز الناصرية لأمراض الدم (Pola-R-ICE). كل 21 يوماً؛ 6 دورات حسب جدول الملف.
+⚠ الملف يكتب Polatuzumab vedotin «1.8 mg/m²»، وجرعته المعتمدة 1.8 ملغ/كغ كما في ملفات Pola الأخرى للمركز. أُدخلت 1.8 ملغ/كغ.
+Ifosfamide 5000 ملغ/م² على 24 ساعة (2500 ملغ/م² مرتين)؛ يتوقف التسريب عند 24 ساعة.
+Carboplatin بجرعة AUC: الجرعة = AUC × (CrCl + 25)، وCrCl بمعادلة Cockcroft-Gault من أحدث كرياتينين خلال 30 يوماً والعمر والجنس والوزن، مقصوص عند 125 مل/دقيقة (أعلى جرعة لـ AUC 5 = 750 ملغ). أعد حسابها قبل كل دورة من شاشة الدورة.
+Filgrastim 5 ميكروغرام/كغ تحت الجلد من اليوم المذكور في الملف ويستمر يومياً حتى تعافي العدلات. لم يُدخل سطراً لأن التطبيق لا يدعم وحدة الميكروغرام.$q$) returning id into v;
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Polatuzumab vedotin$q$, 1.8, $q$mg/kg$q$, $q$IV$q$, $q$1$q$, 240, true, null, null, 1);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Rituximab$q$, 375, $q$mg/m2$q$, $q$IV$q$, $q$1$q$, null, true, null, null, 2);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Etoposide$q$, 100, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 3);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Carboplatin$q$, 5, $q$AUC$q$, $q$IV$q$, $q$2$q$, 800, true, null, null, 4);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 1000, $q$mg/m2$q$, $q$IV$q$, $q$2$q$, null, false, $q$قبل Ifosfamide$q$, null, 5);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Ifosfamide$q$, 2500, $q$mg/m2$q$, $q$IV$q$, $q$2$q$, null, true, $q$مرتين في اليوم 2 (المجموع 5000 ملغ/م²)$q$, null, 6);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 2500, $q$mg/m2$q$, $q$IV$q$, $q$2$q$, null, false, $q$مرتين، مع Ifosfamide$q$, null, 7);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 3000, $q$mg/m2$q$, $q$IV$q$, $q$3$q$, null, false, $q$بعد انتهاء Ifosfamide$q$, null, 8);
+end $do$;
+
+-- ICE (مجزأ)  (الملف: ice_protocol_with_logo, fractionated_ICE)
+do $do$ declare v uuid; begin
+  if exists (select 1 from public.protocols where name = $q$ICE (مجزأ)$q$) then return; end if;
+  insert into public.protocols(name, disease, kind, cycle_length_days, total_cycles, notes)
+  values ($q$ICE (مجزأ)$q$, $q$لمفوما هودجكن أو لاهودجكينية منتكسة أو مقاومة$q$, $q$mixed$q$, 21, 3, $q$المصدر: ملف بروتوكول مركز الناصرية لأمراض الدم (ICE المجزأ: ملفان بالجدول نفسه). كل 21 يوماً، 2–3 دورات؛ أُدخلت 3.
+⚠ الملف يكتب Ifosfamide «1.666 mg/m²»، والمقصود 1,666 (الفاصلة للآلاف) كما في جدول Mesna من الملف نفسه (1667 ملغ/م²، والمجموع 5 غ/م² على 3 أيام). أُدخل 1667.
+Mesna في الأيام 1–3: 333 ملغ/م² وريدياً قبل Ifosfamide، و1667 ملغ/م² مع Ifosfamide، و667 ملغ/م² فموياً بعد ساعتين و6 ساعات من نهاية كل Ifosfamide.
+Carboplatin بجرعة AUC: الجرعة = AUC × (CrCl + 25)، وCrCl بمعادلة Cockcroft-Gault من أحدث كرياتينين خلال 30 يوماً والعمر والجنس والوزن، مقصوص عند 125 مل/دقيقة (أعلى جرعة لـ AUC 5 = 750 ملغ). أعد حسابها قبل كل دورة من شاشة الدورة.
+Filgrastim 5 ميكروغرام/كغ تحت الجلد من اليوم المذكور في الملف ويستمر يومياً حتى تعافي العدلات. لم يُدخل سطراً لأن التطبيق لا يدعم وحدة الميكروغرام.$q$) returning id into v;
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Etoposide$q$, 100, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 1);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Carboplatin$q$, 5, $q$AUC$q$, $q$IV$q$, $q$1$q$, 800, true, null, null, 2);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 333, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, false, $q$قبل Ifosfamide$q$, null, 3);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Ifosfamide$q$, 1667, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 4);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 1667, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, false, $q$مع Ifosfamide$q$, null, 5);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 667, $q$mg/m2$q$, $q$PO$q$, $q$1-3$q$, null, false, $q$مرتين: بعد ساعتين و6 ساعات من نهاية كل Ifosfamide$q$, null, 6);
+end $do$;
+
+-- Pembro-ICE (مجزأ)  (الملف: keytruda_ICE_Fractionated)
+do $do$ declare v uuid; begin
+  if exists (select 1 from public.protocols where name = $q$Pembro-ICE (مجزأ)$q$) then return; end if;
+  insert into public.protocols(name, disease, kind, cycle_length_days, total_cycles, notes)
+  values ($q$Pembro-ICE (مجزأ)$q$, $q$لمفوما هودجكن أو لاهودجكينية منتكسة أو مقاومة$q$, $q$mixed$q$, 21, 3, $q$المصدر: ملف بروتوكول مركز الناصرية لأمراض الدم (Keytruda + ICE المجزأ). كل 21 يوماً.
+⚠ عدد الدورات غير مذكور نصاً؛ أُدخلت 3 كما في ICE.
+⚠ الملف يكتب Ifosfamide «1.666 mg/m²»، والمقصود 1,666 (الفاصلة للآلاف) كما في جدول Mesna من الملف نفسه (1667 ملغ/م²، والمجموع 5 غ/م² على 3 أيام). أُدخل 1667.
+Mesna في الأيام 1–3: 333 ملغ/م² وريدياً قبل Ifosfamide، و1667 ملغ/م² مع Ifosfamide، و667 ملغ/م² فموياً بعد ساعتين و6 ساعات من نهاية كل Ifosfamide.
+Carboplatin بجرعة AUC: الجرعة = AUC × (CrCl + 25)، وCrCl بمعادلة Cockcroft-Gault من أحدث كرياتينين خلال 30 يوماً والعمر والجنس والوزن، مقصوص عند 125 مل/دقيقة (أعلى جرعة لـ AUC 5 = 750 ملغ). أعد حسابها قبل كل دورة من شاشة الدورة.
+Filgrastim 5 ميكروغرام/كغ تحت الجلد من اليوم المذكور في الملف ويستمر يومياً حتى تعافي العدلات. لم يُدخل سطراً لأن التطبيق لا يدعم وحدة الميكروغرام.$q$) returning id into v;
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Pembrolizumab$q$, 200, $q$mg$q$, $q$IV$q$, $q$1$q$, null, true, $q$يُعطى أولاً$q$, null, 1);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Etoposide$q$, 100, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 2);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Carboplatin$q$, 5, $q$AUC$q$, $q$IV$q$, $q$1$q$, 800, true, null, null, 3);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 333, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, false, $q$قبل Ifosfamide$q$, null, 4);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Ifosfamide$q$, 1667, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 5);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 1667, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, false, $q$مع Ifosfamide$q$, null, 6);
+  insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
+  values (v, $q$Mesna$q$, 667, $q$mg/m2$q$, $q$PO$q$, $q$1-3$q$, null, false, $q$مرتين: بعد ساعتين و6 ساعات من نهاية كل Ifosfamide$q$, null, 7);
+end $do$;

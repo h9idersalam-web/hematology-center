@@ -8,7 +8,7 @@ import { uploadProtocolFile, protocolFileLink, checkFile } from '../files.js';
 import { state } from '../app.js';
 
 const KIND = { iv: 'وريدي', oral: 'فموي', mixed: 'مختلط (وريدي وفموي)' };
-const EX = { bsa: 1.8, weight: 70 };
+const EX = { bsa: 1.8, weight: 70, crcl: 100 };
 
 export async function render(root, params) {
   const id = params.get('id');
@@ -60,7 +60,7 @@ export async function render(root, params) {
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'الأدوية' }), h('span', { class: 'meta', text: count(drugs.length, 'drug') })),
         h('div', { class: 'card flush' }, drugs.map(drugRow)),
-        h('p', { class: 'hint', text: `عمود «مثال» محسوب لمريض مساحة جسمه ${EX.bsa} م² ووزنه ${EX.weight} كغ، للتوضيح فقط.` })),
+        h('p', { class: 'hint', text: `عمود «مثال» محسوب لمريض مساحة جسمه ${EX.bsa} م² ووزنه ${EX.weight} كغ (وتصفية كرياتينين ${EX.crcl} مل/دقيقة لجرعات AUC)، للتوضيح فقط.` })),
       approveBtn, archiveBtn),
     bottomNav('protocols')));
 }
@@ -95,7 +95,7 @@ function fileSection(p, reload) {
 }
 
 function drugRow(d) {
-  const ex = calcDose(Number(d.dose_value), d.dose_unit, EX.bsa, EX.weight, d.max_dose);
+  const ex = calcDose(Number(d.dose_value), d.dose_unit, EX.bsa, EX.weight, d.max_dose, EX.crcl);
   return h('div', { class: 'row', style: 'align-items: flex-start' },
     h('span', { class: 'grow' },
       h('span', { class: 't ltr', style: 'text-align: right', text: d.drug_name }),

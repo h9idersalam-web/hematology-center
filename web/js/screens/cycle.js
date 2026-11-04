@@ -3,7 +3,7 @@ import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, fmtDay, fmtTime, toast, confirmDialog, busy, daysUntil, count, ROLES } from '../ui.js';
 import { go } from '../app.js';
 import { can } from '../perms.js';
-import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num, instrLine } from '../dose.js';
+import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num, instrLine, aucCalc } from '../dose.js';
 import { NKDA } from './patient-form.js';
 import { postponeDialog } from './postpone.js';
 import { latestCbc } from './labs.js';
@@ -45,6 +45,15 @@ export async function render(root, params) {
     actions.push(actionBtn('ok', 'shield', 'تحقق الصيدلاني', async () => {
       const ok = await confirmDialog({ title: 'تحقق الصيدلاني', body: 'تؤكد مراجعة الحساب والسقوف والتداخلات والحساسية ومحلول التخفيف.', okText: 'تأكيد التحقق' });
       if (ok) { await rpc('verify_cycle', { p_cycle: id }); toast('سُجّل تحققك'); reload(); }
+    }));
+  }
+  if (open && can('doctorEdit') && active.some((d) => d.dose_unit === 'AUC')) {
+    actions.push(actionBtn('secondary', 'refresh', 'إعادة حساب Carboplatin بأحدث كرياتينين', async () => {
+      const ok = await confirmDialog({ title: 'إعادة حساب جرعة AUC', body: 'تُحسب الجرعة من أحدث كرياتينين خلال 30 يوماً ووزن المريض الحالي. إن تغيّرت تُسجَّل تعديلاً منك ويُعاد اعتماد الدورة وتحقق الصيدلاني.', okText: 'إعادة الحساب' });
+      if (!ok) return;
+      const n = await rpc('recalc_auc', { p_cycle: id });
+      toast(n ? 'تغيّرت جرعة Carboplatin حسب الكرياتينين الأحدث' : 'الجرعة لم تتغير بالكرياتينين الأحدث');
+      reload();
     }));
   }
   if (open && can('doctorEdit')) actions.push(h('a', { class: 'btn secondary block', href: '#/cycle-edit?id=' + id }, icon('edit', 22), 'تعديل الجرعات أو الخطة'));
@@ -164,7 +173,7 @@ function doseRow(d, t) {
       h('span', { class: 't ltr', style: 'text-align: right', text: d.drug_name }),
       h('span', { class: 's', text: `${d.route} (${ROUTE_AR[d.route] || d.route}) · ${daysText(d.days)}` }),
       instrLine(d),
-      h('span', { class: 's', text: calcLine(d, t.bsa, t.weight_kg) }),
+      d.dose_unit === 'AUC' ? aucCalc(d) : h('span', { class: 's', text: calcLine(d, t.bsa, t.weight_kg) }),
       d.diluent || d.infusion_rate ? h('span', { class: 's', text: [d.diluent, d.infusion_rate].filter(Boolean).join(' · ') }) : null,
       h('span', { style: 'display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px' }, badges)),
     h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(d.final_dose) }), h('span', { text: OUT_UNITS[d.final_unit] || d.final_unit })));
