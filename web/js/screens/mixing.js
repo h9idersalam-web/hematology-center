@@ -3,7 +3,7 @@ import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDate, fmtTime, relTime, initials, count, confirmDialog } from '../ui.js';
 import { go } from '../app.js';
 import { can } from '../perms.js';
-import { ROUTE_AR, OUT_UNITS, daysList, num } from '../dose.js';
+import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
 import { uploadAttachment, signedUrl, openFile, isImage, KINDS } from '../files.js';
 import { NKDA } from './patient-form.js';
 import { protocolFileLink } from '../files.js';
@@ -21,7 +21,7 @@ export async function transfer(root, params) {
   if (!can('transfer')) return shell(notice('info', 'lock', h('p', { text: 'التحويل إلى المزج للصيادلة السريريين.' })));
 
   const [doses, files] = await Promise.all([
-    q(sb.from('cycle_doses').select('id, drug_name, final_dose, final_unit, route, days, diluent, infusion_rate, is_mixed').eq('cycle_id', cid).is('archived_at', null).eq('is_mixed', true)),
+    q(sb.from('cycle_doses').select('id, drug_name, final_dose, final_unit, route, days, diluent, infusion_rate, instructions, is_mixed').eq('cycle_id', cid).is('archived_at', null).eq('is_mixed', true)),
     q(sb.from('attachments').select('id, kind, title, file_path, created_at').eq('patient_id', p.id).in('kind', ['id_card', 'prescription']).order('created_at', { ascending: false })),
   ]);
   const todays = doses.filter((d) => daysList(d.days).includes(day));
@@ -79,7 +79,8 @@ function itemLine(d) {
   return h('div', { class: 'row' },
     h('span', { class: 'grow' },
       h('span', { class: 't ltr', style: 'text-align: right', text: d.drug_name }),
-      h('span', { class: 's', text: [`${d.route} (${ROUTE_AR[d.route] || d.route})`, d.diluent, d.infusion_rate].filter(Boolean).join(' · ') })),
+      h('span', { class: 's', text: [`${d.route} (${ROUTE_AR[d.route] || d.route})`, d.diluent, d.infusion_rate].filter(Boolean).join(' · ') }),
+      instrLine(d)),
     h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(d.final_dose) }), h('span', { text: OUT_UNITS[d.final_unit] })));
 }
 
@@ -130,7 +131,7 @@ function orderRow(o) {
 export async function order(root, params) {
   const id = params.get('id');
   const o = await q(sb.from('mixing_orders')
-    .select('*, sender:profiles(full_name), patients(id, full_name, file_no, allergies, weight_kg), cycles(id, cycle_no, treatments(protocol_name, bsa, weight_kg, protocols(file_path))), idcard:attachments!mixing_orders_id_card_attachment_id_fkey(file_path), rx:attachments!mixing_orders_prescription_attachment_id_fkey(file_path), mixing_items(id, prepared_at, sent_at, cycle_doses(drug_name, final_dose, final_unit, route, diluent, infusion_rate, dose_value, dose_unit, calculated, capped, source, edited_from), preparer:profiles!mixing_items_prepared_by_fkey(full_name))')
+    .select('*, sender:profiles(full_name), patients(id, full_name, file_no, allergies, weight_kg), cycles(id, cycle_no, treatments(protocol_name, bsa, weight_kg, protocols(file_path))), idcard:attachments!mixing_orders_id_card_attachment_id_fkey(file_path), rx:attachments!mixing_orders_prescription_attachment_id_fkey(file_path), mixing_items(id, prepared_at, sent_at, cycle_doses(drug_name, final_dose, final_unit, route, diluent, infusion_rate, instructions, dose_value, dose_unit, calculated, capped, source, edited_from), preparer:profiles!mixing_items_prepared_by_fkey(full_name))')
     .eq('id', id).maybeSingle());
   if (!o) throw new Error('طلب المزج غير موجود');
   const p = o.patients, t = o.cycles.treatments;
@@ -159,6 +160,7 @@ export async function order(root, params) {
       h('span', { class: 'grow' },
         h('span', { class: 't ltr', style: 'text-align: right; font-size: 17px', text: d.drug_name }),
         h('span', { class: 's', text: `${d.route} (${ROUTE_AR[d.route] || d.route})` }),
+        instrLine(d),
         h('span', { class: 's', style: 'font-weight: 600; color: var(--ink-2)', text: [d.diluent ? 'المحلول: ' + d.diluent : 'المحلول: غير محدد', d.infusion_rate ? 'التسريب: ' + d.infusion_rate : null].filter(Boolean).join(' · ') }),
         d.source === 'edited' ? h('span', { class: 'pill info', style: 'align-self: flex-start; margin-top: 4px', text: `عُدّلت من ${num(d.edited_from)}` }) : null,
         it.preparer && it.prepared_at ? h('span', { class: 's', text: `حضّره ${it.preparer.full_name} ${fmtTime(it.prepared_at)}` }) : null),

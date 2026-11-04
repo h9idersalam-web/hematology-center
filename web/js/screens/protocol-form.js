@@ -3,7 +3,7 @@ import { rpc } from '../api.js';
 import { h, mount, icon, topbar, field, notice, toast, busy, latinDigits } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
-import { UNITS, ROUTES, ROUTE_AR, OUT_UNITS, calcDose, validDays, daysText, num } from '../dose.js';
+import { UNITS, ROUTES, ROUTE_AR, OUT_UNITS, calcDose, validDays, daysText, cyclesText, num } from '../dose.js';
 import { uploadProtocolFile, checkFile } from '../files.js';
 
 const KINDS = [['iv', 'وريدي'], ['oral', 'فموي'], ['mixed', 'مختلط']];
@@ -29,7 +29,7 @@ export async function render(root) {
 
   const drugsBox = h('div', { class: 'section' });
   const drugs = [];
-  const addDrug = () => { const d = drugEditor(drugs.length + 1, () => { drugs.splice(drugs.indexOf(d), 1); d.el.remove(); renumber(); }, () => Number(len.value)); drugs.push(d); drugsBox.append(d.el); renumber(); };
+  const addDrug = () => { const d = drugEditor(drugs.length + 1, () => { drugs.splice(drugs.indexOf(d), 1); d.el.remove(); renumber(); }, () => Number(len.value), () => Number(total.value)); drugs.push(d); drugsBox.append(d.el); renumber(); };
   const renumber = () => drugs.forEach((d, i) => d.setNo(i + 1));
   addDrug();
 
@@ -66,7 +66,7 @@ export async function render(root) {
       if (!drugs.length) return fail('أضف دواءً واحداً على الأقل');
       if (fileIn.files[0]) { const bad = checkFile(fileIn.files[0]); if (bad) return fail(bad); }
       const list = [];
-      for (const d of drugs) { const r = d.value(L); if (r.error) return fail(`الدواء ${d.no}: ${r.error}`); list.push(r); }
+      for (const d of drugs) { const r = d.value(L, T); if (r.error) return fail(`الدواء ${d.no}: ${r.error}`); list.push(r); }
       try {
         const id = await rpc('create_protocol', { p_name: nm, p_disease: disease.value.trim(), p_kind: kind, p_cycle_length: L,
           p_total_cycles: T, p_drugs: list, p_notes: notes.value.trim() || null });
@@ -81,7 +81,7 @@ export async function render(root) {
   mount(root, h('div', { class: 'screen' }, topbar({ title: 'بروتوكول جديد', back: '#/protocols' }), h('main', { class: 'main' }, form)));
 }
 
-function drugEditor(no, onRemove, cycleLen) {
+function drugEditor(no, onRemove, cycleLen, totalCycles) {
   const title = h('h2');
   const name = h('input', { class: 'input ltr', style: 'text-align: right', placeholder: 'Doxorubicin', autocomplete: 'off', maxlength: 80 });
   const value = h('input', { class: 'input ltr', type: 'number', inputmode: 'decimal', step: 'any', min: 0, style: 'text-align: right' });
@@ -90,6 +90,9 @@ function drugEditor(no, onRemove, cycleLen) {
   const days = h('input', { class: 'input ltr', style: 'text-align: right', placeholder: '1  أو  1,15  أو  1-5', value: '1' });
   const max = h('input', { class: 'input ltr', type: 'number', inputmode: 'decimal', step: 'any', min: 0, style: 'text-align: right', placeholder: 'اختياري' });
   const mixed = h('input', { type: 'checkbox', checked: true });
+  const ins = h('input', { class: 'input', maxlength: 200, placeholder: 'مثال: كل 12 ساعة، جرعتان يومياً' });
+  const cyc = h('input', { class: 'input ltr', style: 'text-align: right', placeholder: 'فارغ = كل الدورات · مثال: 1 أو 2-12' });
+  const cycHint = h('p', { class: 'hint' });
   const daysHint = h('p', { class: 'hint' });
   const preview = h('p', { class: 'hint', style: 'font-weight: 600' });
   const maxLabel = h('label');
@@ -97,6 +100,7 @@ function drugEditor(no, onRemove, cycleLen) {
   route.addEventListener('change', () => { mixed.checked = route.value !== 'PO'; });
   const redraw = () => {
     daysHint.textContent = validDays(days.value, cycleLen()) ? daysText(days.value) : 'اكتب الأيام بالأرقام مفصولة بفاصلة، أو مدى مثل 1-5';
+    cycHint.textContent = !cyc.value.trim() ? 'يُعطى في كل الدورات' : validDays(cyc.value, totalCycles()) ? cyclesText(cyc.value) : 'اكتب أرقام الدورات مفصولة بفاصلة، أو مدى مثل 2-12';
     const out = unit.value.startsWith('units') ? 'units' : 'mg';
     maxLabel.textContent = `سقف الجرعة (${OUT_UNITS[out]})`;
     const v = Number(latinDigits(value.value));
@@ -105,7 +109,7 @@ function drugEditor(no, onRemove, cycleLen) {
       preview.textContent = `مثال لمريض ${EX.bsa} م² و${EX.weight} كغ: ${num(c.final)} ${OUT_UNITS[c.finalUnit]}${c.capped ? ' (بالسقف)' : ''}`;
     } else preview.textContent = '';
   };
-  [value, unit, days, max].forEach((x) => x.addEventListener('input', redraw));
+  [value, unit, days, max, cyc].forEach((x) => x.addEventListener('input', redraw));
   unit.addEventListener('change', redraw);
   redraw();
 
@@ -116,6 +120,8 @@ function drugEditor(no, onRemove, cycleLen) {
     h('div', { class: 'grid-2' }, field('الجرعة', value), field('الوحدة', unit)),
     h('div', { class: 'grid-2' }, field('طريق الإعطاء', route), h('div', { class: 'field' }, maxLabel, max)),
     field('أيام الإعطاء داخل الدورة', days), daysHint,
+    field('الدورات التي يُعطى فيها (اختياري)', cyc), cycHint,
+    field('تعليمات الجرعة (اختياري)', ins, 'التكرار في اليوم أو التقسيم أو شرط الجرعة. لا تكتب المحلول أو مدة التسريب، فهذه لقسم المزج.'),
     h('label', { class: 'check' }, mixed, h('span', { text: 'يُحضَّر في قسم المزج الكيميائي' })),
     preview);
   maxLabel.htmlFor = max.id = 'mx' + Math.random().toString(36).slice(2, 7);
@@ -123,7 +129,7 @@ function drugEditor(no, onRemove, cycleLen) {
   return {
     el, get no() { return no; },
     setNo(n) { no = n; title.textContent = 'الدواء ' + n; },
-    value(L) {
+    value(L, T) {
       const nm = name.value.trim();
       const v = Number(latinDigits(value.value));
       const mx = max.value ? Number(latinDigits(max.value)) : null;
@@ -131,8 +137,10 @@ function drugEditor(no, onRemove, cycleLen) {
       if (!(v > 0)) return { error: 'الجرعة يجب أن تكون أكبر من صفر' };
       if (!validDays(days.value, L)) return { error: `أيام الإعطاء غير صحيحة أو تتجاوز طول الدورة (${L} يوماً)` };
       if (mx !== null && !(mx > 0)) return { error: 'سقف الجرعة يجب أن يكون أكبر من صفر' };
+      if (cyc.value.trim() && !validDays(cyc.value, T)) return { error: `الدورات غير صحيحة أو تتجاوز عدد الدورات (${T})` };
       return { drug_name: nm, dose_value: v, dose_unit: unit.value, route: route.value, days: days.value.replace(/\s/g, ''),
-        max_dose: mx, is_mixed: mixed.checked };
+        max_dose: mx, is_mixed: mixed.checked, instructions: ins.value.trim() || null,
+        cycles: cyc.value.trim() ? cyc.value.replace(/\s/g, '') : null };
     },
   };
 }

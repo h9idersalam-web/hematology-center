@@ -11,7 +11,8 @@ export const ROUTE_AR = { IV: 'وريدي', SC: 'تحت الجلد', PO: 'فمو
 
 export function calcDose(value, unit, bsa, weight, max) {
   let calculated = unit === 'mg/m2' || unit === 'units/m2' ? value * bsa : unit === 'mg/kg' ? value * weight : value;
-  calculated = calculated >= 10 ? Math.round(calculated) : Math.round(calculated * 10) / 10;
+  // التقريب للجرعة المحسوبة من المساحة أو الوزن فقط؛ الثابتة تبقى كما كُتبت
+  if (unit === 'mg/m2' || unit === 'units/m2' || unit === 'mg/kg') calculated = calculated >= 10 ? Math.round(calculated) : Math.round(calculated * 10) / 10;
   const finalUnit = unit === 'units/m2' || unit === 'units' ? 'units' : 'mg';
   const capped = max != null && max !== '' && calculated > Number(max);
   return { calculated, final: capped ? Number(max) : calculated, finalUnit, capped };
@@ -38,6 +39,21 @@ export function daysText(s) {
   if (d.length === 1) return `اليوم ${d[0]}`;
   if (/^\d+-\d+$/.test(String(s).replace(/\s/g, ''))) return `الأيام ${d[0]} إلى ${d[d.length - 1]}`;
   return 'الأيام ' + d.join('، ');
+}
+
+// الدورات التي يُعطى فيها الدواء (فارغ = كل الدورات)
+export function cyclesText(s) {
+  if (!s) return '';
+  const d = daysList(s);
+  if (d.length === 1) return `الدورة ${d[0]} فقط`;
+  if (/^\d+-\d+$/.test(String(s).replace(/\s/g, ''))) return `الدورات ${d[0]} إلى ${d[d.length - 1]}`;
+  return 'الدورات ' + d.join('، ');
+}
+export const withCycles = (d) => (d.cycles ? ' · ' + cyclesText(d.cycles) : '');
+
+// تعليمات الجرعة (التكرار والتقسيم والشروط) تظهر بارزة تحت الدواء
+export function instrLine(d) {
+  return d && d.instructions ? h('span', { class: 'dose-ins', text: d.instructions }) : null;
 }
 
 export const num = (n) => (n === null || n === undefined || n === '' ? '—' : String(Number(n)));

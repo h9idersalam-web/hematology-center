@@ -305,3 +305,6 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .dept-t { background: var(--card); border: 1px solid var(--line); border-radius: 14px; min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: var(--ink); font-size: 14px; font-weight: 600; position: relative; }
 .dept-t svg { color: var(--brand); }
 .dept-t .count { position: absolute; top: 8px; left: 8px; }
+
+/* تعليمات الجرعة */
+.dose-ins { display: block; margin-top: 4px; padding: 3px 8px; border-radius: 8px; background: var(--warn-soft); color: var(--warn-ink); font-size: 13px; font-weight: 600; line-height: 1.6; align-self: flex-start; }

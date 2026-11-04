@@ -3,7 +3,7 @@ import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, fmtDay, fmtTime, toast, confirmDialog, busy, daysUntil, count, ROLES } from '../ui.js';
 import { go } from '../app.js';
 import { can } from '../perms.js';
-import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num } from '../dose.js';
+import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num, instrLine } from '../dose.js';
 import { NKDA } from './patient-form.js';
 import { postponeDialog } from './postpone.js';
 import { latestCbc } from './labs.js';
@@ -163,6 +163,7 @@ function doseRow(d, t) {
     h('span', { class: 'grow' },
       h('span', { class: 't ltr', style: 'text-align: right', text: d.drug_name }),
       h('span', { class: 's', text: `${d.route} (${ROUTE_AR[d.route] || d.route}) · ${daysText(d.days)}` }),
+      instrLine(d),
       h('span', { class: 's', text: calcLine(d, t.bsa, t.weight_kg) }),
       d.diluent || d.infusion_rate ? h('span', { class: 's', text: [d.diluent, d.infusion_rate].filter(Boolean).join(' · ') }) : null,
       h('span', { style: 'display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px' }, badges)),

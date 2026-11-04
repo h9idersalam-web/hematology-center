@@ -2,7 +2,7 @@
 import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDay, fmtTime, todayISO, addDaysISO, initials, count, field, confirmDialog } from '../ui.js';
 import { can } from '../perms.js';
-import { ROUTE_AR, OUT_UNITS, daysList, num } from '../dose.js';
+import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
 import { NKDA } from './patient-form.js';
 
 const dayOf = (planned, iso = todayISO()) => Math.round((new Date(iso) - new Date(planned)) / 86400000) + 1;
@@ -62,7 +62,7 @@ function dueRow({ c, day, doses, done, ready, mixing }) {
 export async function administer(root, params) {
   const cid = params.get('cycle'), day = Number(params.get('day') || 1);
   const c = await q(sb.from('cycles')
-    .select('id, cycle_no, planned_date, status, doctor_approved_at, pharmacist_verified_at, treatments(status, protocol_name, patients(id, full_name, file_no, allergies)), cycle_doses(id, drug_name, final_dose, final_unit, route, days, diluent, infusion_rate, is_mixed, archived_at, sort)')
+    .select('id, cycle_no, planned_date, status, doctor_approved_at, pharmacist_verified_at, treatments(status, protocol_name, patients(id, full_name, file_no, allergies)), cycle_doses(id, drug_name, final_dose, final_unit, route, days, diluent, infusion_rate, instructions, is_mixed, archived_at, sort)')
     .eq('id', cid).maybeSingle());
   if (!c) throw new Error('الدورة غير موجودة');
   const p = c.treatments.patients;
@@ -94,6 +94,7 @@ export async function administer(root, params) {
       h('span', { class: 'grow' },
         h('span', { class: 't ltr', style: 'text-align: right; font-size: 17px', text: `${d.drug_name}  ${num(d.final_dose)} ${d.final_unit}` }),
         h('span', { class: 's', text: [`${d.route} (${ROUTE_AR[d.route] || d.route})`, d.diluent, d.infusion_rate].filter(Boolean).join(' · ') }),
+        instrLine(d),
         a ? h('span', { class: 's', text: `${a.nurse?.full_name || ''} · ${vitalsText(a.vitals)}` }) : null,
         a?.reaction ? h('span', { class: 'pill warn wrap', style: 'align-self: flex-start; margin-top: 4px', text: 'تفاعل: ' + a.reaction }) : null,
         a?.notes ? h('span', { class: 's', text: a.notes }) : null),

@@ -3,7 +3,7 @@ import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, field, notice, toast, busy, bsa, fmtDate, todayISO, addDaysISO, count } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
-import { ROUTE_AR, OUT_UNITS, UNITS, calcDose, daysText, num } from '../dose.js';
+import { ROUTE_AR, OUT_UNITS, UNITS, calcDose, daysText, num, instrLine, withCycles } from '../dose.js';
 import { NKDA } from './patient-form.js';
 import { protocolFileLink } from '../files.js';
 
@@ -71,7 +71,8 @@ export async function render(root, params) {
         return h('div', { class: 'row', style: 'align-items: flex-start' },
           h('span', { class: 'grow' },
             h('span', { class: 't ltr', style: 'text-align: right', text: d.drug_name }),
-            h('span', { class: 's', text: `${d.route} (${ROUTE_AR[d.route] || d.route}) · ${daysText(d.days)}` }),
+            h('span', { class: 's', text: `${d.route} (${ROUTE_AR[d.route] || d.route}) · ${daysText(d.days)}${withCycles(d)}` }),
+            instrLine(d),
             h('span', { class: 's ltr', style: 'text-align: right', text: calcText(d, c) }),
             c.capped ? h('span', { class: 'pill warn', style: 'align-self: flex-start; margin-top: 4px', text: `قُصّت إلى السقف ${num(d.max_dose)} ${OUT_UNITS[c.finalUnit]} (المحسوب ${num(c.calculated)})` }) : null),
           h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(c.final) }), h('span', { text: OUT_UNITS[c.finalUnit] })));

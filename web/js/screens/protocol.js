@@ -3,7 +3,7 @@ import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, toast, confirmDialog, count, busy } from '../ui.js';
 import { go } from '../app.js';
 import { can } from '../perms.js';
-import { ROUTE_AR, OUT_UNITS, calcDose, daysText, num } from '../dose.js';
+import { ROUTE_AR, OUT_UNITS, calcDose, daysText, num, instrLine, withCycles } from '../dose.js';
 import { uploadProtocolFile, protocolFileLink, checkFile } from '../files.js';
 import { state } from '../app.js';
 
@@ -102,7 +102,8 @@ function drugRow(d) {
       h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
         h('span', { class: 'tag', text: `${num(d.dose_value)} ${d.dose_unit}` }),
         h('span', { text: `${d.route} (${ROUTE_AR[d.route] || d.route})` }),
-        h('span', { text: '· ' + daysText(d.days) })),
+        h('span', { text: '· ' + daysText(d.days) + withCycles(d) })),
+      instrLine(d),
       h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap' },
         d.max_dose ? h('span', { class: 'pill warn', text: `سقف ${num(d.max_dose)} ${OUT_UNITS[ex.finalUnit]}` }) : null,
         h('span', { class: 'pill ' + (d.is_mixed ? 'info' : 'muted'), text: d.is_mixed ? 'يُحضَّر في المزج' : 'لا يحتاج مزجاً' }))),
