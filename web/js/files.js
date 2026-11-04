@@ -1,6 +1,7 @@
 // رفع ملفات المرضى إلى الحاوية الخاصة وفتحها بروابط مؤقتة.
 // الحاوية خاصة: لا رابط دائم لأي ملف، والرابط المؤقت يصلح 10 دقائق فقط.
 import { sb, rpc } from './api.js';
+import { h, icon, toast } from './ui.js';
 
 export const BUCKET = 'patient-files';
 export const KINDS = {
@@ -36,18 +37,38 @@ export function checkFile(file) {
   return null;
 }
 
-// يرفع الملف ثم يسجّله في ملف المريض، ويعيد معرّف المرفق
-export async function uploadAttachment(patientId, file, { kind, title, takenOn } = {}) {
+// يرفع ملفاً إلى مجلد داخل الحاوية الخاصة، ويعيد مساره
+async function put(folder, file) {
   const bad = checkFile(file);
   if (bad) throw new Error(bad);
   const f = await shrink(file);
   if (f.size > MAX) throw new Error('الملف أكبر من 10 ميغابايت حتى بعد الضغط. صوّره بدقة أقل أو قسّمه.');
   const type = f.type || 'image/heic';
   const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'application/pdf': 'pdf' }[type];
-  const path = `patients/${patientId}/${new Date().toISOString().slice(0, 10)}-${crypto.randomUUID()}.${ext}`;
+  const path = `${folder}/${new Date().toISOString().slice(0, 10)}-${crypto.randomUUID()}.${ext}`;
   const { error } = await sb.storage.from(BUCKET).upload(path, await f.arrayBuffer(), { contentType: type, upsert: false });
   if (error) throw new Error(/row-level security|unauthorized|403/i.test(error.message) ? 'ليست لديك صلاحية رفع الملفات' : 'تعذّر رفع الملف: ' + error.message);
+  return path;
+}
+
+// يرفع الملف ثم يسجّله في ملف المريض، ويعيد معرّف المرفق
+export async function uploadAttachment(patientId, file, { kind, title, takenOn } = {}) {
+  const path = await put(`patients/${patientId}`, file);
   return rpc('add_attachment', { p_patient: patientId, p_kind: kind, p_file_path: path, p_title: title || null, p_taken_on: takenOn || null });
+}
+
+// الملف المرجعي للبروتوكول (PDF أو صورة)
+export async function uploadProtocolFile(protocolId, file) {
+  const path = await put(`protocols/${protocolId}`, file);
+  await rpc('set_protocol_file', { p_id: protocolId, p_file_path: path });
+  return path;
+}
+
+// زر يفتح ملف البروتوكول المرجعي
+export function protocolFileLink(path, label = 'ملف البروتوكول المرجعي') {
+  if (!path) return null;
+  return h('button', { type: 'button', class: 'btn secondary block', onclick: () => openFile(path).catch((e) => toast(e.message, true)) },
+    icon('file', 22), label);
 }
 
 export async function signedUrl(path) {

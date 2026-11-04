@@ -6,6 +6,7 @@ import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, daysList, num } from '../dose.js';
 import { uploadAttachment, signedUrl, openFile, isImage, KINDS } from '../files.js';
 import { NKDA } from './patient-form.js';
+import { protocolFileLink } from '../files.js';
 
 const O_STATUS = { incoming: ['وارد', 'brand'], in_progress: ['قيد التحضير', 'info'], partially_sent: ['أُرسل جزء', 'warn'], sent: ['أُرسل كاملاً', 'ok'], held: ['موقوف', 'muted'] };
 
@@ -129,7 +130,7 @@ function orderRow(o) {
 export async function order(root, params) {
   const id = params.get('id');
   const o = await q(sb.from('mixing_orders')
-    .select('*, sender:profiles(full_name), patients(id, full_name, file_no, allergies, weight_kg), cycles(id, cycle_no, treatments(protocol_name, bsa, weight_kg)), idcard:attachments!mixing_orders_id_card_attachment_id_fkey(file_path), rx:attachments!mixing_orders_prescription_attachment_id_fkey(file_path), mixing_items(id, prepared_at, sent_at, cycle_doses(drug_name, final_dose, final_unit, route, diluent, infusion_rate, dose_value, dose_unit, calculated, capped, source, edited_from), preparer:profiles!mixing_items_prepared_by_fkey(full_name))')
+    .select('*, sender:profiles(full_name), patients(id, full_name, file_no, allergies, weight_kg), cycles(id, cycle_no, treatments(protocol_name, bsa, weight_kg, protocols(file_path))), idcard:attachments!mixing_orders_id_card_attachment_id_fkey(file_path), rx:attachments!mixing_orders_prescription_attachment_id_fkey(file_path), mixing_items(id, prepared_at, sent_at, cycle_doses(drug_name, final_dose, final_unit, route, diluent, infusion_rate, dose_value, dose_unit, calculated, capped, source, edited_from), preparer:profiles!mixing_items_prepared_by_fkey(full_name))')
     .eq('id', id).maybeSingle());
   if (!o) throw new Error('طلب المزج غير موجود');
   const p = o.patients, t = o.cycles.treatments;
@@ -189,6 +190,7 @@ export async function order(root, params) {
         h('div', { class: 'section-head' }, h('h2', { text: 'الأدوية' }), h('span', { class: 'meta', text: mine ? 'ضع علامة على ما حضّرته' : '' })),
         h('div', { class: 'card flush' }, items)),
       sendBtn,
+      protocolFileLink(t.protocols?.file_path, 'ملف البروتوكول ' + t.protocol_name),
       can('requestEdit') && o.status !== 'sent' ? h('a', { class: 'btn secondary block', href: '#/cycle-edit?id=' + o.cycles.id }, icon('edit', 22), 'اقتراح تعديل على الطبيب') : null,
       h('a', { class: 'link-btn', href: '#/cycle?id=' + o.cycles.id, text: 'فتح الدورة' })),
     bottomNav('home')));

@@ -4,6 +4,8 @@ import { h, mount, icon, topbar, bottomNav, notice, fmtDate, toast, confirmDialo
 import { go } from '../app.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, calcDose, daysText, num } from '../dose.js';
+import { uploadProtocolFile, protocolFileLink, checkFile } from '../files.js';
+import { state } from '../app.js';
 
 const KIND = { iv: 'وريدي', oral: 'فموي', mixed: 'مختلط (وريدي وفموي)' };
 const EX = { bsa: 1.8, weight: 70 };
@@ -54,12 +56,42 @@ export async function render(root, params) {
           h('div', { class: 'fact' }, h('span', { class: 'l', text: 'عدد الدورات' }), h('span', { class: 'v', text: String(p.total_cycles) })),
           h('div', { class: 'fact' }, h('span', { class: 'l', text: 'أضافه' }), h('span', { class: 'v', text: p.author?.full_name || 'المكتبة الأولية' }))),
         p.notes ? h('div', { class: 'notice info' }, icon('info', 20), h('p', { text: p.notes })) : null),
+      fileSection(p, () => render(root, params)),
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'الأدوية' }), h('span', { class: 'meta', text: count(drugs.length, 'drug') })),
         h('div', { class: 'card flush' }, drugs.map(drugRow)),
         h('p', { class: 'hint', text: `عمود «مثال» محسوب لمريض مساحة جسمه ${EX.bsa} م² ووزنه ${EX.weight} كغ، للتوضيح فقط.` })),
       approveBtn, archiveBtn),
     bottomNav('protocols')));
+}
+
+function fileSection(p, reload) {
+  const isSpecialist = state.profile.role === 'specialist';
+  const canAttach = can('createProtocol') && !p.archived_at && (!p.file_path || !p.approved_at || isSpecialist);
+  const status = h('p', { class: 'hint', 'aria-live': 'polite' });
+  let input = null, picker = null;
+  if (canAttach) {
+    input = h('input', { type: 'file', accept: 'application/pdf,image/*', class: 'sr-only', id: 'proto-file' });
+    picker = h('label', { for: 'proto-file', class: 'btn ' + (p.file_path ? 'link-btn' : 'secondary block'), style: p.file_path ? 'align-self: center' : null },
+      icon(p.file_path ? 'refresh' : 'share', 20), p.file_path ? 'استبدال الملف' : 'إرفاق ملف البروتوكول (PDF أو صورة)');
+    input.addEventListener('change', async () => {
+      const f = input.files[0]; if (!f) return;
+      const bad = checkFile(f); if (bad) { status.textContent = bad; return; }
+      status.textContent = 'جارٍ الرفع…';
+      try {
+        await uploadProtocolFile(p.id, f);
+        toast(isSpecialist ? 'أُرفق الملف' : 'أُرفق الملف وأُبلغ أطباء الاختصاص لمراجعته');
+        reload();
+      } catch (e) { status.textContent = e.message; }
+    });
+  }
+  return h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', { text: 'الملف المرجعي' })),
+    p.file_path ? protocolFileLink(p.file_path, 'فتح ملف البروتوكول')
+      : notice('warn', 'file', h('p', { text: 'لم يُرفق ملف البروتوكول المعتمد في المركز بعد. إرفاقه يتيح لكل من يعتمد أو يتحقق أو يحضّر الجرعات أن يطابق مع المصدر نفسه.' })),
+    input, picker, status,
+    p.file_path && p.approved_at && !isSpecialist && can('createProtocol')
+      ? h('p', { class: 'hint', text: 'استبدال ملف بروتوكول معتمد لطبيب الاختصاص فقط.' }) : null);
 }
 
 function drugRow(d) {

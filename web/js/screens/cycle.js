@@ -9,6 +9,7 @@ import { postponeDialog } from './postpone.js';
 import { latestCbc } from './labs.js';
 import { flag } from '../labs.js';
 import { daysList } from '../dose.js';
+import { protocolFileLink } from '../files.js';
 
 export const CR_STATUS = { pending: ['بانتظار القرار', 'warn'], approved: ['وافق الطبيب', 'ok'], partially_approved: ['موافقة جزئية', 'info'], rejected: ['رُفض', 'muted'] };
 const C_STATUS = { planned: ['مجدولة', 'muted'], held: ['موقوفة', 'warn'], given: ['أُعطيت', 'ok'], cancelled: ['أُلغيت', 'muted'] };
@@ -16,7 +17,7 @@ const C_STATUS = { planned: ['مجدولة', 'muted'], held: ['موقوفة', 'w
 export async function render(root, params) {
   const id = params.get('id');
   const [c, doses, reqs, orders] = await Promise.all([
-    q(sb.from('cycles').select('*, doctor:profiles!cycles_doctor_approved_by_fkey(full_name), pharm:profiles!cycles_pharmacist_verified_by_fkey(full_name), treatments(*, patients(id, full_name, file_no, allergies, archived_at))').eq('id', id).maybeSingle()),
+    q(sb.from('cycles').select('*, doctor:profiles!cycles_doctor_approved_by_fkey(full_name), pharm:profiles!cycles_pharmacist_verified_by_fkey(full_name), treatments(*, protocols(file_path), patients(id, full_name, file_no, allergies, archived_at))').eq('id', id).maybeSingle()),
     q(sb.from('cycle_doses').select('*').eq('cycle_id', id).order('sort').order('drug_name')),
     q(sb.from('change_requests').select('id, status, requester_role, created_at, report, requester:profiles!change_requests_requested_by_fkey(full_name), change_request_items(id)').eq('cycle_id', id).order('created_at', { ascending: false })),
     q(sb.from('mixing_orders').select('id, day, status').eq('cycle_id', id)),
@@ -80,6 +81,7 @@ export async function render(root, params) {
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'الجرعات' }), h('span', { class: 'meta', text: count(active.length, 'drug') })),
         h('div', { class: 'card flush' }, active.length ? active.map((d) => doseRow(d, t)) : h('div', { class: 'empty', text: 'لا توجد أدوية' }))),
+      protocolFileLink(t.protocols?.file_path, 'ملف البروتوكول ' + t.protocol_name),
       removed.length ? h('details', { class: 'card' },
         h('summary', { style: 'font-weight: 700; cursor: pointer', text: `أدوية حُذفت من هذه الدورة (${removed.length})` }),
         removed.map((d) => h('p', { style: 'font-size: 14px; color: var(--muted)' }, h('span', { class: 'ltr', text: d.drug_name }), ' · ', d.archive_reason || ''))) : null,

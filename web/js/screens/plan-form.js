@@ -5,6 +5,7 @@ import { go, state } from '../app.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, UNITS, calcDose, daysText, num } from '../dose.js';
 import { NKDA } from './patient-form.js';
+import { protocolFileLink } from '../files.js';
 
 export async function render(root, params) {
   const pid = params.get('patient');
@@ -16,7 +17,7 @@ export async function render(root, params) {
 
   const [p, protocols, current] = await Promise.all([
     q(sb.from('patients').select('id, full_name, file_no, height_cm, weight_kg, allergies, archived_at').eq('id', pid).maybeSingle()),
-    q(sb.from('protocols').select('id, name, disease, kind, cycle_length_days, total_cycles, notes, protocol_drugs(*)')
+    q(sb.from('protocols').select('id, name, disease, kind, cycle_length_days, total_cycles, notes, file_path, protocol_drugs(*)')
       .not('approved_at', 'is', null).is('archived_at', null).order('name')),
     q(sb.from('treatments').select('id').eq('patient_id', pid).in('status', ['active', 'pending_approval'])),
   ]);
@@ -76,7 +77,8 @@ export async function render(root, params) {
           h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(c.final) }), h('span', { text: OUT_UNITS[c.finalUnit] })));
       })),
       h('p', { class: 'hint', text: `حُسبت من طول ${num(p.height_cm)} سم ووزن ${num(p.weight_kg)} كغ بمعادلة موستيلر. هذه معاينة، والجرعات المعتمدة تحسبها قاعدة البيانات عند الحفظ بالطريقة نفسها.` }),
-      chosen.notes ? notice('info', 'info', h('p', { text: chosen.notes })) : null);
+      chosen.notes ? notice('info', 'info', h('p', { text: chosen.notes })) : null,
+      protocolFileLink(chosen.file_path, 'مطابقة مع ملف البروتوكول ' + chosen.name));
   }
   function calcText(d, c) {
     if (d.dose_unit === 'mg' || d.dose_unit === 'units') return `${num(d.dose_value)} ${d.dose_unit} (fixed)`;

@@ -4,6 +4,7 @@ import { h, mount, icon, topbar, field, notice, toast, busy, latinDigits } from 
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
 import { UNITS, ROUTES, ROUTE_AR, OUT_UNITS, calcDose, validDays, daysText, num } from '../dose.js';
+import { uploadProtocolFile, checkFile } from '../files.js';
 
 const KINDS = [['iv', 'وريدي'], ['oral', 'فموي'], ['mixed', 'مختلط']];
 const EX = { bsa: 1.8, weight: 70 };
@@ -20,6 +21,7 @@ export async function render(root) {
   const len = h('input', { class: 'input ltr', type: 'number', inputmode: 'numeric', min: 1, max: 120, style: 'text-align: right', placeholder: '21' });
   const total = h('input', { class: 'input ltr', type: 'number', inputmode: 'numeric', min: 1, max: 60, style: 'text-align: right', placeholder: '6' });
   const notes = h('textarea', { class: 'input', rows: 3, placeholder: 'فحوص قبل البدء، أدوية وقائية، سقوف تراكمية، تحذيرات...', maxlength: 2000 });
+  const fileIn = h('input', { type: 'file', accept: 'application/pdf,image/*', class: 'input', style: 'padding-top: 12px' });
   let kind = 'iv';
   const kindSeg = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': 'نوع العلاج' });
   const drawKind = () => kindSeg.replaceChildren(...KINDS.map(([k, l]) => h('button', { type: 'button', 'aria-pressed': kind === k ? 'true' : 'false', text: l, onclick: () => { kind = k; drawKind(); } })));
@@ -40,7 +42,8 @@ export async function render(root) {
       field('المرض', disease),
       h('div', { class: 'field' }, h('span', { class: 'label', text: 'نوع العلاج' }), kindSeg),
       h('div', { class: 'grid-2' }, field('طول الدورة (يوم)', len), field('عدد الدورات', total)),
-      field('ملاحظات ومتطلبات', notes)),
+      field('ملاحظات ومتطلبات', notes),
+      field('ملف البروتوكول المرجعي (اختياري)', fileIn, 'PDF أو صورة من بروتوكول المركز. يمكن إرفاقه لاحقاً أيضاً.')),
     h('div', { class: 'section-head' }, h('h2', { text: 'الأدوية' })),
     drugsBox,
     h('button', { type: 'button', class: 'btn secondary block', onclick: addDrug }, icon('plus', 22), 'إضافة دواء'),
@@ -61,12 +64,15 @@ export async function render(root) {
       if (!(L >= 1 && L <= 120 && Number.isInteger(L))) return fail('طول الدورة عدد أيام صحيح بين 1 و120');
       if (!(T >= 1 && T <= 60 && Number.isInteger(T))) return fail('عدد الدورات بين 1 و60');
       if (!drugs.length) return fail('أضف دواءً واحداً على الأقل');
+      if (fileIn.files[0]) { const bad = checkFile(fileIn.files[0]); if (bad) return fail(bad); }
       const list = [];
       for (const d of drugs) { const r = d.value(L); if (r.error) return fail(`الدواء ${d.no}: ${r.error}`); list.push(r); }
       try {
         const id = await rpc('create_protocol', { p_name: nm, p_disease: disease.value.trim(), p_kind: kind, p_cycle_length: L,
           p_total_cycles: T, p_drugs: list, p_notes: notes.value.trim() || null });
-        toast(isSpecialist ? 'حُفظ البروتوكول واعتُمد' : 'حُفظ البروتوكول وأُرسل للاعتماد');
+        let fileErr = null;
+        if (fileIn.files[0]) { try { await uploadProtocolFile(id, fileIn.files[0]); } catch (e3) { fileErr = e3.message; } }
+        toast(fileErr ? 'حُفظ البروتوكول، لكن تعذّر رفع الملف: ' + fileErr : isSpecialist ? 'حُفظ البروتوكول واعتُمد' : 'حُفظ البروتوكول وأُرسل للاعتماد', !!fileErr);
         go('/protocol?id=' + id);
       } catch (e2) { fail(e2.message); }
     });
