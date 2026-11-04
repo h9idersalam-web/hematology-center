@@ -15,7 +15,7 @@
 
 ## الإعداد
 
-1. شغّل في Supabase الملفات `01_schema.sql` ثم `02_storage.sql` ثم `03_seed_protocols.sql` ثم `05_hardening.sql` ثم `06_patients_view.sql`.
+1. شغّل في Supabase الملفات `01_schema.sql` ثم `02_storage.sql` ثم `03_seed_protocols.sql` ثم `05_hardening.sql` ثم `06_patients_view.sql` ثم `07_step5.sql`.
 2. ضع رابط المشروع والمفتاح العام (anon أو publishable) في `web/js/config.js`.
    لا تضع المفتاح السري (service_role أو secret) في أي ملف هنا.
 3. فعّل النشر: Settings › Pages › Source: **GitHub Actions**.
@@ -27,7 +27,7 @@
 - [x] الخطوة 2: الحساب والتفعيل والرئيسية والإشعارات والإدارة
 - [x] الخطوة 3: المرضى وملف المريض والمواعيد
 - [x] الخطوة 4: البروتوكولات والجرعات وطلبات التعديل والموافقة
-- [ ] الخطوة 5: التحاليل والمرفقات وقسم المزج والتمريض
+- [x] الخطوة 5: التحاليل والمرفقات وقسم المزج والتمريض
 
 ## الاختبار المحلي (للمطوّر)
 
@@ -36,6 +36,7 @@
 node tests/ui-test-step3.cjs ./shots     # اختبار شاشات المرضى والمواعيد (مع mock-server)
 node tests/pgrest-lite.mjs ./web 8788    # خادم اختبار على القاعدة الحقيقية المحلية
 node tests/ui-test-step4.cjs ./shots     # اختبار البروتوكولات والخطط والتعديلات بكل الأدوار
+node tests/ui-test-step5.cjs ./shots ./fixtures  # من رفع التحليل إلى إغلاق الدورة
 node tests/mock-server.mjs ./web 8787    # خادم تجريبي للواجهة
 node tests/ui-test.cjs ./shots           # اختبار الواجهة بالمتصفح
 ```

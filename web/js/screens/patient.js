@@ -5,6 +5,7 @@ import { go } from '../app.js';
 import { can } from '../perms.js';
 import { NKDA } from './patient-form.js';
 import { postponeDialog } from './postpone.js';
+import { fileTile } from './files.js';
 
 const T_STATUS = {
   active: ['فعّالة', 'ok'], pending_approval: ['بانتظار موافقة الطبيب المختص', 'info'],
@@ -28,6 +29,7 @@ export async function render(root, params) {
     countOf('lab_results', (x) => x.eq('patient_id', id)).catch(() => 0),
     countOf('attachments', (x) => x.eq('patient_id', id)).catch(() => 0),
   ]);
+  const recentFiles = filesN ? await q(sb.from('attachments').select('id, kind, title, file_path, taken_on, created_at').eq('patient_id', id).order('created_at', { ascending: false }).limit(4)).catch(() => []) : [];
   if (!p) throw new Error('المريض غير موجود، أو ليست لديك صلاحية عرضه');
 
   const current = treatments.find((t) => t.status === 'active' || t.status === 'pending_approval') || null;
@@ -51,7 +53,7 @@ export async function render(root, params) {
       infoCard(p),
       current ? treatmentCard(p, current, cycles, () => render(root, params)) : noPlanCard(p),
       previous.length ? previousCard(previous) : null,
-      filesCard(labsN, filesN),
+      filesCard(p, labsN, filesN, recentFiles),
       can('archivePatient') && !p.archived_at
         ? h('button', { class: 'btn danger block', type: 'button', onclick: () => archive(p) }, icon('archive', 22), 'أرشفة الملف') : null),
     bottomNav('patients')));
@@ -217,14 +219,15 @@ function previousCard(list) {
     })));
 }
 
-function filesCard(labsN, filesN) {
+function filesCard(p, labsN, filesN, recent) {
+  const up = can('upload') && !p.archived_at;
   return h('section', { class: 'section' },
     h('div', { class: 'section-head' }, h('h2', { text: 'التحاليل والمرفقات' })),
-    h('div', { class: 'card' },
-      h('div', { class: 'grid-2' },
-        h('div', { class: 'tile' }, h('span', { class: 'l', text: 'نتائج التحاليل' }), h('span', { class: 'v', text: String(labsN) })),
-        h('div', { class: 'tile' }, h('span', { class: 'l', text: 'الملفات المرفقة' }), h('span', { class: 'v', text: String(filesN) }))),
-      h('p', { class: 'hint', text: 'رفع صور التحاليل والوصفات ومنحنيات النتائج تُضاف في الخطوة 5.' })));
+    h('div', { class: 'grid-2' },
+      h('a', { class: 'tile link', href: '#/labs?patient=' + p.id }, h('span', { class: 'l', text: 'نتائج التحاليل' }), h('span', { class: 'v', text: String(labsN) }), h('span', { class: 's', text: 'القيم والمنحنيات ›' })),
+      h('a', { class: 'tile link', href: '#/files?patient=' + p.id }, h('span', { class: 'l', text: 'الملفات المرفقة' }), h('span', { class: 'v', text: String(filesN) }), h('span', { class: 's', text: 'عرض الكل ›' }))),
+    recent.length ? h('div', { class: 'files-grid' }, recent.map(fileTile)) : null,
+    up ? h('a', { class: 'btn secondary block', href: '#/upload?patient=' + p.id }, icon('share', 22), 'رفع تحليل أو وصفة أو مرفق') : null);
 }
 
 async function archive(p) {

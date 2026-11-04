@@ -1,0 +1,193 @@
+// اختبار الخطوة 5 على القاعدة الحقيقية: التحاليل والمرفقات والمزج والتمريض (pgrest-lite على 8788)
+let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
+const OUT = process.argv[2], FIX = process.argv[3];
+const B = 'http://localhost:8788/';
+
+(async () => {
+  await fetch(B + '__reset');
+  const browser = await pw.chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  const errors = [], checks = [];
+  const ok = (name, cond) => checks.push((cond ? 'PASS ' : 'FAIL ') + name);
+  let n = 0;
+  async function login(email) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'ar-IQ' });
+    const page = await ctx.newPage();
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+    page.on('pageerror', (e) => errors.push(email + ' pageerror: ' + e.message));
+    page.on('response', (r) => { if (r.status() >= 400 && /\/(rest|storage)\/v1\//.test(r.url()) && !r.url().includes('/rpc/')) errors.push(`${email} ${r.status()} ${r.url().slice(22, 170)}`); });
+    await nav(page, B + '#/login');
+    await page.getByLabel('البريد الإلكتروني').fill(email);
+    await page.getByLabel('كلمة المرور').fill('Pass12345');
+    await page.getByRole('button', { name: 'دخول' }).click();
+    await page.waitForSelector('text=جلسات اليوم');
+    return page;
+  }
+  // الانتقال إلى الرابط نفسه لا يعيد التحميل؛ أعد تحميل الصفحة حينها
+  const nav = async (page, url) => { if (page.url() === url) await page.reload(); else await page.goto(url); };
+  const shot = async (page, name, full = true) => { await page.waitForTimeout(600); await page.screenshot({ path: `${OUT}/s5-${String(++n).padStart(2, '0')}-${name}.png`, fullPage: full }); };
+  const confirm = (page, label) => page.locator('dialog').getByRole('button', { name: label, exact: true }).click();
+  const openPatient = async (page, name) => { await nav(page, B + '#/patients?f=all'); await page.waitForSelector('main .row'); await page.locator('main .row', { hasText: name }).click(); await page.waitForSelector('text=خطة العلاج الحالية'); };
+  const cycleUrlOf = async (page, name, no) => { await openPatient(page, name); await page.locator(`a[aria-label^="الدورة ${no}،"]`).click(); await page.waitForSelector('text=الجرعات'); return page.url(); };
+
+  const sara = await login('sara@test.iq');
+  const cp = await login('cp@test.iq');
+  const mix = await login('mix@test.iq');
+  const nurse = await login('nurse@test.iq');
+
+  // ===== 1. التحاليل: صورة ثم قيم، مرتان لرسم المنحنى
+  const ali = await cycleUrlOf(sara, 'علي حسين', 3);
+  ok('cycle shows no CBC yet', (await sara.locator('text=أدخل نتائج تعداد الدم قبل اعتماد الدورة').count()) === 1);
+  await openPatient(nurse, 'علي حسين');
+  await nurse.getByRole('link', { name: 'رفع تحليل أو وصفة أو مرفق' }).click();
+  await nurse.waitForSelector('text=نوع المرفق');
+  await nurse.locator('#up-file').setInputFiles(FIX + '/cbc.jpg');
+  await nurse.getByLabel('العنوان (اختياري)').fill('تعداد دم كامل');
+  await shot(nurse, 'upload');
+  await nurse.getByRole('button', { name: 'رفع وحفظ في ملف المريض' }).click();
+  await nurse.waitForSelector('text=مرتبط بصورة التحليل المرفوعة');
+  ok('upload → lab entry linked to image', true);
+  await nurse.getByLabel('WBC (×10⁹/L)').fill('3.1');
+  await nurse.getByLabel('ANC (×10⁹/L)').fill('1.2');
+  await nurse.getByLabel('Hb (g/dL)').fill('10.4');
+  await nurse.getByLabel('PLT (×10⁹/L)').fill('132');
+  ok('live low flags', (await nurse.locator('.lab-flag.low').count()) === 4);
+  await shot(nurse, 'lab-entry', false);
+  await nurse.getByRole('button', { name: 'حفظ النتائج' }).click();
+  await nurse.waitForSelector('text=كل القيم');
+  await nurse.waitForTimeout(300);
+  ok('toast reports 4 out of range', (await nurse.locator('#toast').textContent()).includes('4 خارج المرجع'));
+  // قيم سابقة قبل 21 يوماً
+  await nav(nurse, nurse.url().replace('#/labs?', '#/labs-new?'));
+  await nurse.waitForSelector('text=تاريخ سحب العينة');
+  const d21 = new Date(Date.now() - 21 * 864e5).toISOString().slice(0, 10);
+  await nurse.getByLabel('تاريخ سحب العينة').fill(d21);
+  await nurse.getByLabel('WBC (×10⁹/L)').fill('6.2');
+  await nurse.getByLabel('ANC (×10⁹/L)').fill('3.8');
+  await nurse.getByLabel('Hb (g/dL)').fill('12.9');
+  await nurse.getByLabel('PLT (×10⁹/L)').fill('240');
+  await nurse.getByRole('button', { name: 'حفظ النتائج' }).click();
+  await nurse.waitForSelector('svg.spark');
+  ok('trend charts drawn', (await nurse.locator('svg.spark').count()) === 4);
+  await shot(nurse, 'labs-view');
+  const notifs = await sara.evaluate(async () => 0);
+  void notifs;
+
+  // ===== 2. الاعتماد والتحقق مع آخر تعداد
+  await nav(sara, ali); await sara.waitForSelector('.cbc');
+  ok('cycle shows latest CBC with flags', (await sara.locator('.cbc-i.low').count()) === 4);
+  await sara.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(sara, 'اعتماد');
+  await sara.waitForSelector('.step.done');
+  await nav(cp, ali); await cp.waitForSelector('text=تحقق الصيدلاني');
+  await cp.getByRole('button', { name: 'تحقق الصيدلاني' }).click(); await confirm(cp, 'تأكيد التحقق');
+  await cp.waitForSelector('text=تحويل للمزج');
+  await shot(cp, 'cycle-ready');
+
+  // ===== 3. التحويل إلى المزج
+  async function transfer(page, url, day) {
+    await nav(page, url); await page.waitForSelector('text=تحويل للمزج');
+    await page.locator('.row', { hasText: `اليوم ${day}` }).getByRole('link', { name: 'تحويل للمزج' }).click();
+    await page.waitForSelector('text=ملف تعريف المريض');
+    if (!(await page.locator('.card', { hasText: 'ملف تعريف المريض' }).locator('.file-tile[aria-pressed="true"]').count())) {
+      await page.locator('#tf-id_card').setInputFiles(FIX + '/idcard.jpg');
+      await page.locator('.card', { hasText: 'ملف تعريف المريض' }).locator('.file-tile[aria-pressed="true"]').waitFor();
+    }
+    await page.locator('#tf-prescription').setInputFiles(FIX + '/rx.jpg');
+    await page.locator('.card', { hasText: 'وصفة طبية' }).locator('.file-tile[aria-pressed="true"]').waitFor();
+  }
+  await transfer(cp, ali, 1);
+  await shot(cp, 'transfer');
+  await cp.getByRole('button', { name: 'تحويل إلى قسم المزج' }).click();
+  await cp.waitForSelector('text=المستندات');
+  ok('order created', (await cp.locator('.pill', { hasText: 'وارد' }).count()) === 1);
+  ok('pharmacist sees no prepare boxes', (await cp.locator('main input[type=checkbox]').count()) === 0);
+
+  // ===== 4. صيدلي المزج: تحضير وإرسال على دفعتين
+  await nav(mix, B + '#/home'); await mix.waitForSelector('.dept');
+  ok('mixing tile shows 1', (await mix.locator('[data-k="mix"] .count').textContent()) === '1');
+  await mix.locator('[data-k="mix"]').click(); await mix.waitForSelector('main .row');
+  await mix.locator('main .row').first().click(); await mix.waitForSelector('text=ضع علامة على ما حضّرته');
+  const tick = async (drug) => { await mix.locator('label.row', { hasText: drug }).locator('input').check(); await mix.waitForSelector(`.mix-item.done >> text=${drug}`); };
+  await tick('Rituximab'); await tick('Cyclophosphamide');
+  await mix.getByRole('button', { name: /إرسال المحضَّر/ }).click(); await confirm(mix, 'إرسال');
+  await mix.waitForSelector('.pill >> text=أُرسل جزء');
+  ok('partial send', true);
+  await tick('Doxorubicin'); await tick('Vincristine');
+  await shot(mix, 'mixing-order');
+  await mix.getByRole('button', { name: /إرسال المحضَّر/ }).click(); await confirm(mix, 'إرسال');
+  await mix.waitForSelector('.pill >> text=أُرسل كاملاً');
+  ok('fully sent', true);
+
+  // ===== 5. التمريض: إعطاء اليوم الأول
+  async function giveAll(page, url, day, reactionFor) {
+    await nav(page, url);
+    await page.waitForFunction((d) => (document.querySelector('.topbar .sub')?.textContent || '').endsWith('اليوم ' + d), day);
+    await page.waitForSelector('main .row');
+    for (;;) {
+      const btn = page.getByRole('button', { name: 'تسجيل الإعطاء' }).first();
+      if (!(await btn.count())) break;
+      const drug = (await btn.locator('xpath=ancestor::div[contains(@class,"row")]').locator('.t').textContent()).trim();
+      await btn.click(); await page.waitForSelector('dialog');
+      await page.getByLabel('الضغط').fill('120/80'); await page.getByLabel('النبض').fill('82');
+      await page.getByLabel('الحرارة').fill('36.8'); await page.getByLabel('الأكسجة %').fill('98');
+      if (reactionFor && drug.startsWith(reactionFor)) {
+        await page.locator('dialog').getByRole('button', { name: 'حدث تفاعل' }).click();
+        await page.locator('dialog textarea').fill('قشعريرة وحكة بعد 20 دقيقة، أُوقف التسريب وأُعطي Chlorpheniramine، واستُكمل بنصف المعدل');
+        await shot(page, 'give-reaction', false);
+      }
+      await confirm(page, 'تأكيد الإعطاء');
+      await page.waitForSelector('dialog', { state: 'detached' });
+      const before = await page.locator('main .pill.ok').count();
+      await page.waitForFunction((b) => document.querySelectorAll('main .pill.ok').length > b, before - 1, { timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(700);
+    }
+  }
+  await nav(nurse, B + '#/home'); await nurse.waitForSelector('.dept');
+  await nurse.locator('.dept-t', { hasText: 'الإعطاء اليوم' }).click(); await nurse.waitForSelector('main .row');
+  ok('nursing list shows ready patient', await nurse.locator('main .row', { hasText: 'علي حسين' }).locator('.pill', { hasText: 'جاهزة للإعطاء' }).waitFor({ timeout: 5000 }).then(() => true, () => false));
+  await shot(nurse, 'nursing-list', false);
+  await nurse.locator('main .row', { hasText: 'علي حسين' }).click(); await nurse.waitForSelector('text=قبل كل جرعة');
+  const adminUrl = nurse.url();
+  await giveAll(nurse, adminUrl, 1, 'Rituximab');
+  ok('all 5 day-1 doses given', await nurse.waitForFunction(() => document.querySelectorAll('main .pill.ok').length === 5, null, { timeout: 5000 }).then(() => true, () => false));
+  ok('reaction shown', (await nurse.locator('text=تفاعل: قشعريرة').count()) === 1);
+  await shot(nurse, 'administered');
+  await nav(nurse, adminUrl.replace('day=1', 'day=2')); await nurse.waitForSelector('main .row');
+  ok('future day blocked', await nurse.locator('.pill', { hasText: 'لم يحن موعده' }).waitFor({ timeout: 5000 }).then(() => true, () => false));
+  ok('no horizontal overflow on phone', await nurse.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  // الطبيبة أُبلغت بالتفاعل
+  await nav(sara, B + '#/notifications'); await sara.waitForSelector('main .row');
+  ok('specialist notified of reaction', (await sara.locator('text=تفاعل أثناء الإعطاء').count()) >= 1);
+
+  // ===== 6. دورة كاملة لرقية: تبدأ قبل 4 أيام، تُغلق في اليوم 5
+  const ruq = await cycleUrlOf(sara, 'رقية', 1);
+  await sara.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(sara, 'اعتماد');
+  await sara.waitForSelector('.step.done');
+  await nav(cp, ruq); await cp.getByRole('button', { name: 'تحقق الصيدلاني' }).click(); await confirm(cp, 'تأكيد التحقق');
+  await cp.waitForSelector('text=تحويل للمزج');
+  await transfer(cp, ruq, 1);
+  await cp.getByRole('button', { name: 'تحويل إلى قسم المزج' }).click(); await cp.waitForSelector('text=المستندات');
+  const orderUrl = cp.url();
+  await nav(mix, orderUrl); await mix.waitForSelector('text=ضع علامة على ما حضّرته');
+  for (const d of ['Rituximab', 'Cyclophosphamide', 'Doxorubicin', 'Vincristine']) await tick(d);
+  await mix.getByRole('button', { name: /إرسال المحضَّر/ }).click(); await confirm(mix, 'إرسال');
+  await mix.waitForSelector('.pill >> text=أُرسل كاملاً');
+  const cid = ruq.split('id=')[1];
+  for (let day = 1; day <= 5; day++) await giveAll(nurse, `${B}#/administer?cycle=${cid}&day=${day}`, day);
+  ok('close button on last day', (await nurse.getByRole('button', { name: 'إغلاق الدورة 1' }).count()) === 1);
+  await nurse.getByRole('button', { name: 'إغلاق الدورة 1' }).click(); await confirm(nurse, 'إغلاق');
+  await nurse.waitForTimeout(800);
+  await nav(sara, ruq); await sara.waitForSelector('text=الجرعات');
+  ok('cycle closed as given', (await sara.locator('.pill', { hasText: 'أُعطيت' }).count()) >= 1);
+
+  // ===== 7. الطبيب الدوري لا يرفع
+  const intern = await login('intern@test.iq');
+  await openPatient(intern, 'علي حسين');
+  ok('intern has no upload button', (await intern.getByRole('link', { name: 'رفع تحليل أو وصفة أو مرفق' }).count()) === 0);
+  await intern.getByRole('link', { name: /الملفات المرفقة/ }).click(); await intern.waitForSelector('.file-tile');
+  ok('intern can view files (3)', (await intern.locator('.file-tile').count()) === 3);
+  await shot(intern, 'files', false);
+
+  checks.forEach((c) => console.log(c));
+  console.log('ERRORS:', errors.length ? '\n' + errors.join('\n') : 'none');
+  await browser.close();
+})().catch((e) => { console.error('FAILED', e); process.exit(1); });

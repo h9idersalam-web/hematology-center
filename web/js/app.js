@@ -18,6 +18,10 @@ import * as cycle from './screens/cycle.js';
 import * as cycleEdit from './screens/cycle-edit.js';
 import * as requests from './screens/requests.js';
 import * as request from './screens/request.js';
+import * as files from './screens/files.js';
+import * as labs from './screens/labs.js';
+import * as mixing from './screens/mixing.js';
+import * as nursing from './screens/nursing.js';
 
 const root = document.getElementById('app');
 
@@ -44,6 +48,15 @@ const ROUTES = {
   '/requests': { screen: requests.render },
   '/request': { screen: request.render },
   '/treatment': { screen: openTreatment },
+  '/upload': { screen: files.upload },
+  '/files': { screen: files.list },
+  '/labs': { screen: labs.view },
+  '/labs-new': { screen: labs.entry },
+  '/transfer': { screen: mixing.transfer },
+  '/mixing': { screen: mixing.list },
+  '/mixing-order': { screen: mixing.order },
+  '/nursing': { screen: nursing.list },
+  '/administer': { screen: nursing.administer },
 };
 
 // رابط إشعار يشير إلى خطة علاج: افتح ملف مريضها

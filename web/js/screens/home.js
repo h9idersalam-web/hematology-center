@@ -2,6 +2,7 @@
 import { sb, q, countOf } from '../api.js';
 import { h, mount, icon, ROLES, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil } from '../ui.js';
 import { state, logout } from '../app.js';
+import { can } from '../perms.js';
 
 function greeting() {
   const hr = new Date().getHours();
@@ -19,6 +20,7 @@ export async function render(root) {
   const todayBox = h('div', { class: 'card flush' }, h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
   const alertBox = h('div');
   const adminBox = p.is_admin ? h('div') : null;
+  const deptBox = departments(p);
 
   const profileBtn = h('button', { class: 'icon-btn boxed', 'aria-label': 'حسابي', onclick: () => profileDialog() },
     h('span', { style: 'font-weight: 700; font-size: 14px; color: var(--brand)', text: initials(p.full_name) || '؟' }));
@@ -33,6 +35,7 @@ export async function render(root) {
             text: (p.is_admin ? 'مدير النظام · ' : '') + ROLES[p.role] })),
         h('div', { style: 'display: flex; gap: 8px' }, bell, profileBtn)),
       p.role === 'intern' ? h('div', { class: 'notice info' }, icon('info', 20), h('p', { text: 'حسابك للعرض فقط، دون إضافة أو تعديل.' })) : null,
+      deptBox,
       statsBox,
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'جلسات اليوم' }),
@@ -82,6 +85,21 @@ export async function render(root) {
   }
 
   if (adminBox) renderAdminPanel(adminBox);
+}
+
+// اختصارات الأقسام حسب الدور: المزج والتمريض والطلبات
+function departments(p) {
+  const tiles = [];
+  if (can('seeMixing')) tiles.push(['#/mixing', 'pill', 'قسم المزج', 'mix']);
+  if (can('seeNursing')) tiles.push(['#/nursing', 'check', 'الإعطاء اليوم', 'nurse']);
+  if (can('seeRequests')) tiles.push(['#/requests', 'edit', 'طلبات التعديل', 'req']);
+  if (!tiles.length) return null;
+  const box = h('div', { class: 'dept' }, tiles.map(([href, ic, label, key]) => h('a', { href, class: 'dept-t', 'data-k': key }, icon(ic, 24), h('span', { text: label }))));
+  // عدد الطلبات الواردة للمزج
+  if (can('seeMixing')) countOf('mixing_orders', (x) => x.in('status', ['incoming', 'in_progress', 'partially_sent'])).then((n) => {
+    if (n) box.querySelector('[data-k="mix"]').append(h('span', { class: 'count', text: n }));
+  }).catch(() => {});
+  return box;
 }
 
 function skeletonStats() {

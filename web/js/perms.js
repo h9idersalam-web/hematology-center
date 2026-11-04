@@ -17,6 +17,13 @@ const RULES = {
   requestEdit: ['clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'],
   decide: ['specialist'],
   completeCycle: ['specialist', 'senior_resident', 'nurse'],
+  upload: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist', 'nurse'],
+  labs: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'nurse'],
+  transfer: ['clinical_pharmacist', 'chief_clinical_pharmacist'],
+  prepare: ['mixing_pharmacist'],
+  administer: ['nurse'],
+  seeMixing: ['clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist', 'specialist', 'senior_resident'],
+  seeNursing: ['nurse', 'specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist'],
   seeRequests: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'],
 };
 

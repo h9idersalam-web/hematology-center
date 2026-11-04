@@ -260,3 +260,48 @@ details > summary::-webkit-details-marker { display: none; }
 details > summary::before { content: '‹ '; display: inline-block; transition: transform .15s; }
 details[open] > summary::before { transform: rotate(-90deg); }
 [hidden] { display: none !important; }
+
+/* الخطوة 5: المرفقات والتحاليل والمزج والتمريض */
+.pill.wrap { white-space: normal; border-radius: 10px; line-height: 1.6; padding: 4px 10px; }
+.row .grow { overflow-wrap: anywhere; }
+.drop { border: 2px dashed var(--field); border-radius: var(--radius); background: var(--card); min-height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--muted); cursor: pointer; text-align: center; padding: 16px; }
+.drop b { color: var(--ink); font-size: 16px; }
+.drop span { font-size: 13px; }
+.thumb { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex-shrink: 0; background: var(--chip); display: flex; align-items: center; justify-content: center; }
+.files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.file-tile { border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 4px; text-align: right; cursor: pointer; color: var(--ink); text-decoration: none; min-width: 0; }
+.file-tile[aria-pressed="true"] { border: 2px solid var(--brand); padding: 5px; }
+.file-tile.add { align-items: center; justify-content: center; color: var(--brand); border-style: dashed; min-height: 110px; }
+.ft-img { height: 80px; border-radius: 8px; background: var(--chip); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.ft-img img { width: 100%; height: 100%; object-fit: cover; }
+.ft-k { font-size: 12px; color: var(--muted-2); }
+.ft-t { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ft-d { font-size: 12px; color: var(--muted-2); }
+.tile.link { text-decoration: none; color: inherit; }
+.tile.link .s { color: var(--brand); font-weight: 600; }
+.lab-head, .lab-row { display: grid; grid-template-columns: 1.1fr 1fr 1.5fr; gap: 8px; align-items: center; }
+.lab-head { font-size: 12px; color: var(--muted-2); }
+.lab-grid { display: flex; flex-direction: column; gap: 10px; }
+.lab-row { position: relative; padding-bottom: 14px; }
+.lab-n { display: flex; flex-direction: column; line-height: 1.3; }
+.lab-n span { font-size: 12px; color: var(--muted-2); }
+.lab-v { height: 46px; font-weight: 700; text-align: center; padding: 0 6px; }
+.lab-v.out { border: 2px solid var(--brand); color: var(--brand); }
+.lab-ref { display: flex; align-items: center; gap: 4px; color: var(--muted-2); }
+.lab-r { height: 40px; font-size: 14px; padding: 0 6px; text-align: center; color: var(--muted); }
+.lab-flag { position: absolute; bottom: -2px; font-size: 12px; font-weight: 700; inset-inline-start: calc(36% + 4px); }
+.lab-flag.low, .lab-flag.high { color: var(--brand); }
+.lab-last { font-size: 24px; font-weight: 700; }
+.lab-last.low, .lab-last.high { color: var(--brand); }
+.lab-last.ok { color: var(--ok); }
+.spark { width: 100%; height: 90px; }
+.cbc { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cbc-i { background: var(--chip); border-radius: 10px; padding: 6px 8px; display: flex; flex-direction: column; align-items: center; font-size: 12px; color: var(--muted-2); }
+.cbc-i b { font-size: 18px; color: var(--ink); }
+.cbc-i.low, .cbc-i.high { background: var(--brand-soft); }
+.cbc-i.low b, .cbc-i.high b { color: var(--brand); }
+.mix-item.done { background: #F7FBF8; }
+.dept { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; }
+.dept-t { background: var(--card); border: 1px solid var(--line); border-radius: 14px; min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: var(--ink); font-size: 14px; font-weight: 600; position: relative; }
+.dept-t svg { color: var(--brand); }
+.dept-t .count { position: absolute; top: 8px; left: 8px; }

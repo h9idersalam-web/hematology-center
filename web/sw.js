@@ -1,16 +1,17 @@
 // يحفظ ملفات واجهة التطبيق فقط ليفتح بسرعة.
 // لا يحفظ أي بيانات مرضى: كل طلبات قاعدة البيانات تذهب إلى الخادم مباشرة.
-const VERSION = 'v3-2026-11-04-step4';
+const VERSION = 'v4-2026-11-04-step5';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'vendor/supabase-2.118.0.js',
-  'js/app.js', 'js/api.js', 'js/ui.js', 'js/config.js', 'js/perms.js', 'js/dose.js',
+  'js/app.js', 'js/api.js', 'js/ui.js', 'js/config.js', 'js/perms.js', 'js/dose.js', 'js/files.js', 'js/labs.js',
   'js/screens/auth.js', 'js/screens/activation.js', 'js/screens/home.js',
   'js/screens/notifications.js', 'js/screens/admin.js',
   'js/screens/patients.js', 'js/screens/patient.js', 'js/screens/patient-form.js',
   'js/screens/appointments.js', 'js/screens/postpone.js',
   'js/screens/protocols.js', 'js/screens/protocol.js', 'js/screens/protocol-form.js', 'js/screens/plan-form.js',
   'js/screens/cycle.js', 'js/screens/cycle-edit.js', 'js/screens/requests.js', 'js/screens/request.js',
+  'js/screens/files.js', 'js/screens/labs.js', 'js/screens/mixing.js', 'js/screens/nursing.js',
   'icons/icon-192.png', 'icons/icon-512.png',
 ];
 

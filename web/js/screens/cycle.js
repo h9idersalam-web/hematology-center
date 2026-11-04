@@ -6,16 +6,20 @@ import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num } from '../dose.js';
 import { NKDA } from './patient-form.js';
 import { postponeDialog } from './postpone.js';
+import { latestCbc } from './labs.js';
+import { flag } from '../labs.js';
+import { daysList } from '../dose.js';
 
 export const CR_STATUS = { pending: ['بانتظار القرار', 'warn'], approved: ['وافق الطبيب', 'ok'], partially_approved: ['موافقة جزئية', 'info'], rejected: ['رُفض', 'muted'] };
 const C_STATUS = { planned: ['مجدولة', 'muted'], held: ['موقوفة', 'warn'], given: ['أُعطيت', 'ok'], cancelled: ['أُلغيت', 'muted'] };
 
 export async function render(root, params) {
   const id = params.get('id');
-  const [c, doses, reqs] = await Promise.all([
+  const [c, doses, reqs, orders] = await Promise.all([
     q(sb.from('cycles').select('*, doctor:profiles!cycles_doctor_approved_by_fkey(full_name), pharm:profiles!cycles_pharmacist_verified_by_fkey(full_name), treatments(*, patients(id, full_name, file_no, allergies, archived_at))').eq('id', id).maybeSingle()),
     q(sb.from('cycle_doses').select('*').eq('cycle_id', id).order('sort').order('drug_name')),
     q(sb.from('change_requests').select('id, status, requester_role, created_at, report, requester:profiles!change_requests_requested_by_fkey(full_name), change_request_items(id)').eq('cycle_id', id).order('created_at', { ascending: false })),
+    q(sb.from('mixing_orders').select('id, day, status').eq('cycle_id', id)),
   ]);
   if (!c) throw new Error('الدورة غير موجودة');
   const t = c.treatments, p = t.patients;
@@ -26,6 +30,7 @@ export async function render(root, params) {
   const live = open && t.status === 'active';
   const [stL, stK] = C_STATUS[c.status];
   const reload = () => render(root, params);
+  const cbc = await latestCbc(p.id).catch(() => ({}));
 
   // الأزرار حسب الدور والحالة
   const actions = [];
@@ -67,6 +72,8 @@ export async function render(root, params) {
       t.status === 'pending_approval' ? notice('info', 'info', h('p', { text: 'خطة العلاج بانتظار موافقة الطبيب المختص. لا تُعتمد الدورة قبلها.' })) : null,
       t.status === 'stopped' ? notice('warn', 'warn', h('p', { text: 'أُوقفت الخطة: ' + (t.stop_reason || '') })) : null,
       steps(c),
+      cbcCard(cbc, p.id),
+      flowCard(c, active, orders, live),
       pendingReqs.length ? h('a', { href: '#/request?id=' + pendingReqs[0].id, class: 'notice warn', style: 'text-decoration: none; align-items: center' },
         icon('warn', 22), h('span', { style: 'flex: 1', text: `${count(pendingReqs.length, 'request')} تعديل بانتظار قرار الطبيب المختص. لا يتحقق الصيدلاني قبل القرار.` }),
         h('b', { text: 'عرض' })) : null,
@@ -100,6 +107,49 @@ function steps(c) {
     step(!!c.pharmacist_verified_at, 'تحقق الصيدلاني', c.pharm?.full_name, c.pharmacist_verified_at, !!c.doctor_approved_at && !c.pharmacist_verified_at),
     step(c.status === 'given', 'المزج والإعطاء', null, null, false));
 }
+
+// آخر تعداد دم: يراه الطبيب قبل الاعتماد والصيدلاني قبل التحقق
+function cbcCard(cbc, pid) {
+  const names = ['WBC', 'ANC', 'Hb', 'PLT'];
+  const any = names.some((n) => cbc[n]);
+  const dates = names.map((n) => cbc[n]?.test_date).filter(Boolean).sort();
+  const age = dates.length ? daysUntil(dates[dates.length - 1]) : null;
+  return h('a', { class: 'card', href: '#/labs?patient=' + pid, style: 'text-decoration: none; color: inherit; gap: 10px' },
+    h('div', { style: 'display: flex; justify-content: space-between; align-items: baseline' },
+      h('b', { text: 'آخر تعداد دم' }),
+      h('span', { style: 'font-size: 13px; color: ' + (age !== null && age < -7 ? 'var(--warn)' : 'var(--muted-2)'),
+        text: any ? fmtDate(dates[dates.length - 1], { day: 'numeric', month: 'short' }) + (age < -7 ? ' · أقدم من أسبوع' : '') : 'لا يوجد' })),
+    any ? h('div', { class: 'cbc' }, names.map((n) => {
+      const r = cbc[n]; const f = r ? flag(r.value, r.ref_low, r.ref_high) : null;
+      return h('span', { class: 'cbc-i ' + (f || '') }, h('span', { class: 'ltr', text: n }), h('b', { class: 'ltr', text: r ? String(r.value) : '—' }));
+    })) : h('span', { style: 'font-size: 14px; color: var(--muted)', text: 'أدخل نتائج تعداد الدم قبل اعتماد الدورة' }));
+}
+
+// المزج والإعطاء لكل يوم فيه أدوية
+function flowCard(c, doses, orders, live) {
+  if (!live) return null;
+  const days = [...new Set(doses.flatMap((d) => daysList(d.days)))].sort((a, b) => a - b);
+  const ready = c.doctor_approved_at && c.pharmacist_verified_at;
+  const O = { incoming: 'وصل قسم المزج', in_progress: 'قيد التحضير', partially_sent: 'أُرسل جزء', sent: 'أُرسل كاملاً', held: 'موقوف' };
+  return h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', { text: 'المزج والإعطاء' })),
+    !ready ? notice('info', 'lock', h('p', { text: 'يبدأ التحويل للمزج والإعطاء بعد اعتماد الطبيب وتحقق الصيدلاني.' })) : null,
+    h('div', { class: 'card flush' }, days.map((n) => {
+      const mixed = doses.some((d) => d.is_mixed && daysList(d.days).includes(n));
+      const o = orders.find((x) => x.day === n);
+      let mix;
+      if (!mixed) mix = h('span', { class: 'pill muted', text: 'بلا مزج' });
+      else if (o) mix = h('a', { class: 'pill info', href: '#/mixing-order?id=' + o.id, style: 'text-decoration: none', text: O[o.status] });
+      else if (ready && can('transfer')) mix = h('a', { class: 'btn primary sm', href: `#/transfer?cycle=${c.id}&day=${n}`, text: 'تحويل للمزج' });
+      else mix = h('span', { class: 'pill muted', text: 'لم يُحوَّل' });
+      return h('div', { class: 'row' },
+        h('a', { href: `#/administer?cycle=${c.id}&day=${n}`, style: 'display: flex; flex-direction: column; flex: 1; text-decoration: none; color: inherit' },
+          h('b', { style: 'font-size: 15px', text: `اليوم ${n}` }),
+          h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: fmtDay(addDays(c.planned_date, n - 1)) + ' · الإعطاء ›' })),
+        mix);
+    })));
+}
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 
 function doseRow(d, t) {
   const badges = [];

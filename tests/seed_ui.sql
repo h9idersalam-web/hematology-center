@@ -5,7 +5,7 @@ do $$
 declare
   sara uuid := md5('sara@test.iq')::uuid;
   chief uuid := md5('admin@test.iq')::uuid;
-  p1 uuid; p2 uuid; p3 uuid; p4 uuid; p5 uuid; p6 uuid; t uuid; c record;
+  p1 uuid; p2 uuid; p3 uuid; p4 uuid; p5 uuid; p6 uuid; p7 uuid; t uuid; c record;
 begin
   -- طبيبة الاختصاص تعتمد ثلاثة بروتوكولات، ويبقى Imatinib وHydroxyurea بانتظار الاعتماد
   perform set_config('request.jwt.claim.sub', sara::text, true);
@@ -19,6 +19,7 @@ begin
   p4 := register_patient('كرار ماجد عبيس', '1989-01-15', 'male', 182, 90, null, null, sara);
   p5 := register_patient('فاطمة الزهراء علي', '2004-09-09', 'female', null, null, null, null, sara);
   p6 := register_patient('أمير جاسم محمد', '1970-04-04', 'male', 168, 77, null, 'لا توجد حساسية دوائية معروفة', sara);
+  p7 := register_patient('رقية حسن عبد الله', '1983-08-08', 'female', 158, 62, null, 'Ondansetron', sara);
 
   -- خطط فعّالة من الطبيبة: R-CHOP اليوم دورته الثالثة، وABVD اليوم دورته الثانية
   perform set_config('request.jwt.claim.sub', sara::text, true);
@@ -26,6 +27,7 @@ begin
   for c in select id from cycles where treatment_id = t and cycle_no <= 2 loop perform complete_cycle(c.id); end loop;
   t := create_treatment(p2, (select id from protocols where name = 'ABVD'), 'لمفوما هودجكن', 'C81.1', 'IIA', current_date - 28);
   perform complete_cycle((select id from cycles where treatment_id = t and cycle_no = 1));
+  perform create_treatment(p7, (select id from protocols where name = 'R-CHOP-21'), 'لمفوما الخلايا البائية الكبيرة المنتشرة', 'C83.3', 'I', current_date - 4);
 
   -- خطة من مسؤول الصيادلة: تنتظر موافقة الطبيبة
   perform set_config('request.jwt.claim.sub', chief::text, true);

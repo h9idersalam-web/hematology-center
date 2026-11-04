@@ -271,9 +271,11 @@ function sendErr(res, e) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
-  let body = '';
-  for await (const ch of req) body += ch;
-  const json = body ? JSON.parse(body) : {};
+  const chunks = [];
+  for await (const ch of req) chunks.push(ch);
+  const raw = Buffer.concat(chunks);
+  const isJson = (req.headers['content-type'] || '').includes('json');
+  const json = raw.length && (isJson || url.pathname.startsWith('/auth/')) ? JSON.parse(raw.toString('utf8')) : {};
   try {
     if (req.method === 'OPTIONS') return send(res, 204, undefined, { 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' });
     if (url.pathname === '/auth/v1/signup') {
@@ -321,6 +323,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, rows, headers);
     }
 
+    if (url.pathname.startsWith('/storage/v1/object/')) return await storage(req, res, url, raw, json);
     if (url.pathname === '/__reset') { await setup(); await loadMeta(); return send(res, 200, { ok: true }); }
     if (url.pathname === '/js/config.js') {
       res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
@@ -333,6 +336,42 @@ const server = http.createServer(async (req, res) => {
     fs.createReadStream(file).pipe(res);
   } catch (e) { sendErr(res, e); }
 });
+
+// ------------------------------------------------------------------ التخزين (محاكاة Supabase Storage)
+const STORE = path.join(process.env.TMPDIR || '/tmp', 'pgrest-lite-store');
+const signs = {};
+async function storage(req, res, url, raw, json) {
+  const uid = uidOf(req);
+  let m;
+  if (req.method === 'POST' && (m = url.pathname.match(/^\/storage\/v1\/object\/sign\/([\w-]+)\/(.+)$/))) {
+    const [, bucket, name] = m.map(decodeURIComponent);
+    const found = await asUser(uid, (c) => c.query('select 1 from storage.objects where bucket_id = $1 and name = $2', [bucket, name]));
+    if (!found.rowCount) return send(res, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' });
+    const tok = crypto.randomUUID(); signs[tok] = { bucket, name, exp: Date.now() + (json.expiresIn || 60) * 1000 };
+    return send(res, 200, { signedURL: `/object/sign/${bucket}/${encodeURI(name)}?token=${tok}` });
+  }
+  if (req.method === 'GET' && (m = url.pathname.match(/^\/storage\/v1\/object\/sign\/([\w-]+)\/(.+)$/))) {
+    const s = signs[url.searchParams.get('token')];
+    if (!s || s.exp < Date.now()) return send(res, 400, { message: 'invalid token' });
+    const file = path.join(STORE, s.bucket, s.name);
+    const ext = path.extname(file).toLowerCase();
+    res.writeHead(200, { 'content-type': { '.jpg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.pdf': 'application/pdf' }[ext] || 'application/octet-stream' });
+    return fs.createReadStream(file).pipe(res);
+  }
+  if (req.method === 'POST' && (m = url.pathname.match(/^\/storage\/v1\/object\/([\w-]+)\/(.+)$/))) {
+    const [, bucket, name] = m.map(decodeURIComponent);
+    try {
+      await asUser(uid, (c) => c.query('insert into storage.objects(bucket_id, name) values ($1, $2)', [bucket, name]));
+    } catch (e) {
+      return send(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' });
+    }
+    const file = path.join(STORE, bucket, name);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, raw);
+    return send(res, 200, { Key: `${bucket}/${name}`, Id: crypto.randomUUID() });
+  }
+  return send(res, 404, { message: 'not found' });
+}
 
 await setup();
 await loadMeta();
