@@ -26,6 +26,12 @@ function append(el, children) {
   }
 }
 
+// replaceChildren الأصلية تكتب null نصاً؛ هنا تُتجاهل القيم الفارغة كما في h()
+const nativeReplace = Element.prototype.replaceChildren;
+Element.prototype.replaceChildren = function (...nodes) {
+  return nativeReplace.apply(this, nodes.flat().filter((n) => n !== null && n !== undefined && n !== false));
+};
+
 export function mount(root, ...nodes) {
   root.replaceChildren();
   append(root, nodes);
@@ -152,6 +158,9 @@ const NOUNS = {
   cycle: ['دورة', 'دورتان', 'دورات', 'دورة'],
   session: ['جلسة', 'جلستان', 'جلسات', 'جلسة'],
   patient: ['مريض', 'مريضان', 'مرضى', 'مريضاً'],
+  drug: ['دواء', 'دواءان', 'أدوية', 'دواءً'],
+  item: ['بند', 'بندان', 'بنود', 'بنداً'],
+  request: ['طلب', 'طلبان', 'طلبات', 'طلباً'],
 };
 export function count(n, noun) {
   const [one, two, few, many] = NOUNS[noun];

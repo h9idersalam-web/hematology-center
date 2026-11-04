@@ -124,8 +124,8 @@ const B = 'http://localhost:8787/';
 
   // من الرئيسية إلى ملف المريض
   await a.goto(B + '#/home'); await a.waitForSelector('main .row');
-  await a.locator('main .row').first().click(); await a.waitForSelector('text=جدول الدورات');
-  ok('home row opens patient file', a.url().includes('#/patient?id='));
+  await a.locator('main .row').first().click(); await a.waitForTimeout(400);
+  ok('home row opens the cycle', a.url().includes('#/cycle?id='));
 
   // ===== طبيبة الاختصاص: التأجيل والأرشفة
   const s = await login('sara@test.iq', 'Pass12345');

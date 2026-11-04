@@ -18,6 +18,9 @@ const AUTH_ERRORS = [
   [/rate limit|too many requests/i, 'محاولات كثيرة، انتظر دقيقة ثم أعد المحاولة'],
   [/failed to fetch|network|load failed/i, 'تعذّر الاتصال بالخادم، تحقق من الإنترنت'],
   [/jwt expired|invalid jwt/i, 'انتهت الجلسة، سجّل الدخول مجدداً'],
+  [/protocols_name_key/i, 'يوجد بروتوكول بهذا الاسم من قبل، اختر اسماً مميزاً (مثلاً أضف رقم النسخة)'],
+  [/duplicate key/i, 'هذا السجل موجود من قبل'],
+  [/violates check constraint/i, 'إحدى القيم خارج الحدود المسموحة، راجع الأرقام المدخلة'],
 ];
 
 export function errMsg(err) {

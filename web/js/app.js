@@ -6,11 +6,18 @@ import * as activation from './screens/activation.js';
 import * as home from './screens/home.js';
 import * as notifications from './screens/notifications.js';
 import * as admin from './screens/admin.js';
-import * as soon from './screens/soon.js';
 import * as patients from './screens/patients.js';
 import * as patient from './screens/patient.js';
 import * as patientForm from './screens/patient-form.js';
 import * as appointments from './screens/appointments.js';
+import * as protocols from './screens/protocols.js';
+import * as protocol from './screens/protocol.js';
+import * as protocolForm from './screens/protocol-form.js';
+import * as planForm from './screens/plan-form.js';
+import * as cycle from './screens/cycle.js';
+import * as cycleEdit from './screens/cycle-edit.js';
+import * as requests from './screens/requests.js';
+import * as request from './screens/request.js';
 
 const root = document.getElementById('app');
 
@@ -28,8 +35,22 @@ const ROUTES = {
   '/patient-new': { screen: patientForm.render },
   '/patient-edit': { screen: patientForm.render },
   '/appointments': { screen: appointments.render },
-  '/protocols': { screen: soon.render('protocols') },
+  '/protocols': { screen: protocols.render },
+  '/protocol': { screen: protocol.render },
+  '/protocol-new': { screen: protocolForm.render },
+  '/plan-new': { screen: planForm.render },
+  '/cycle': { screen: cycle.render },
+  '/cycle-edit': { screen: cycleEdit.render },
+  '/requests': { screen: requests.render },
+  '/request': { screen: request.render },
+  '/treatment': { screen: openTreatment },
 };
+
+// رابط إشعار يشير إلى خطة علاج: افتح ملف مريضها
+async function openTreatment(root, params) {
+  const t = await q(sb.from('treatments').select('patient_id').eq('id', params.get('id')).maybeSingle());
+  go(t ? '/patient?id=' + t.patient_id : '/patients');
+}
 
 export function go(path) {
   if (location.hash === '#' + path) route(); else location.hash = path;

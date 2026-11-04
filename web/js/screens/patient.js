@@ -1,6 +1,6 @@
 // ملف المريض: البيانات، والحساسية، وخطة العلاج ودوراتها، والخطط السابقة
 import { sb, q, rpc, countOf } from '../api.js';
-import { h, mount, icon, topbar, bottomNav, notice, empty, fmtDate, fmtDay, daysUntil, ageText, bsa, SEX, toast, confirmDialog, initials, count } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, notice, empty, fmtDate, fmtDay, daysUntil, ageText, bsa, SEX, toast, confirmDialog, initials, count, busy } from '../ui.js';
 import { go } from '../app.js';
 import { can } from '../perms.js';
 import { NKDA } from './patient-form.js';
@@ -49,7 +49,7 @@ export async function render(root, params) {
         h('p', { text: 'السبب: ' + (p.archive_reason || '—') })) : null,
       allergyBanner(p, editable),
       infoCard(p),
-      current ? treatmentCard(p, current, cycles, () => render(root, params)) : noPlanCard(),
+      current ? treatmentCard(p, current, cycles, () => render(root, params)) : noPlanCard(p),
       previous.length ? previousCard(previous) : null,
       filesCard(labsN, filesN),
       can('archivePatient') && !p.archived_at
@@ -95,11 +95,13 @@ function infoCard(p) {
       fact('تاريخ التسجيل', fmtDate(p.created_at), { wide: true })));
 }
 
-function noPlanCard() {
+function noPlanCard(p) {
+  const canCreate = can('createPlan') && !p.archived_at;
   return h('section', { class: 'section' },
     h('div', { class: 'section-head' }, h('h2', { text: 'خطة العلاج' })),
     h('div', { class: 'card' }, empty('لا توجد خطة علاج حالية لهذا المريض', 'pill'),
-      h('p', { class: 'hint', style: 'text-align: center', text: 'اختيار البروتوكول وإنشاء الخطة وحساب الجرعات تُضاف في الخطوة 4.' })));
+      canCreate ? h('a', { class: 'btn primary block', href: '#/plan-new?patient=' + p.id }, icon('plus', 22, '#fff', 2.2), 'إنشاء خطة علاج')
+        : h('p', { class: 'hint', style: 'text-align: center', text: 'ينشئ الخطة طبيب الاختصاص أو المقيم الأقدم أو مسؤول الصيادلة السريريين.' })));
 }
 
 function treatmentCard(p, t, cycles, reload) {
@@ -150,7 +152,8 @@ function treatmentCard(p, t, cycles, reload) {
         h('div', { class: 'progress', role: 'progressbar', 'aria-valuenow': given, 'aria-valuemin': 0, 'aria-valuemax': t.total_cycles },
           h('span', { style: `width: ${pct}%` }))),
       h('div', { class: 'grid-2' }, lastTile, nextTile),
-      weightWarn),
+      weightWarn,
+      planActions(p, t, reload)),
     h('div', { class: 'section-head', style: 'margin-top: 6px' }, h('h2', { text: 'جدول الدورات' }), h('span', { class: 'meta', text: count(cycles.length, 'cycle') })),
     h('div', { class: 'card flush' }, cycles.map((c) => cycleRow(c, c === next && t.status === 'active', p, reload))));
 }
@@ -164,16 +167,41 @@ function cycleRow(c, isNext, p, reload) {
     readiness = c.pharmacist_verified_at ? 'معتمدة ومتحقق منها' : c.doctor_approved_at ? 'بانتظار تحقق الصيدلاني' : 'بانتظار اعتماد الطبيب';
   }
   return h('div', { class: 'row', style: isNext ? 'background: #FFFBFB' : null },
-    h('span', { class: 'cyc-no' + (c.status === 'given' ? ' done' : isNext ? ' next' : ''), text: c.cycle_no }),
-    h('span', { class: 'grow' },
-      h('span', { class: 't', style: 'font-size: 15px', text: fmtDay(c.planned_date) }),
-      c.postpone_reason ? h('span', { class: 's', text: (c.status === 'cancelled' ? 'السبب: ' : 'أُجّلت: ') + c.postpone_reason }) : null,
-      readiness ? h('span', { class: 's', text: readiness }) : null),
-    late ? h('span', { class: 'pill warn', text: 'متأخرة' }) : h('span', { class: 'pill ' + kind, text: label }),
+    h('a', { href: '#/cycle?id=' + c.id, 'aria-label': `الدورة ${c.cycle_no}، ${fmtDay(c.planned_date)}`, style: 'display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; text-decoration: none; color: inherit' },
+      h('span', { class: 'cyc-no' + (c.status === 'given' ? ' done' : isNext ? ' next' : ''), text: c.cycle_no }),
+      h('span', { class: 'grow' },
+        h('span', { class: 't', style: 'font-size: 15px', text: fmtDay(c.planned_date) }),
+        c.postpone_reason ? h('span', { class: 's', text: (c.status === 'cancelled' ? 'السبب: ' : 'أُجّلت: ') + c.postpone_reason }) : null,
+        readiness ? h('span', { class: 's', text: readiness }) : null),
+      late ? h('span', { class: 'pill warn', text: 'متأخرة' }) : h('span', { class: 'pill ' + kind, text: label })),
     isNext && can('postpone') && !p.archived_at
       ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': `تأجيل الدورة ${c.cycle_no}`, title: 'تأجيل',
           onclick: async () => { if (await postponeDialog({ ...c, patient_name: p.full_name })) reload(); } }, icon('clock', 22))
       : null);
+}
+
+function planActions(p, t, reload) {
+  if (p.archived_at) return null;
+  const out = [];
+  if (t.status === 'pending_approval' && can('approvePlan')) {
+    const b = h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), 'الموافقة على الخطة');
+    b.addEventListener('click', () => busy(b, async () => {
+      const ok = await confirmDialog({ title: 'الموافقة على خطة ' + t.protocol_name, body: 'راجع البروتوكول والتشخيص وجرعات الدورة الأولى قبل الموافقة. تُفعَّل الخطة ويُبلَّغ من أنشأها.', okText: 'موافقة' });
+      if (!ok) return;
+      try { await rpc('approve_treatment', { p_tid: t.id }); toast('فُعّلت الخطة'); reload(); } catch (e) { toast(e.message, true); }
+    }));
+    out.push(b);
+  }
+  if (can('stopPlan')) {
+    out.push(h('button', { type: 'button', class: 'link-btn', style: 'color: var(--muted)', onclick: async () => {
+      const reason = await confirmDialog({ title: 'إيقاف خطة ' + t.protocol_name, body: 'تُلغى الدورات التي لم تُعطَ، وتبقى الخطة وسجلها محفوظين. لا يمكن التراجع.', okText: 'إيقاف الخطة', danger: true,
+        input: { label: 'سبب الإيقاف', placeholder: 'مثال: تطور المرض، سمّية، رغبة المريض' } });
+      if (reason === null) return;
+      if (!reason) return toast('اكتب سبب الإيقاف', true);
+      try { await rpc('stop_treatment', { p_tid: t.id, p_reason: reason }); toast('أُوقفت الخطة'); reload(); } catch (e) { toast(e.message, true); }
+    } }, 'إيقاف الخطة'));
+  }
+  return out.length ? h('div', { style: 'display: flex; flex-direction: column; gap: 4px' }, ...out) : null;
 }
 
 function previousCard(list) {

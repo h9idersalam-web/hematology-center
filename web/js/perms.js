@@ -6,7 +6,21 @@ const RULES = {
   editPatient: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist'],
   archivePatient: ['specialist'],
   postpone: ['specialist', 'senior_resident'],
+  createProtocol: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist'],
+  approveProtocol: ['specialist'],
+  createPlan: ['specialist', 'senior_resident', 'chief_clinical_pharmacist'],
+  approvePlan: ['specialist'],
+  stopPlan: ['specialist', 'senior_resident'],
+  approveCycle: ['specialist', 'senior_resident'],
+  verifyCycle: ['clinical_pharmacist', 'chief_clinical_pharmacist'],
+  doctorEdit: ['specialist', 'senior_resident'],
+  requestEdit: ['clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'],
+  decide: ['specialist'],
+  completeCycle: ['specialist', 'senior_resident', 'nurse'],
+  seeRequests: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'],
 };
+
+export const role = () => state.profile?.role;
 
 export function can(action) {
   const p = state.profile;

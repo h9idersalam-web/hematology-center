@@ -59,7 +59,7 @@ export async function render(root) {
       stat('brand', todayN, 'جلسة اليوم', '#/appointments'),
       stat('warn', overdueN, 'جلسات متأخرة', '#/appointments'),
       reqN === null ? stat('info', '—', 'طلبات التعديل', null)
-        : stat('info', reqN, CAN_APPROVE.includes(p.role) ? 'بانتظار موافقتك' : 'طلبات تعديل معلّقة', '#/notifications'),
+        : stat('info', reqN, CAN_APPROVE.includes(p.role) ? 'بانتظار موافقتك' : 'طلبات تعديل معلّقة', '#/requests'),
       stat('plain', patientsN, 'مريضاً مسجّلاً', '#/patients'));
     if (overdueN > 0) {
       alertBox.replaceChildren(h('a', { href: '#/appointments', class: 'notice warn', style: 'text-decoration: none; align-items: center' },
@@ -101,7 +101,7 @@ function cycleRow(c) {
   else if (c.pharmacist_verified_at) pill = h('span', { class: 'pill ok', text: 'جاهزة' });
   else if (c.doctor_approved_at) pill = h('span', { class: 'pill info', text: 'بانتظار الصيدلاني' });
   else pill = h('span', { class: 'pill muted', text: 'بانتظار اعتماد الطبيب' });
-  return h('a', { class: 'row', href: '#/patient?id=' + pt.id },
+  return h('a', { class: 'row', href: '#/cycle?id=' + c.id },
     h('span', { class: 'avatar', text: initials(pt.full_name) }),
     h('span', { class: 'grow' },
       h('span', { class: 't', text: pt.full_name }),

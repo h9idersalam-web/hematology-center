@@ -17,6 +17,9 @@ const KIND = {
 const LINKS = {
   profile: () => '#/admin?tab=users',
   patient: (id) => '#/patient?id=' + id,
+  treatment: (id) => '#/treatment?id=' + id,
+  change_request: (id) => '#/request?id=' + id,
+  protocol: (id) => '#/protocol?id=' + id,
 };
 
 export async function render(root, params) {
