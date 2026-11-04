@@ -1,0 +1,216 @@
+// ملف المريض: البيانات، والحساسية، وخطة العلاج ودوراتها، والخطط السابقة
+import { sb, q, rpc, countOf } from '../api.js';
+import { h, mount, icon, topbar, bottomNav, notice, empty, fmtDate, fmtDay, daysUntil, ageText, bsa, SEX, toast, confirmDialog, initials, count } from '../ui.js';
+import { go } from '../app.js';
+import { can } from '../perms.js';
+import { NKDA } from './patient-form.js';
+import { postponeDialog } from './postpone.js';
+
+const T_STATUS = {
+  active: ['فعّالة', 'ok'], pending_approval: ['بانتظار موافقة الطبيب المختص', 'info'],
+  completed: ['اكتملت', 'muted'], stopped: ['أُوقفت', 'warn'],
+};
+const C_STATUS = {
+  planned: ['مجدولة', 'muted'], held: ['موقوفة', 'warn'], given: ['أُعطيت', 'ok'], cancelled: ['أُلغيت', 'muted'],
+};
+
+export async function render(root, params) {
+  const id = params.get('id');
+  if (!id) return go('/patients');
+
+  mount(root, h('div', { class: 'screen' }, topbar({ title: 'ملف المريض', back: '#/patients' }),
+    h('main', { class: 'main' }, h('div', { class: 'empty' }, h('span', { class: 'spinner' })))));
+
+  const [p, treatments, labsN, filesN] = await Promise.all([
+    q(sb.from('patient_overview').select('*').eq('id', id).maybeSingle()),
+    q(sb.from('treatments').select('id, protocol_name, diagnosis, icd10, stage, status, stop_reason, start_date, bsa, height_cm, weight_kg, total_cycles, cycle_length_days, created_at')
+      .eq('patient_id', id).order('created_at', { ascending: false })),
+    countOf('lab_results', (x) => x.eq('patient_id', id)).catch(() => 0),
+    countOf('attachments', (x) => x.eq('patient_id', id)).catch(() => 0),
+  ]);
+  if (!p) throw new Error('المريض غير موجود، أو ليست لديك صلاحية عرضه');
+
+  const current = treatments.find((t) => t.status === 'active' || t.status === 'pending_approval') || null;
+  const previous = treatments.filter((t) => t !== current);
+  const cycles = current
+    ? await q(sb.from('cycles').select('id, cycle_no, planned_date, status, postpone_reason, doctor_approved_at, pharmacist_verified_at')
+        .eq('treatment_id', current.id).order('cycle_no'))
+    : [];
+
+  const editable = can('editPatient') && !p.archived_at;
+  const editBtn = editable
+    ? h('a', { class: 'icon-btn boxed', href: '#/patient-edit?id=' + id, 'aria-label': 'تعديل بيانات المريض' }, icon('edit', 22)) : null;
+
+  mount(root, h('div', { class: 'screen' },
+    topbar({ title: p.full_name, sub: 'ملف ' + p.file_no, back: '#/patients', actions: editBtn }),
+    h('main', { class: 'main with-nav' },
+      p.archived_at ? notice('dark', 'archive',
+        h('p', { style: 'font-weight: 700', text: `مؤرشف منذ ${fmtDate(p.archived_at)}` }),
+        h('p', { text: 'السبب: ' + (p.archive_reason || '—') })) : null,
+      allergyBanner(p, editable),
+      infoCard(p),
+      current ? treatmentCard(p, current, cycles, () => render(root, params)) : noPlanCard(),
+      previous.length ? previousCard(previous) : null,
+      filesCard(labsN, filesN),
+      can('archivePatient') && !p.archived_at
+        ? h('button', { class: 'btn danger block', type: 'button', onclick: () => archive(p) }, icon('archive', 22), 'أرشفة الملف') : null),
+    bottomNav('patients')));
+}
+
+function allergyBanner(p, editable) {
+  if (p.allergies === NKDA) {
+    return h('div', { class: 'notice ok', style: 'align-items: center' }, icon('check', 20), h('p', { text: NKDA }));
+  }
+  if (p.allergies) {
+    return h('div', { class: 'notice err', role: 'alert', style: 'border: 2px solid var(--brand)' }, icon('alert', 22),
+      h('div', null, h('p', { style: 'font-weight: 700', text: 'حساسية دوائية' }), h('p', { text: p.allergies })));
+  }
+  return notice('warn', 'warn', h('p', null, 'لم تُسجَّل معلومات الحساسية الدوائية. ',
+    editable ? h('a', { href: '#/patient-edit?id=' + p.id, style: 'font-weight: 700; color: inherit', text: 'أضفها الآن' }) : null));
+}
+
+function fact(label, value, opts = {}) {
+  return h('div', { class: 'fact' + (opts.wide ? ' wide' : '') },
+    h('span', { class: 'l', text: label }),
+    value instanceof Node ? value : h('span', { class: 'v' + (opts.ltr ? ' ltr' : ''), text: value ?? '—' }));
+}
+
+function infoCard(p) {
+  const b = bsa(p.height_cm, p.weight_kg);
+  return h('section', { class: 'card' },
+    h('div', { style: 'display: flex; align-items: center; gap: 12px' },
+      h('span', { class: 'avatar', style: 'width: 52px; height: 52px; border-radius: 26px; font-size: 18px', text: initials(p.full_name) }),
+      h('div', { style: 'display: flex; flex-direction: column; gap: 4px; min-width: 0' },
+        h('h2', { text: p.full_name }),
+        h('span', { style: 'display: flex; gap: 6px; align-items: center; flex-wrap: wrap' },
+          h('span', { class: 'tag', text: p.file_no }),
+          h('span', { class: 'pill muted', text: [SEX[p.sex], ageText(p.birth_date)].filter(Boolean).join(' · ') || '—' })))),
+    h('div', { class: 'facts' },
+      fact('تاريخ الميلاد', p.birth_date ? fmtDate(p.birth_date) : null),
+      fact('الهاتف', p.phone ? h('a', { class: 'v ltr', href: 'tel:' + p.phone, style: 'text-decoration: none' }, p.phone) : null),
+      fact('الطول', p.height_cm ? `${Number(p.height_cm)} سم` : null),
+      fact('الوزن', p.weight_kg ? `${Number(p.weight_kg)} كغ` : null),
+      fact('مساحة سطح الجسم', b ? `${b} م²` : 'أدخل الطول والوزن'),
+      fact('الطبيب المختص', p.specialist_name || 'لم يُحدَّد'),
+      fact('تاريخ التسجيل', fmtDate(p.created_at), { wide: true })));
+}
+
+function noPlanCard() {
+  return h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', { text: 'خطة العلاج' })),
+    h('div', { class: 'card' }, empty('لا توجد خطة علاج حالية لهذا المريض', 'pill'),
+      h('p', { class: 'hint', style: 'text-align: center', text: 'اختيار البروتوكول وإنشاء الخطة وحساب الجرعات تُضاف في الخطوة 4.' })));
+}
+
+function treatmentCard(p, t, cycles, reload) {
+  const given = cycles.filter((c) => c.status === 'given').length;
+  const next = cycles.find((c) => c.status === 'planned' || c.status === 'held');
+  const last = [...cycles].reverse().find((c) => c.status === 'given');
+  const [stLabel, stKind] = T_STATUS[t.status];
+  const pct = Math.round((given / t.total_cycles) * 100);
+
+  // تنبيه إذا تغيّر الوزن كثيراً عن وزن الخطة
+  let weightWarn = null;
+  if (p.weight_kg && t.weight_kg) {
+    const diff = Math.round(((p.weight_kg - t.weight_kg) / t.weight_kg) * 100);
+    if (Math.abs(diff) >= 10) {
+      weightWarn = notice('warn', 'warn', h('p', { text: `الوزن الحالي (${Number(p.weight_kg)} كغ) ${diff > 0 ? 'أعلى' : 'أقل'} من وزن الخطة (${Number(t.weight_kg)} كغ) بنسبة ${Math.abs(diff)}%. راجع الجرعات مع الطبيب المختص.` }));
+    }
+  }
+
+  const nextTile = next ? (() => {
+    const d = daysUntil(next.planned_date);
+    const when = d < 0 ? 'متأخرة ' + count(-d, 'day') : d === 0 ? 'اليوم' : d === 1 ? 'غداً' : 'بعد ' + count(d, 'day');
+    return h('div', { class: 'tile' + (d < 0 ? ' warn' : d === 0 ? ' brand' : '') },
+      h('span', { class: 'l', text: `الجلسة القادمة · الدورة ${next.cycle_no}` }),
+      h('span', { class: 'v', text: fmtDay(next.planned_date) }),
+      h('span', { class: 's', text: when + (next.status === 'held' ? ' · موقوفة' : '') }));
+  })() : h('div', { class: 'tile' }, h('span', { class: 'l', text: 'الجلسة القادمة' }), h('span', { class: 'v', text: '—' }));
+
+  const lastTile = h('div', { class: 'tile' },
+    h('span', { class: 'l', text: last ? `الجلسة السابقة · الدورة ${last.cycle_no}` : 'الجلسة السابقة' }),
+    h('span', { class: 'v', text: last ? fmtDay(last.planned_date) : 'لم تبدأ بعد' }));
+
+  return h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', { text: 'خطة العلاج الحالية' }), h('span', { class: 'pill ' + stKind, text: stLabel })),
+    h('div', { class: 'card' },
+      h('div', { style: 'display: flex; justify-content: space-between; align-items: center; gap: 8px' },
+        h('span', { class: 'tag', style: 'font-size: 16px; padding: 3px 10px', text: t.protocol_name }),
+        h('span', { style: 'font-size: 14px; color: var(--muted-2)', text: 'كل ' + count(t.cycle_length_days, 'day') })),
+      h('div', { class: 'facts' },
+        fact('التشخيص', t.diagnosis, { wide: true }),
+        fact('ICD-10', t.icd10, { ltr: true }),
+        fact('المرحلة', t.stage),
+        fact('بدء العلاج', fmtDate(t.start_date)),
+        fact('BSA عند الخطة', `${t.bsa} م²`)),
+      h('div', { class: 'progress-wrap' },
+        h('div', { style: 'display: flex; justify-content: space-between; font-size: 14px' },
+          h('span', { style: 'font-weight: 600', text: `أُعطيت ${given} من ${count(t.total_cycles, 'cycle')}` }),
+          h('span', { style: 'color: var(--muted-2)', text: pct + '%' })),
+        h('div', { class: 'progress', role: 'progressbar', 'aria-valuenow': given, 'aria-valuemin': 0, 'aria-valuemax': t.total_cycles },
+          h('span', { style: `width: ${pct}%` }))),
+      h('div', { class: 'grid-2' }, lastTile, nextTile),
+      weightWarn),
+    h('div', { class: 'section-head', style: 'margin-top: 6px' }, h('h2', { text: 'جدول الدورات' }), h('span', { class: 'meta', text: count(cycles.length, 'cycle') })),
+    h('div', { class: 'card flush' }, cycles.map((c) => cycleRow(c, c === next && t.status === 'active', p, reload))));
+}
+
+function cycleRow(c, isNext, p, reload) {
+  const [label, kind] = C_STATUS[c.status];
+  const d = daysUntil(c.planned_date);
+  const late = (c.status === 'planned' || c.status === 'held') && d < 0;
+  let readiness = null;
+  if (c.status === 'planned' && isNext) {
+    readiness = c.pharmacist_verified_at ? 'معتمدة ومتحقق منها' : c.doctor_approved_at ? 'بانتظار تحقق الصيدلاني' : 'بانتظار اعتماد الطبيب';
+  }
+  return h('div', { class: 'row', style: isNext ? 'background: #FFFBFB' : null },
+    h('span', { class: 'cyc-no' + (c.status === 'given' ? ' done' : isNext ? ' next' : ''), text: c.cycle_no }),
+    h('span', { class: 'grow' },
+      h('span', { class: 't', style: 'font-size: 15px', text: fmtDay(c.planned_date) }),
+      c.postpone_reason ? h('span', { class: 's', text: (c.status === 'cancelled' ? 'السبب: ' : 'أُجّلت: ') + c.postpone_reason }) : null,
+      readiness ? h('span', { class: 's', text: readiness }) : null),
+    late ? h('span', { class: 'pill warn', text: 'متأخرة' }) : h('span', { class: 'pill ' + kind, text: label }),
+    isNext && can('postpone') && !p.archived_at
+      ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': `تأجيل الدورة ${c.cycle_no}`, title: 'تأجيل',
+          onclick: async () => { if (await postponeDialog({ ...c, patient_name: p.full_name })) reload(); } }, icon('clock', 22))
+      : null);
+}
+
+function previousCard(list) {
+  return h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', { text: 'خطط سابقة' }), h('span', { class: 'meta', text: `${list.length}` })),
+    h('div', { class: 'card flush' }, list.map((t) => {
+      const [label, kind] = T_STATUS[t.status];
+      return h('div', { class: 'row' },
+        h('span', { class: 'grow' },
+          h('span', { class: 't', style: 'display: flex; gap: 8px; align-items: center' }, h('span', { class: 'tag', text: t.protocol_name }), h('span', { style: 'font-size: 15px', text: t.diagnosis })),
+          h('span', { class: 's', text: `بدأت ${fmtDate(t.start_date)}` + (t.stop_reason ? ` · ${t.stop_reason}` : '') })),
+        h('span', { class: 'pill ' + kind, text: label }));
+    })));
+}
+
+function filesCard(labsN, filesN) {
+  return h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', { text: 'التحاليل والمرفقات' })),
+    h('div', { class: 'card' },
+      h('div', { class: 'grid-2' },
+        h('div', { class: 'tile' }, h('span', { class: 'l', text: 'نتائج التحاليل' }), h('span', { class: 'v', text: String(labsN) })),
+        h('div', { class: 'tile' }, h('span', { class: 'l', text: 'الملفات المرفقة' }), h('span', { class: 'v', text: String(filesN) }))),
+      h('p', { class: 'hint', text: 'رفع صور التحاليل والوصفات ومنحنيات النتائج تُضاف في الخطوة 5.' })));
+}
+
+async function archive(p) {
+  const reason = await confirmDialog({
+    title: 'أرشفة ملف ' + p.full_name,
+    body: 'لا يُحذف شيء: يبقى الملف وسجله محفوظين، ويختفي من القوائم اليومية. لا يمكن تعديل ملف مؤرشف.',
+    okText: 'أرشفة', danger: true,
+    input: { label: 'سبب الأرشفة', placeholder: 'مثال: أنهى العلاج وانتقل للمتابعة الدورية' },
+  });
+  if (reason === null) return;
+  if (!reason) return toast('اكتب سبب الأرشفة', true);
+  try {
+    await rpc('archive_patient', { p_id: p.id, p_reason: reason });
+    toast('أُرشف الملف');
+    go('/patient?id=' + p.id);
+  } catch (e) { toast(e.message, true); }
+}

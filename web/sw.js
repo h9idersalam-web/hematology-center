@@ -1,12 +1,14 @@
 // يحفظ ملفات واجهة التطبيق فقط ليفتح بسرعة.
 // لا يحفظ أي بيانات مرضى: كل طلبات قاعدة البيانات تذهب إلى الخادم مباشرة.
-const VERSION = 'v1-2026-11-04';
+const VERSION = 'v2-2026-11-04-step3';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'vendor/supabase-2.118.0.js',
-  'js/app.js', 'js/api.js', 'js/ui.js', 'js/config.js',
+  'js/app.js', 'js/api.js', 'js/ui.js', 'js/config.js', 'js/perms.js',
   'js/screens/auth.js', 'js/screens/activation.js', 'js/screens/home.js',
   'js/screens/notifications.js', 'js/screens/admin.js', 'js/screens/soon.js',
+  'js/screens/patients.js', 'js/screens/patient.js', 'js/screens/patient-form.js',
+  'js/screens/appointments.js', 'js/screens/postpone.js',
   'icons/icon-192.png', 'icons/icon-512.png',
 ];
 

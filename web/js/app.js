@@ -7,6 +7,10 @@ import * as home from './screens/home.js';
 import * as notifications from './screens/notifications.js';
 import * as admin from './screens/admin.js';
 import * as soon from './screens/soon.js';
+import * as patients from './screens/patients.js';
+import * as patient from './screens/patient.js';
+import * as patientForm from './screens/patient-form.js';
+import * as appointments from './screens/appointments.js';
 
 const root = document.getElementById('app');
 
@@ -19,8 +23,11 @@ const ROUTES = {
   '/home': { screen: home.render },
   '/notifications': { screen: notifications.render },
   '/admin': { screen: admin.render, admin: true },
-  '/patients': { screen: soon.render('patients') },
-  '/appointments': { screen: soon.render('appointments') },
+  '/patients': { screen: (root, params) => (params.get('id') ? patient.render(root, params) : patients.render(root, params)) },
+  '/patient': { screen: patient.render },
+  '/patient-new': { screen: patientForm.render },
+  '/patient-edit': { screen: patientForm.render },
+  '/appointments': { screen: appointments.render },
   '/protocols': { screen: soon.render('protocols') },
 };
 

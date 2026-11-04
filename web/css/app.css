@@ -202,6 +202,29 @@ legend { padding: 0; margin-bottom: 10px; }
 .perm-grid .n { background: var(--chip); color: var(--muted); }
 .perm-grid .p { background: var(--warn-soft); color: var(--warn); }
 
+/* ملف المريض */
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.fact { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fact.wide { grid-column: 1 / -1; }
+.fact .l { font-size: 13px; color: var(--muted-2); }
+.fact .v { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.tile { background: var(--chip); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tile .l { font-size: 13px; color: var(--muted-2); }
+.tile .v { font-size: 16px; font-weight: 700; }
+.tile .s { font-size: 13px; color: var(--muted); }
+.tile.brand { background: var(--brand-soft); }
+.tile.brand .v, .tile.brand .s { color: var(--brand); }
+.tile.warn { background: var(--warn-soft); }
+.tile.warn .v, .tile.warn .s { color: var(--warn); }
+.progress-wrap { display: flex; flex-direction: column; gap: 6px; }
+.progress { height: 10px; border-radius: 5px; background: var(--seg); overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--ok-strong); border-radius: 5px; }
+.cyc-no { width: 34px; height: 34px; border-radius: 17px; border: 2px solid var(--field); color: var(--muted); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+.cyc-no.done { background: var(--ok-strong); border-color: var(--ok-strong); color: #fff; }
+.cyc-no.next { border-color: var(--brand); color: var(--brand); }
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+input[type="date"].input { text-align: right; }
+
 /* القوائم الفارغة */
 .empty { text-align: center; padding: 28px 16px; color: var(--muted-2); font-size: 15px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 

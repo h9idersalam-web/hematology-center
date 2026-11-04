@@ -53,6 +53,15 @@ const PATHS = {
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   refresh: '<path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  edit: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  archive: '<rect x="3.5" y="4.5" width="17" height="4.5" rx="1"/><path d="M5 9v10.5h14V9M10 13h4"/>',
+  phone: '<path d="M6.5 3.5h3l1.5 4.5-2 1.5a11 11 0 0 0 5.5 5.5l1.5-2 4.5 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 4.5 5.5a2 2 0 0 1 2-2z"/>',
+  file: '<path d="M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h4"/>',
+  pill: '<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-35 12 12)"/><path d="M9.6 8.6l4.8 6.8"/>',
+  alert: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16v.3"/>',
+  chevron: '<path d="M14.5 6l-6 6 6 6"/>',
+  move: '<path d="M4 12h14M14 7l5 5-5 5"/>',
 };
 
 export function icon(name, size = 24, color = 'currentColor', width = 1.8) {
@@ -117,6 +126,67 @@ export function daysUntil(iso) {
   if (!iso) return null;
   return Math.round((new Date(iso + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000);
 }
+export function addDaysISO(iso, n) {
+  const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+// الأرقام العربية الهندية إلى لاتينية
+export function latinDigits(s) {
+  return String(s ?? '').replace(/[٠-٩]/g, (c) => c.charCodeAt(0) - 0x660).replace(/[۰-۹]/g, (c) => c.charCodeAt(0) - 0x6F0);
+}
+
+// توحيد الكتابة العربية للبحث (مطابق للدالة ar_norm في قاعدة البيانات)
+export function arNorm(s) {
+  const from = 'أإآٱةىؤئ', to = 'ااااهيوي';
+  return latinDigits(s).replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/[أإآٱةىؤئ]/g, (c) => to[from.indexOf(c)]).toLowerCase();
+}
+
+// المعدود العربي: 1 يوم، يومان، 3 أيام، 11 يوماً
+const NOUNS = {
+  day: ['يوم', 'يومان', 'أيام', 'يوماً'],
+  year: ['سنة', 'سنتان', 'سنوات', 'سنة'],
+  month: ['شهر', 'شهران', 'أشهر', 'شهراً'],
+  cycle: ['دورة', 'دورتان', 'دورات', 'دورة'],
+  session: ['جلسة', 'جلستان', 'جلسات', 'جلسة'],
+  patient: ['مريض', 'مريضان', 'مرضى', 'مريضاً'],
+};
+export function count(n, noun) {
+  const [one, two, few, many] = NOUNS[noun];
+  const m = Math.abs(n) % 100;
+  if (n === 2) return two;
+  if (n === 1) return `1 ${one}`;
+  if (m >= 3 && m <= 10) return `${n} ${few}`;
+  if (n === 0 || m === 0 || m === 1 || m === 2) return `${n} ${one}`;
+  return `${n} ${many}`;
+}
+
+export function ageOf(birth) {
+  if (!birth) return null;
+  const b = new Date(birth + 'T00:00:00'), n = new Date();
+  let a = n.getFullYear() - b.getFullYear();
+  if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) a--;
+  return a;
+}
+export function ageText(birth) {
+  const a = ageOf(birth);
+  if (a === null) return null;
+  if (a >= 1) return count(a, 'year');
+  const b = new Date(birth + 'T00:00:00'), n = new Date();
+  const m = (n.getFullYear() - b.getFullYear()) * 12 + n.getMonth() - b.getMonth() - (n.getDate() < b.getDate() ? 1 : 0);
+  return count(Math.max(m, 0), 'month');
+}
+
+// مساحة سطح الجسم (موستيلر) بالتقريب نفسه في قاعدة البيانات
+export function bsa(h, w) {
+  if (!h || !w) return null;
+  return Math.round(Math.sqrt((h * w) / 3600) * 100) / 100;
+}
+
+export const SEX = { male: 'ذكر', female: 'أنثى' };
+
 export function initials(name) {
   const parts = String(name || '').replace(/^د\.\s*/, '').trim().split(/\s+/).filter(Boolean);
   return parts.slice(0, 2).map((p) => p[0]).join(' ');

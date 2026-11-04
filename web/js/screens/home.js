@@ -101,7 +101,7 @@ function cycleRow(c) {
   else if (c.pharmacist_verified_at) pill = h('span', { class: 'pill ok', text: 'جاهزة' });
   else if (c.doctor_approved_at) pill = h('span', { class: 'pill info', text: 'بانتظار الصيدلاني' });
   else pill = h('span', { class: 'pill muted', text: 'بانتظار اعتماد الطبيب' });
-  return h('a', { class: 'row', href: '#/patients?id=' + pt.id },
+  return h('a', { class: 'row', href: '#/patient?id=' + pt.id },
     h('span', { class: 'avatar', text: initials(pt.full_name) }),
     h('span', { class: 'grow' },
       h('span', { class: 't', text: pt.full_name }),
