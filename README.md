@@ -15,7 +15,7 @@
 
 ## الإعداد
 
-1. شغّل في Supabase الملفات `01_schema.sql` ثم `02_storage.sql` ثم `03_seed_protocols.sql`.
+1. شغّل في Supabase الملفات `01_schema.sql` ثم `02_storage.sql` ثم `03_seed_protocols.sql` ثم `05_hardening.sql`.
 2. ضع رابط المشروع والمفتاح العام (anon أو publishable) في `web/js/config.js`.
    لا تضع المفتاح السري (service_role أو secret) في أي ملف هنا.
 3. فعّل النشر: Settings › Pages › Source: **GitHub Actions**.
