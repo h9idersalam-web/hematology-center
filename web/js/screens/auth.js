@@ -100,7 +100,8 @@ export function register(root) {
       });
       if (error) return err.show(errMsg(error));
       if (!data.session) {
-        return err.show('أُنشئ الحساب لكن تأكيد البريد مفعّل في Supabase. أوقفه من Authentication › Email ثم سجّل الدخول.');
+        // تأكيد البريد ما زال مفعّلاً في Supabase (يُوقفه المدير من لوحة التحكم)
+        return err.show('أُنشئ حسابك. افتح رسالة تأكيد البريد في صندوق بريدك، ثم سجّل الدخول وأدخل كود التفعيل.');
       }
       state.session = data.session; state.profile = null;
       try { await loadProfile(); } catch (e2) { return err.show(e2.message); }

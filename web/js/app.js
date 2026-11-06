@@ -33,7 +33,7 @@ const ROUTES = {
   '/activate': { screen: activation.render, inactive: true },
   '/home': { screen: home.render },
   '/notifications': { screen: notifications.render },
-  '/admin': { screen: admin.render, admin: true },
+  '/admin': { screen: admin.render, admin: true, wide: true },
   '/patients': { screen: (root, params) => (params.get('id') ? patient.render(root, params) : patients.render(root, params)) },
   '/patient': { screen: patient.render },
   '/patient-new': { screen: patientForm.render },
@@ -72,6 +72,7 @@ export function go(path) {
 export async function loadProfile() {
   if (!state.session) { state.profile = null; return null; }
   state.profile = await q(sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle());
+  state.profileAt = Date.now();
   return state.profile;
 }
 
@@ -97,8 +98,9 @@ async function route() {
   if (!state.session) {
     if (!r.public) return go('/login');
   } else {
-    if (!state.profile) {
-      try { await loadProfile(); } catch (e) { return fatal(e.message); }
+    // يُعاد تحميل الملف الشخصي كل دقيقة: إن أوقف المدير الحساب يخرج صاحبه إلى صفحة الحالة
+    if (!state.profile || Date.now() - (state.profileAt || 0) > 60000) {
+      try { await loadProfile(); } catch (e) { if (!state.profile) return fatal(e.message); }
     }
     const st = accountState();
     if (r.public) return go(st === 'active' ? '/home' : '/activate');
@@ -108,6 +110,7 @@ async function route() {
     if (r.admin && !state.profile.is_admin) return go('/home');
   }
 
+  root.classList.toggle('wide', !!r.wide);
   try {
     await r.screen(root, params);
     window.scrollTo(0, 0);

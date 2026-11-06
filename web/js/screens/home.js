@@ -148,10 +148,10 @@ async function renderAdminPanel(box) {
       h('h2', null, icon('shield', 22), h('span', { text: 'الإدارة' })),
       h('span', { class: 'pill', style: 'background: var(--dark-3); font-size: 12px', text: 'تظهر لك وحدك' })),
     h('div', { class: 'grid-2' },
-      tile('#/admin?tab=users', 'المستخدمون', pending ? `${pending} بانتظار التفعيل` : `${total} مستخدماً مفعّلاً`, pending > 0),
+      tile('#/admin?tab=users', 'إدارة المستخدمين', pending ? `${pending} بانتظار التفعيل` : `${total} مستخدماً مفعّلاً`, pending > 0),
       tile('#/admin?tab=permissions', 'الصلاحيات', '7 أنواع مستخدمين'),
       tile('#/admin?tab=subscriptions', 'الاشتراكات', expiring ? `${expiring} تنتهي خلال أسبوعين` : 'كلها سارية', expiring > 0),
-      tile('#/admin?tab=codes', 'كود تفعيل جديد', 'إنشاء ومشاركة', false, true))));
+      tile('#/admin?tab=users', 'كود تفعيل', 'يُصدر لكل مستخدم من إدارة المستخدمين', false, true))));
 }
 
 async function profileDialog() {

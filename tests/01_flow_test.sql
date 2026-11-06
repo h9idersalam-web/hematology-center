@@ -26,38 +26,32 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 select 'T2 pending sees protocols: ' || count(*) from protocols;
 select 'T2b pending sees own profile: ' || count(*) from profiles;
 
--- ===== المدير ينشئ أكواد التفعيل
+-- ===== المدير يصدر كوداً خاصاً بكل مستخدم
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
-select admin_create_code('specialist', 6) as c_sp \gset
-select admin_create_code('senior_resident', 6) as c_sr \gset
-select admin_create_code('intern', 3) as c_in \gset
-select admin_create_code('clinical_pharmacist', 6) as c_cp \gset
-select admin_create_code('mixing_pharmacist', 6) as c_mx \gset
-select admin_create_code('nurse', 12) as c_nu \gset
-select 'T3 code format: ' || (:'c_sp' ~ '^[A-Z2-9]{4}-[A-Z2-9]{4}$');
+select admin_issue_code('00000000-0000-0000-0000-000000000002', 6)->>'code' as c_sp \gset
+select admin_issue_code('00000000-0000-0000-0000-000000000003', 6)->>'code' as c_sr \gset
+select admin_issue_code('00000000-0000-0000-0000-000000000004', 3)->>'code' as c_in \gset
+select admin_issue_code('00000000-0000-0000-0000-000000000005', 6)->>'code' as c_cp \gset
+select admin_issue_code('00000000-0000-0000-0000-000000000006', 6)->>'code' as c_mx \gset
+select admin_issue_code('00000000-0000-0000-0000-000000000007', 12)->>'code' as c_nu \gset
+select 'T3 code format: ' || (:'c_sp' ~ '^[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$');
 
--- غير المدير لا ينشئ كوداً
+-- غير المدير لا يصدر كوداً
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
-do $$ begin perform admin_create_code('specialist', 6); raise exception 'FAIL'; exception when insufficient_privilege then raise notice 'T4 non-admin code blocked OK'; end $$;
+do $$ begin perform admin_issue_code('00000000-0000-0000-0000-000000000003', 6); raise exception 'FAIL'; exception when insufficient_privilege then raise notice 'T4 non-admin code blocked OK'; end $$;
 
--- كود تخصص آخر يُرفض
-do $$ begin perform redeem_activation_code(current_setting('my.c_nu', true)); exception when others then null; end $$;
-select set_config('my.c_nu', :'c_nu', false);
-do $$ begin perform redeem_activation_code(current_setting('my.c_nu')); raise exception 'FAIL';
-exception when others then raise notice 'T5 wrong-role code: %', sqlerrm; end $$;
+-- كود مستخدم آخر يُرفض
+select 'T5 other user code: ' || (activate_account(:'c_nu')->>'error');
 
 -- التفعيل الصحيح
-select 'T6 specialist active until: ' || (redeem_activation_code(:'c_sp') = (current_date + interval '6 months')::date);
-do $$ begin perform redeem_activation_code(current_setting('my.c_nu')); exception when others then null; end $$;
-select set_config('my.c_sp', :'c_sp', false);
+select 'T6 specialist active until: ' || ((activate_account(:'c_sp')->>'active_until')::date = (current_date + interval '6 months')::date);
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
-do $$ begin perform redeem_activation_code(current_setting('my.c_sp')); raise exception 'FAIL';
-exception when others then raise notice 'T7 reused code: %', sqlerrm; end $$;
-select redeem_activation_code(:'c_sr') is not null;
-set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004'; select redeem_activation_code(:'c_in') is not null;
-set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000005'; select redeem_activation_code(:'c_cp') is not null;
-set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006'; select redeem_activation_code(lower(:'c_mx')) is not null;
-set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000007'; select redeem_activation_code(:'c_nu') is not null;
+select 'T7 reused code: ' || (activate_account(:'c_sp')->>'error');
+select (activate_account(:'c_sr')->>'ok')::boolean;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004'; select (activate_account(:'c_in')->>'ok')::boolean;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000005'; select (activate_account(:'c_cp')->>'ok')::boolean;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006'; select (activate_account(lower(:'c_mx'))->>'ok')::boolean;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000007'; select (activate_account(:'c_nu')->>'ok')::boolean;
 
 -- لا كتابة مباشرة على الجداول
 do $$ begin insert into patients(full_name) values ('x'); raise exception 'FAIL';
@@ -213,9 +207,11 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000005';
 select 'T30 notif rows visible to cp all own: ' || bool_and(user_id = auth.uid()) from notifications;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
 select 'T31 intern audit visible: ' || count(*) from audit_log;
-select 'T31b intern codes visible: ' || count(*) from activation_codes;
+do $$ begin perform count(*) from user_activation_codes; raise exception 'FAIL';
+exception when insufficient_privilege then raise notice 'T31b intern codes table blocked OK'; end $$;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
-select 'T32 admin codes visible: ' || count(*) from activation_codes;
+do $$ begin perform count(*) from user_activation_codes; raise exception 'FAIL';
+exception when insufficient_privilege then raise notice 'T32 admin codes table blocked too (hashes only via functions) OK'; end $$;
 -- التخزين
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
 do $$ begin insert into storage.objects(bucket_id, name) values ('patient-files', 'patients/x/a.jpg'); raise exception 'FAIL';

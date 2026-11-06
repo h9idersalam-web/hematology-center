@@ -1,24 +1,27 @@
 // الإدارة: المستخدمون، أكواد التفعيل، الاشتراكات، الصلاحيات (للمدير وحده)
-import { sb, q, rpc } from '../api.js';
-import { h, mount, icon, topbar, empty, ROLES, fmtDate, daysUntil, toast, busy, field, notice, initials } from '../ui.js';
+import { rpc } from '../api.js';
+import { h, mount, icon, topbar, empty, ROLES, fmtDate, daysUntil, toast, busy, field, notice, initials, confirmDialog } from '../ui.js';
 import { state, go } from '../app.js';
 
 const STATUS = { pending: ['بانتظار التفعيل', 'warn'], active: ['مفعّل', 'ok'], suspended: ['موقوف', 'muted'] };
 const MONTHS = [3, 6, 12];
+const VALID = [[24, '24 ساعة'], [72, '3 أيام'], [168, '7 أيام']];
+const fmtDateTime = (d) => new Intl.DateTimeFormat('ar-IQ', { day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }).format(new Date(d));
 
 export async function render(root, params) {
   let tab = params.get('tab') || 'users';
+  if (tab === 'codes') tab = 'users';   // الأكواد صارت داخل إدارة المستخدمين
   const tabs = h('div', { class: 'tabs', role: 'tablist' });
   const body = h('main', { class: 'main' });
   const stats = h('div', { class: 'mini-stats', style: 'padding: 0 20px' });
 
   mount(root, h('div', { class: 'screen' },
     h('div', { style: 'background: var(--dark); color: #fff; padding-bottom: 16px; display: flex; flex-direction: column; gap: 12px' },
-      topbar({ title: 'الإدارة', sub: 'مدير النظام فقط', back: '#/home', dark: true }),
+      topbar({ title: 'لوحة المدير', sub: 'مدير النظام فقط', back: '#/home', dark: true }),
       stats),
     tabs, body));
 
-  const TABS = [['users', 'المستخدمون'], ['codes', 'الأكواد'], ['subscriptions', 'الاشتراكات'], ['permissions', 'الصلاحيات']];
+  const TABS = [['users', 'إدارة المستخدمين'], ['subscriptions', 'الاشتراكات'], ['permissions', 'الصلاحيات']];
   function drawTabs() {
     tabs.replaceChildren(...TABS.map(([id, label]) => h('button', {
       role: 'tab', 'aria-selected': tab === id ? 'true' : 'false',
@@ -28,10 +31,10 @@ export async function render(root, params) {
 
   let users = [];
   async function loadUsers() {
-    users = await q(sb.from('profiles').select('*').order('created_at', { ascending: false }));
+    users = await rpc('admin_list_users');
     const soon = users.filter((u) => u.status === 'active' && u.subscription_ends && daysUntil(u.subscription_ends) <= 14).length;
     stats.replaceChildren(
-      miniStat(users.filter((u) => u.status === 'active').length, 'مستخدم مفعّل'),
+      miniStat(users.filter((u) => u.status === 'active').length, 'مفعّل'),
       miniStat(users.filter((u) => u.status === 'pending').length, 'بانتظار التفعيل', true),
       miniStat(soon, 'اشتراك ينتهي قريباً', true));
   }
@@ -40,7 +43,6 @@ export async function render(root, params) {
     body.replaceChildren(h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
     try {
       if (tab === 'users') await drawUsers();
-      else if (tab === 'codes') await drawCodes();
       else if (tab === 'subscriptions') await drawSubscriptions();
       else drawPermissions();
     } catch (e) {
@@ -48,63 +50,121 @@ export async function render(root, params) {
     }
   }
 
-  // ------------------------------------------------------------ المستخدمون
+  // ------------------------------------------------------------ إدارة المستخدمين
+  let filter = 'all', search = '';
+  const FILTERS = [['all', 'الكل'], ['pending', 'بانتظار'], ['active', 'مفعّل'], ['suspended', 'موقوف']];
+
   async function drawUsers() {
     await loadUsers();
-    const pending = users.filter((u) => u.status === 'pending');
-    const others = users.filter((u) => u.status !== 'pending');
+    const seg = h('div', { class: 'segmented', role: 'group', 'aria-label': 'تصفية حسب الحالة' });
+    const list = h('div', { class: 'user-grid' });
+    const searchIn = h('input', { class: 'input', type: 'search', placeholder: 'ابحث بالاسم أو البريد', value: search,
+      oninput: (e) => { search = e.target.value; drawList(); } });
+    function drawSeg() {
+      seg.replaceChildren(...FILTERS.map(([id, label]) => {
+        const n = id === 'all' ? users.length : users.filter((u) => u.status === id).length;
+        return h('button', { type: 'button', 'aria-pressed': filter === id ? 'true' : 'false',
+          onclick: () => { filter = id; drawSeg(); drawList(); } }, `${label} (${n})`);
+      }));
+    }
+    function drawList() {
+      const qs = search.trim().toLowerCase();
+      const rows = users.filter((u) => (filter === 'all' || u.status === filter)
+        && (!qs || (u.full_name || '').toLowerCase().includes(qs) || (u.email || '').toLowerCase().includes(qs)));
+      list.replaceChildren(...(rows.length ? rows.map(userCard) : [h('div', { class: 'card' }, empty('لا يوجد مستخدمون بهذه التصفية', 'users'))]));
+    }
+    drawSeg(); drawList();
     body.replaceChildren(
       h('section', { class: 'section' },
-        h('div', { class: 'section-head' }, h('h2', { text: 'بانتظار التفعيل' }), h('span', { class: 'meta', text: `${pending.length}` })),
-        h('div', { class: 'card flush' }, pending.length ? pending.map(pendingRow) : empty('لا توجد طلبات جديدة', 'check'))),
-      h('section', { class: 'section' },
-        h('div', { class: 'section-head' }, h('h2', { text: 'كل المستخدمين' }), h('span', { class: 'meta', text: `${others.length}` })),
-        h('div', { class: 'card flush' }, others.length ? others.map(userRow) : empty('لا يوجد مستخدمون بعد', 'users'))));
+        h('div', { class: 'section-head' }, h('h2', { text: 'إدارة المستخدمين' }), h('span', { class: 'meta', text: `${users.length} حساب` })),
+        h('p', { style: 'color: var(--muted); font-size: 15px; line-height: 1.7',
+          text: 'الحساب الجديد يبقى «بانتظار التفعيل» حتى تصدر له كوداً. تحقق من هوية صاحبه قبل الإصدار.' }),
+        searchIn, seg, list));
   }
 
-  function pendingRow(u) {
-    return h('div', { class: 'row' },
-      h('span', { class: 'avatar', text: initials(u.full_name) }),
-      h('span', { class: 'grow' },
-        h('span', { class: 't', text: u.full_name }),
-        h('span', { class: 's', text: ROLES[u.role] }),
-        u.email ? h('span', { class: 's ltr', style: 'text-align: right; font-size: 13px', text: u.email }) : null),
-      h('button', { class: 'btn primary sm', text: 'إرسال كود', onclick: () => codeForUser(u) }),
-      h('button', { class: 'icon-btn boxed', style: 'width: 44px; height: 44px', 'aria-label': 'رفض طلب ' + u.full_name,
-        onclick: async () => { await updateUser(u, { p_status: 'suspended' }, 'رُفض الطلب'); } }, icon('x', 18, 'currentColor', 2)));
+  function codeLine(u) {
+    if (u.status !== 'pending' && !(u.status === 'active' && u.code)) return null;
+    if (u.failed_15m >= 5) return h('span', { class: 'pill warn', text: 'مقفل مؤقتاً بعد محاولات خاطئة' });
+    if (!u.code) return h('span', { class: 's', text: 'لم يُصدر له كود بعد' });
+    if (u.code.expired) return h('span', { class: 'pill muted', text: 'انتهت صلاحية الكود' });
+    return h('span', { class: 's', text: 'كود صالح حتى ' + fmtDateTime(u.code.expires_at) });
   }
 
-  function userRow(u) {
+  function userCard(u) {
     const [label, tone] = STATUS[u.status];
+    const isSelf = u.id === state.profile.id;
     const left = daysUntil(u.subscription_ends);
-    return h('button', { class: 'row', onclick: () => userDialog(u) },
-      h('span', { class: 'avatar', text: initials(u.full_name) }),
-      h('span', { class: 'grow' },
-        h('span', { class: 't', text: u.full_name + (u.is_admin ? ' · المدير' : '') }),
-        h('span', { class: 's', text: ROLES[u.role] + (u.role === 'intern' ? ' · عرض فقط' : '') })),
-      u.status !== 'active' ? h('span', { class: 'pill ' + tone, text: label })
-        : u.is_admin || !u.subscription_ends ? h('span', { class: 'pill ok', text: 'دائم' })
-          : h('span', { class: 'pill ' + (left <= 14 ? 'warn' : 'ok'), text: left < 0 ? 'منتهٍ' : 'حتى ' + fmtDate(u.subscription_ends, { month: 'short', year: 'numeric' }) }));
+    const sub = u.status !== 'active' ? null
+      : u.is_admin || !u.subscription_ends ? 'اشتراك دائم'
+        : left < 0 ? 'انتهى الاشتراك' : 'الاشتراك حتى ' + fmtDate(u.subscription_ends);
+    const btn = (cls, text, onclick) => h('button', { type: 'button', class: 'btn sm ' + cls, onclick }, text);
+    const actions = [];
+    if (u.is_admin) actions.push(h('span', { class: 'pill ok', text: isSelf ? 'أنت المدير' : 'مدير' }));
+    else if (u.status === 'pending') {
+      actions.push(btn('primary', u.code && !u.code.expired ? 'إصدار كود جديد' : 'إصدار كود', () => issueDialog(u)));
+      actions.push(btn('secondary', 'إيقاف', () => suspend(u)));
+    } else if (u.status === 'active') {
+      actions.push(btn('secondary', 'كود تجديد', () => issueDialog(u)));
+      actions.push(btn('secondary', 'التخصص والاشتراك', () => userDialog(u)));
+      actions.push(btn('danger', 'إيقاف', () => suspend(u)));
+    } else {
+      actions.push(btn('ok', 'إعادة التفعيل', () => reactivate(u)));
+    }
+    if (!u.is_admin && u.code && !u.code.expired) actions.push(h('button', { type: 'button', class: 'link-btn', onclick: () => revoke(u) }, 'إلغاء الكود'));
+
+    return h('article', { class: 'card', style: 'gap: 10px' },
+      h('div', { style: 'display: flex; gap: 12px; align-items: center' },
+        h('span', { class: 'avatar', text: initials(u.full_name) }),
+        h('span', { class: 'grow', style: 'display: flex; flex-direction: column; gap: 2px; min-width: 0' },
+          h('span', { class: 't', style: 'font-size: 17px; font-weight: 700', text: u.full_name }),
+          h('span', { class: 's', text: ROLES[u.role] || u.role }),
+          u.email ? h('span', { class: 's ltr', style: 'text-align: right; font-size: 13px; overflow-wrap: anywhere', text: u.email }) : null),
+        h('span', { class: 'pill ' + tone, text: label })),
+      sub ? h('span', { class: 's', text: sub }) : null,
+      u.status === 'suspended' && u.suspended_reason ? h('span', { class: 's', text: 'سبب الإيقاف: ' + u.suspended_reason }) : null,
+      codeLine(u),
+      h('div', { style: 'display: flex; flex-wrap: wrap; gap: 8px' }, actions));
   }
 
-  async function updateUser(u, params, msg) {
-    try { await rpc('admin_update_user', { p_user: u.id, ...params }); toast(msg); draw(); }
+  async function suspend(u) {
+    const reason = await confirmDialog({ title: 'إيقاف حساب ' + u.full_name,
+      body: 'لن يستطيع فتح بيانات المرضى أو تعديلها، ويُلغى أي كود صالح له. يمكنك إعادة تفعيله لاحقاً.',
+      okText: 'إيقاف الحساب', danger: true, input: { label: 'السبب (اختياري، يظهر لصاحب الحساب)', placeholder: 'مثال: انتهى التعاقد' } });
+    if (reason === null) return;
+    try { await rpc('admin_suspend_user', { p_user: u.id, p_reason: reason }); toast('أُوقف الحساب'); draw(); }
     catch (e) { toast(e.message, true); }
   }
 
-  // نافذة إدارة مستخدم: التخصص، الإيقاف، التمديد
+  async function reactivate(u) {
+    try {
+      const st = await rpc('admin_reactivate_user', { p_user: u.id });
+      toast(st === 'active' ? 'أُعيد تفعيل الحساب' : 'أُعيد الحساب إلى «بانتظار التفعيل»؛ أصدر له كوداً');
+      draw();
+    } catch (e) { toast(e.message, true); }
+  }
+
+  async function revoke(u) {
+    const ok = await confirmDialog({ title: 'إلغاء الكود', body: 'لن يعمل الكود الحالي لـ ' + u.full_name + '. يمكنك إصدار كود جديد في أي وقت.', okText: 'إلغاء الكود', danger: true });
+    if (!ok) return;
+    try { await rpc('admin_revoke_user_codes', { p_user: u.id }); toast('أُلغي الكود'); draw(); }
+    catch (e) { toast(e.message, true); }
+  }
+
+  // نافذة التخصص والاشتراك
   function userDialog(u) {
     const dlg = h('dialog', null);
     const close = () => { dlg.close(); dlg.remove(); };
     const roleSel = h('select', { class: 'input' }, Object.entries(ROLES).map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
-    const isSelf = u.id === state.profile.id;
     dlg.append(h('div', { class: 'dlg' },
       h('h2', { text: u.full_name }),
       h('p', { style: 'color: var(--muted)', text: [u.email, u.phone].filter(Boolean).join(' · ') || '—' }),
       h('p', { style: 'font-size: 15px', text: u.is_admin || !u.subscription_ends ? 'اشتراك دائم' : `الاشتراك حتى ${fmtDate(u.subscription_ends)}` }),
       field('التخصص', roleSel),
       h('button', { class: 'btn secondary', text: 'حفظ التخصص', onclick: async (e) => {
-        await busy(e.currentTarget, () => updateUser(u, { p_role: roleSel.value }, 'حُدّث التخصص')); close();
+        await busy(e.currentTarget, async () => {
+          try { await rpc('admin_update_user', { p_user: u.id, p_role: roleSel.value }); toast('حُدّث التخصص'); draw(); close(); }
+          catch (err) { toast(err.message, true); }
+        });
       } }),
       u.is_admin ? null : h('div', { class: 'field' }, h('span', { class: 'label', text: 'تمديد الاشتراك' }),
         h('div', { class: 'grid-3' }, MONTHS.map((m) => h('button', { class: 'btn secondary sm', text: m === 12 ? 'سنة' : `${m} أشهر`,
@@ -114,95 +174,51 @@ export async function render(root, params) {
               catch (err) { toast(err.message, true); }
             });
           } })))),
-      isSelf ? null : u.status === 'suspended'
-        ? h('button', { class: 'btn ok', text: 'إعادة التفعيل', onclick: async () => { await updateUser(u, { p_status: 'active' }, 'أُعيد تفعيل الحساب'); close(); } })
-        : h('button', { class: 'btn danger', text: 'إيقاف الحساب', onclick: async () => { await updateUser(u, { p_status: 'suspended' }, 'أُوقف الحساب'); close(); } }),
       h('button', { class: 'link-btn', text: 'إغلاق', onclick: close })));
     document.body.append(dlg);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
   }
 
-  // إنشاء كود لمستخدم ينتظر
-  function codeForUser(u) {
+  // إصدار كود لمستخدم بعينه: التخصص، مدة الاشتراك، صلاحية الكود
+  function issueDialog(u) {
     const dlg = h('dialog', null);
     const close = () => { dlg.close(); dlg.remove(); };
-    let months = 6;
-    const seg = h('div', { class: 'segmented' });
-    const drawSeg = () => seg.replaceChildren(...MONTHS.map((m) => h('button', { type: 'button', 'aria-pressed': m === months ? 'true' : 'false',
-      text: m === 12 ? 'سنة' : `${m} أشهر`, onclick: () => { months = m; drawSeg(); } })));
+    let months = 6, hours = 72;
+    const roleSel = h('select', { class: 'input' }, Object.entries(ROLES).map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
+    const segM = h('div', { class: 'segmented' });
+    const segH = h('div', { class: 'segmented' });
+    const drawSeg = () => {
+      segM.replaceChildren(...MONTHS.map((m) => h('button', { type: 'button', 'aria-pressed': m === months ? 'true' : 'false',
+        text: m === 12 ? 'سنة' : `${m} أشهر`, onclick: () => { months = m; drawSeg(); } })));
+      segH.replaceChildren(...VALID.map(([hh, t]) => h('button', { type: 'button', 'aria-pressed': hh === hours ? 'true' : 'false',
+        text: t, onclick: () => { hours = hh; drawSeg(); } })));
+    };
     drawSeg();
+    const opts = h('div', { style: 'display: flex; flex-direction: column; gap: 12px' },
+      field('التخصص الذي يُمنح عند التفعيل', roleSel, u.status === 'pending' ? 'اختاره المستخدم عند التسجيل؛ غيّره إن لزم' : null),
+      h('span', { class: 'label', style: 'font-weight: 600', text: 'مدة الاشتراك' }), segM,
+      h('span', { class: 'label', style: 'font-weight: 600', text: 'صلاحية الكود' }), segH,
+      u.code && !u.code.expired ? notice('warn', 'warn', h('p', { text: 'يوجد كود صالح لهذا المستخدم؛ إصدار كود جديد يلغي السابق.' })) : null);
     const out = h('div');
-    const monthsLabel = h('span', { class: 'label', style: 'font-weight: 600', text: 'مدة الاشتراك' });
-    const make = h('button', { class: 'btn primary', text: 'إنشاء الكود', onclick: async () => {
+    const make = h('button', { class: 'btn primary', text: 'إصدار الكود', onclick: async () => {
       await busy(make, async () => {
         try {
-          const code = await rpc('admin_create_code', { p_role: u.role, p_months: months });
-          make.remove(); seg.remove();
-          monthsLabel.textContent = 'مدة الاشتراك: ' + (months === 12 ? 'سنة' : `${months} أشهر`);
-          out.replaceChildren(codeBox(code, u.role, months, u.phone));
+          const r = await rpc('admin_issue_code', { p_user: u.id, p_months: months, p_valid_hours: hours, p_role: roleSel.value });
+          make.remove(); opts.remove();
+          out.replaceChildren(codeBox(r.code, r.role, r.months, u.phone, r.expires_at));
           draw();
         } catch (e) { toast(e.message, true); }
       });
     } });
     dlg.append(h('div', { class: 'dlg' },
       h('h2', { text: 'كود تفعيل لـ ' + u.full_name }),
-      h('p', { style: 'color: var(--muted)', text: ROLES[u.role] }),
-      monthsLabel,
-      seg, make, out,
+      u.email ? h('p', { class: 'ltr', style: 'color: var(--muted); text-align: right', text: u.email }) : null,
+      opts, make, out,
       h('button', { class: 'link-btn', text: 'إغلاق', onclick: close })));
     document.body.append(dlg);
     dlg.addEventListener('cancel', close);
     dlg.showModal();
-  }
-
-  // ------------------------------------------------------------ الأكواد
-  async function drawCodes() {
-    const roleSel = h('select', { class: 'input' }, Object.entries(ROLES).map(([k, v]) => h('option', { value: k, text: v })));
-    let months = 6;
-    const seg = h('div', { class: 'segmented' });
-    const drawSeg = () => seg.replaceChildren(...MONTHS.map((m) => h('button', { type: 'button', 'aria-pressed': m === months ? 'true' : 'false',
-      text: m === 12 ? 'سنة' : `${m} أشهر`, onclick: () => { months = m; drawSeg(); } })));
-    drawSeg();
-    const out = h('div');
-    const make = h('button', { class: 'btn primary', text: 'إنشاء الكود', onclick: async () => {
-      await busy(make, async () => {
-        try {
-          const code = await rpc('admin_create_code', { p_role: roleSel.value, p_months: months });
-          out.replaceChildren(codeBox(code, roleSel.value, months));
-          loadList();
-        } catch (e) { toast(e.message, true); }
-      });
-    } });
-    const list = h('div', { class: 'card flush' });
-
-    async function loadList() {
-      const codes = await q(sb.from('activation_codes').select('*, used:used_by(full_name)').order('created_at', { ascending: false }).limit(50));
-      list.replaceChildren(...(codes.length ? codes.map(codeRow) : [empty('لم تُنشأ أكواد بعد', 'key')]));
-    }
-    function codeRow(c) {
-      let pill;
-      if (c.used_by) pill = h('span', { class: 'pill ok', text: 'استُخدم' });
-      else if (c.revoked) pill = h('span', { class: 'pill muted', text: 'ملغى' });
-      else if (new Date(c.expires_at) < new Date()) pill = h('span', { class: 'pill muted', text: 'منتهي' });
-      else pill = h('button', { class: 'btn danger sm', style: 'height: 36px; font-size: 13px', text: 'إلغاء', onclick: async () => {
-        try { await rpc('admin_revoke_code', { p_code: c.code }); toast('أُلغي الكود'); loadList(); } catch (e) { toast(e.message, true); }
-      } });
-      return h('div', { class: 'row' },
-        h('span', { class: 'grow' },
-          h('span', { class: 't ltr', style: 'text-align: right; letter-spacing: 2px', text: c.code }),
-          h('span', { class: 's', text: `${ROLES[c.role]} · ${c.months} أشهر` + (c.used ? ` · ${c.used.full_name}` : '') })),
-        pill);
-    }
-
-    body.replaceChildren(
-      h('section', { class: 'card' },
-        h('h2', { text: 'إنشاء كود تفعيل' }),
-        field('التخصص', roleSel),
-        h('span', { class: 'label', style: 'font-weight: 600; font-size: 15px', text: 'مدة الاشتراك' }), seg,
-        make, out),
-      h('section', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', { text: 'آخر الأكواد' })), list));
-    await loadList();
   }
 
   // ------------------------------------------------------------ الاشتراكات
@@ -254,10 +270,12 @@ function miniStat(n, label, warn) {
   return h('div', null, h('span', { class: 'n', style: warn && n ? 'color: var(--on-dark-warn)' : null, text: n }), h('span', { class: 'l', text: label }));
 }
 
-// صندوق الكود: نسخ ومشاركة عبر واتساب
-function codeBox(code, role, months, phone) {
+// صندوق الكود: يظهر مرة واحدة فقط؛ نسخ ومشاركة عبر واتساب
+function codeBox(code, role, months, phone, expiresAt) {
   const appUrl = location.origin + location.pathname;
-  const msg = `كود تفعيل حسابك في نظام متابعة مرضى الدم:\n${code}\nالتخصص: ${ROLES[role]}\nمدة الاشتراك: ${months} أشهر\nالكود صالح 7 أيام ويُستخدم مرة واحدة.\nرابط التطبيق: ${appUrl}`;
+  const until = fmtDateTime(expiresAt);
+  const dur = months === 12 ? 'سنة' : `${months} أشهر`;
+  const msg = `كود تفعيل حسابك في نظام متابعة مرضى الدم:\n${code}\nالتخصص: ${ROLES[role]}\nمدة الاشتراك: ${dur}\nالكود خاص بحسابك، يُستخدم مرة واحدة، وصالح حتى ${until}.\nسجّل الدخول ثم أدخل الكود في صفحة التفعيل: ${appUrl}`;
   let wa = 'https://wa.me/?text=' + encodeURIComponent(msg);
   const digits = String(phone || '').replace(/\D/g, '');
   if (/^07\d{9}$/.test(digits)) wa = `https://wa.me/964${digits.slice(1)}?text=` + encodeURIComponent(msg);
@@ -265,7 +283,8 @@ function codeBox(code, role, months, phone) {
 
   return h('div', { class: 'code-box' },
     h('span', { class: 'code', text: code }),
-    h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: 'يُستخدم مرة واحدة خلال 7 أيام' }),
+    h('span', { style: 'font-size: 13px; color: var(--muted-2); text-align: center', text: `لهذا الحساب وحده، مرة واحدة، حتى ${until}` }),
+    notice('warn', 'warn', h('p', { text: 'انسخ الكود أو أرسله الآن: لا يُحفظ في النظام ولن يظهر مرة أخرى.' })),
     h('div', { class: 'grid-2', style: 'width: 100%' },
       h('button', { class: 'btn secondary sm', onclick: async () => {
         try { await navigator.clipboard.writeText(msg); toast('نُسخت الرسالة مع الكود'); } catch { toast('انسخ الكود يدوياً', true); }
