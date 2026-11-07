@@ -79,7 +79,11 @@ export async function entry(root, params) {
     try {
       await rpc('add_lab_results', { p_patient: pid, p_test_date: date.value, p_results: results, p_attachment: attId || null });
       const out = results.filter((r) => flag(r.value, r.ref_low, r.ref_high) !== 'ok').length;
-      toast(out ? `حُفظت النتائج، و${out} خارج المرجع أُبلغ بها الطبيب المختص` : 'حُفظت النتائج');
+      // الإشعار للطبيب المختص لتحاليل يوم دورة لم تُعتمد بعد فقط (الملف 19)
+      const cyc = out ? await rpc('lab_alert_cycle', { p_patient: pid, p_test_date: date.value }).catch(() => null) : null;
+      toast(!out ? 'حُفظت النتائج'
+        : cyc ? `حُفظت النتائج، و${out} خارج المرجع أُبلغ بها الطبيب المختص قبل الدورة ${cyc}`
+        : `حُفظت النتائج، و${out} خارج المرجع`);
       go('/labs?patient=' + pid);
     } catch (e) { err.replaceChildren(notice('err', 'warn', h('p', { text: e.message }))); }
   }));

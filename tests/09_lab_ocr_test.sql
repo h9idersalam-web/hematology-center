@@ -13,8 +13,7 @@ select 'L1 saved: ' || add_lab_results(:'pt', current_date,
     {"test_name":"Hb","value":12.4,"unit":"g/dL","ref_low":13.5,"ref_high":17.5,"entry_method":"ocr"},
     {"test_name":"ANC","value":5.1,"unit":"×10⁹/L","ref_low":1.5,"ref_high":8}]'::jsonb, :'att');
 reset role;
-select 'L1b alert links to the out-of-range result: ' || n.link_type || ' → ' || l.test_name || ' ' || l.value
-  from notifications n join lab_results l on l.id = n.link_id
+select 'L1b no alert without a cycle that day: ' || count(*) from notifications n join lab_results l on l.id = n.link_id
  where n.title = 'تحليل خارج المرجع' and l.patient_id = :'pt';
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000035';

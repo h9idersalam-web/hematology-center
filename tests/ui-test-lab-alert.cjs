@@ -38,8 +38,12 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
     await nurse.waitForTimeout(600);
   }
   const d = (k) => { const x = new Date(); x.setDate(x.getDate() + k); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
-  await enter(d(-14), { 'WBC (×10⁹/L)': '6.1', 'ANC (×10⁹/L)': '3.9', 'Hb (g/dL)': '14.2', 'PLT (×10⁹/L)': '210' });
+  // تحليل سابق خارج المرجع في غير يوم دورة: لا إشعار
+  await enter(d(-14), { 'WBC (×10⁹/L)': '6.1', 'ANC (×10⁹/L)': '3.9', 'Hb (g/dL)': '12.0', 'PLT (×10⁹/L)': '210' });
+  ok('non-cycle-day toast: no doctor notified', !(await nurse.locator('#toast').textContent()).includes('أُبلغ'));
+  // يوم الدورة 3 (اليوم) وهي لم تُعتمد: إشعار
   await enter(d(0), { 'WBC (×10⁹/L)': '1.6', 'ANC (×10⁹/L)': '0.4', 'Hb (g/dL)': '13.6', 'PLT (×10⁹/L)': '38' });
+  ok('cycle-day toast: doctor notified', (await nurse.locator('#toast').textContent()).includes('قبل الدورة 3'));
 
   const sara = await login('sara@test.iq');
   await sara.goto(B + '#/notifications'); await sara.waitForSelector('main .row');
@@ -53,9 +57,9 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   ok('ANC value and grade 4', (await anc.textContent()).includes('0.4') && (await anc.textContent()).includes('نقص العدلات: الدرجة 4'));
   ok('PLT grade 3', (await sara.locator('.card.lab-alert', { hasText: 'PLT' }).textContent()).includes('نقص الصفيحات: الدرجة 3'));
   ok('previous value and change', (await sara.locator('.card.lab-alert', { hasText: 'PLT' }).textContent()).includes('السابق 210'));
-  ok('febrile neutropenia note', (await sara.locator('text=حمى قلة العدلات').count()) === 1);
-  ok('next cycle note', (await sara.locator('text=الدورة القادمة 3').count()) === 1);
-  ok('reference ≠ treatment threshold note', (await sara.locator('text=وليس حدّ إعطاء العلاج').count()) === 1);
+  ok('important-notes section removed', (await sara.locator('text=ملاحظات مهمة').count()) === 0);
+  ok('only one alert: earlier non-cycle-day test did not notify', psql("select count(*) from notifications where title = 'تحليل خارج المرجع'") === '1');
+  ok('alert names the cycle', psql("select body from notifications where title = 'تحليل خارج المرجع'").includes('قبل الدورة 3'));
   ok('in-range results collapsed', (await sara.locator('summary', { hasText: 'ضمن المرجع (1)' }).count()) === 1);
   await shot(sara, 'alert');
   await sara.locator('main a.card').first().click();

@@ -1,6 +1,6 @@
 // شاشة إشعار «تحليل خارج المرجع»: المريض باختصار، ثم التحاليل الخارجة وقيمها وشدتها وما يتعلق بها
 import { sb, q } from '../api.js';
-import { h, mount, icon, topbar, bottomNav, notice, fmtDate, fmtDay, toast, empty } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, notice, fmtDate, toast, empty } from '../ui.js';
 import { flag, ctcae, testKey } from '../labs.js';
 import { openFile } from '../files.js';
 import { NKDA } from './patient-form.js';
@@ -83,20 +83,7 @@ export async function render(root, params) {
       trend ? h('span', { style: 'font-size: 14px; color: var(--ink-2)', text: trend }) : null);
   };
 
-  // ----------------------------------------------- ملاحظات مهمة
-  const notes = [];
-  const grades = out.map((r) => ({ r, g: ctcae(r.test_name, r.value, r.ref_low, r.ref_high) })).filter((x) => x.g);
-  const severe = grades.filter((x) => x.g.grade >= 3);
-  if (severe.length) notes.push(h('p', { style: 'font-weight: 700', text: `انحراف شديد: ${severe.map((x) => `${x.r.test_name} ${x.g.label}`).join('، ')}. يحتاج مراجعة الطبيب المختص قبل أي إعطاء.` }));
-  const anc = out.find((r) => testKey(r.test_name) === 'ANC' && Number(r.value) < 0.5);
-  if (anc) notes.push(h('p', { text: 'العدلات أقل من 0.5×10⁹/L: أي حرارة ≥ 38.3 °م، أو ≥ 38.0 °م لساعة، تُعامل كحمى قلة العدلات وتحتاج تقييماً عاجلاً (تعريف IDSA).' }));
   const next = t ? (t.cycles || []).filter((c) => ['planned', 'held'].includes(c.status)).sort((a, b) => a.cycle_no - b.cycle_no)[0] : null;
-  if (next) {
-    notes.push(h('p', null, `الدورة القادمة ${next.cycle_no}: ${fmtDay(next.planned_date)} · `,
-      h('b', { text: next.doctor_approved_at ? 'معتمدة ووصلت إلى المزج' : 'لم تُعتمد بعد' }),
-      next.doctor_approved_at ? '. إن تغيّر القرار بسبب هذا التحليل، عدّل الدورة أو أجّلها.' : '. راجع هذا التحليل قبل اعتمادها.'));
-  }
-  notes.push(h('p', { style: 'color: var(--muted)', text: 'المرجع هو المدى الطبيعي للمختبر، وليس حدّ إعطاء العلاج. قرار إعطاء الدورة أو تأجيلها أو تعديل جرعتها للطبيب المختص حسب البروتوكول وحالة المريض. درجات الشدة حسب CTCAE v5.0.' }));
 
   const allergy = p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null;
   const imgPath = first?.attachments?.file_path;
@@ -106,7 +93,6 @@ export async function render(root, params) {
     h('div', { class: 'section-head' }, h('h2', { text: 'التحاليل خارج المرجع' }),
       h('span', { class: 'meta', text: first ? `سحب العينة ${fmtDate(first.test_date, { day: 'numeric', month: 'short', year: 'numeric' })}` : '' })),
     out.length ? out.map(resultCard) : h('div', { class: 'card flush' }, empty('كل نتائج هذا الإدخال ضمن المرجع', 'check')),
-    h('section', { class: 'card', style: 'gap: 8px' }, h('h2', { text: 'ملاحظات مهمة' }), ...notes),
     inRange.length ? h('details', { class: 'card' },
       h('summary', { style: 'font-weight: 700; cursor: pointer', text: `بقية نتائج الإدخال نفسه ضمن المرجع (${inRange.length})` }),
       ...inRange.map((r) => h('p', { class: 'ltr', style: 'text-align: right', text: `${r.test_name} ${r.value} ${r.unit || ''}` }))) : null,
