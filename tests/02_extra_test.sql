@@ -28,7 +28,13 @@ select 'E4 new plan cycles: ' || count(*) from cycles c join treatments t on t.i
 insert into auth.users(id,email,raw_user_meta_data) values ('00000000-0000-0000-0000-000000000009','sp2@t','{"full_name":"مختص2","role":"specialist"}');
 update profiles set status='active', subscription_ends=current_date+30 where id='00000000-0000-0000-0000-000000000009';
 set role authenticated;
+-- (الملف 14: صيدلي المزج يطلب الجرعات فقط، فيُرسل طلب الحذف مسؤول الصيادلة)
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000006';
+select c.id as c1n from cycles c join treatments t on t.id=c.treatment_id where t.patient_id=:'pt' and t.status='active' and c.cycle_no=1 \gset
+select set_config('my.c1n', :'c1n', false);
+do $$ begin perform submit_change_request(current_setting('my.c1n')::uuid, jsonb_build_array(jsonb_build_object('kind','remove_drug','target_dose_id',(select id from cycle_doses where cycle_id=current_setting('my.c1n')::uuid and drug_name='Dexamethasone'))), 'سمية','تقرير'); raise exception 'FAIL';
+exception when others then if sqlerrm = 'FAIL' then raise; end if; raise notice 'E4b mixing remove_drug: %', sqlerrm; end $$;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 select c.id as c1n from cycles c join treatments t on t.id=c.treatment_id where t.patient_id=:'pt' and t.status='active' and c.cycle_no=1 \gset
 select submit_change_request(:'c1n', jsonb_build_array(jsonb_build_object('kind','remove_drug','target_dose_id',(select id from cycle_doses where cycle_id=:'c1n' and drug_name='Dexamethasone'))), 'سمية','تقرير') as req2 \gset
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000009';

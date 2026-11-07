@@ -95,13 +95,14 @@ const B = 'http://localhost:8788/';
   ok('cycle approved by sara', (await sara.locator('.step.done', { hasText: 'د. سارة الربيعي' }).count()) === 1);
   await shot(sara, 'cycle-approved');
 
-  // ===== D. الصيدلي السريري: تحقق ثم اقتراح تعديل
+  // ===== D. الصيدلي السريري: لا تحقق (الملف 14)، الدورة في المزج، ومهمته صورة الطبلة، ثم اقتراح تعديل
   const cp = await login('cp@test.iq');
-  await cp.goto(cycleUrl); await cp.waitForSelector('text=تحقق الصيدلاني');
+  await cp.goto(cycleUrl); await cp.waitForSelector('text=صورة الدورة من طبلة المريض');
   ok('cp has no approve button', (await cp.getByRole('button', { name: 'اعتماد الدورة' }).count()) === 0);
-  await cp.getByRole('button', { name: 'تحقق الصيدلاني' }).click(); await confirm(cp, 'تأكيد التحقق');
-  await cp.waitForSelector('.step.done >> text=رسل عادل');
-  ok('pharmacist verified', true);
+  ok('no pharmacist verification step', (await cp.getByRole('button', { name: 'تحقق الصيدلاني' }).count()) === 0);
+  ok('cycle reached mixing on approval', (await cp.locator('.pill', { hasText: 'وصل قسم المزج' }).count()) >= 1);
+  ok('chart task shown to pharmacist', (await cp.locator('text=مطلوب منك: صوّر الدورة').count()) === 1);
+  await shot(cp, 'cycle-chart-task');
   await cp.getByRole('link', { name: 'اقتراح تعديل على الطبيب' }).click();
   await cp.waitForSelector('text=تقرير الأسباب للطبيب');
   ok('clinical pharmacist cannot change protocol/diagnosis', (await cp.locator('text=تغيير البروتوكول').count()) === 0 && (await cp.locator('text=حذف الدواء').count()) === 0);
@@ -114,7 +115,7 @@ const B = 'http://localhost:8788/';
   await cp.getByRole('button', { name: 'وظائف الكبد' }).click();
   await cp.getByLabel('التقرير').fill('البيليروبين 2.4 ملغ/دل (1.2 إلى 3 أضعاف الحد الأعلى). يُنصح بتخفيض دوكسوروبيسين 25% حسب مرجع eviQ.');
   await shot(cp, 'request-form');
-  await cp.getByRole('button', { name: 'إرسال للطبيب المختص' }).click(); await confirm(cp, 'إرسال');
+  await cp.getByRole('button', { name: 'إرسال الطلب' }).click(); await confirm(cp, 'إرسال');
   await cp.waitForSelector('text=بانتظار القرار');
   ok('request created with 2 items', (await cp.locator('main .row').count()) === 2);
   await shot(cp, 'request-sent');
@@ -135,7 +136,7 @@ const B = 'http://localhost:8788/';
   const after = await sara.locator('main').textContent();
   ok('doxorubicin 80, edited from 107', after.includes('عُدّلت من 107') && after.includes('80'));
   ok('ondansetron not added', !after.includes('Ondansetron'));
-  ok('approvals reset after edit', (await sara.locator('.step.done').count()) === 0);
+  ok('doctor decision keeps cycle approval', (await sara.locator('.step.done', { hasText: 'د. سارة الربيعي' }).count()) === 1);
   await shot(sara, 'cycle-after-decision');
 
   // ===== F. المقيم الأقدم: تعديل مباشر
@@ -183,11 +184,11 @@ const B = 'http://localhost:8788/';
   await chief.getByLabel('تاريخ أول دورة').fill(new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10));
   await chief.getByRole('button', { name: 'تعداد الدم' }).click();
   await chief.getByLabel('التقرير').fill('إعادة تصنيف المرض بعد الخزعة: لمفوما خلايا صغيرة. نقترح BR.');
-  await chief.getByRole('button', { name: 'إرسال للطبيب المختص' }).click(); await confirm(chief, 'إرسال');
+  await chief.getByRole('button', { name: 'إرسال الطلب' }).click(); await confirm(chief, 'إرسال');
   await chief.waitForSelector('text=إلى BR');
   await sara.goto(chief.url()); await sara.waitForSelector('text=قرارك');
   await sara.getByRole('button', { name: 'موافقة على البنود المحددة' }).click(); await confirm(sara, 'موافقة');
-  await sara.waitForSelector('text=وافق الطبيب');
+  await sara.waitForSelector('text=وُوفق عليه');
   await sara.goto(B + '#/patient?id=' + pid); await sara.waitForSelector('text=خطط سابقة');
   ok('protocol switched to BR, R-CHOP in previous', (await sara.locator('.tag', { hasText: 'BR' }).count()) >= 1);
   await shot(sara, 'patient-after-protocol-change');

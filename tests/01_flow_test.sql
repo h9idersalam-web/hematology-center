@@ -114,11 +114,14 @@ select submit_change_request(:'c3', jsonb_build_array(
 select 'T16 not applied before approval: ' || final_dose from cycle_doses where id = :'d3_dox';
 reset role; select 'T16b specialist notified: ' || count(*) from notifications where user_id = '00000000-0000-0000-0000-000000000002' and kind = 'approval'; set role authenticated;
 
--- الطبيب المقيم لا يقرّر
-set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000003';
+-- الطبيب الدوري لا يقرّر، ومرسل الطلب لا يقرّر طلبه (الملف 14: المقيم الأقدم يقرّر طلب مسؤول الصيادلة)
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000004';
 select set_config('my.req', :'req', false);
 do $$ begin perform decide_change_request(current_setting('my.req')::uuid, null, null); raise exception 'FAIL';
-exception when insufficient_privilege then raise notice 'T17 resident decide blocked OK'; end $$;
+exception when insufficient_privilege then raise notice 'T17 intern decide blocked OK'; end $$;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
+do $$ begin perform decide_change_request(current_setting('my.req')::uuid, null, null); raise exception 'FAIL';
+exception when others then if sqlerrm = 'FAIL' then raise; end if; raise notice 'T17b own request: %', sqlerrm; end $$;
 
 -- الطبيب المختص يوافق على بندين ويرفض الثالث، دون سبب (اختياري)
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
@@ -130,21 +133,19 @@ select 'T18c vincristine cycles 2..6: ' || string_agg(c.cycle_no || '=' || cd.fi
 select 'T18d ondansetron not added: ' || count(*) from cycle_doses where drug_name = 'Ondansetron';
 select 'T18e pharmacist told: ' || title from notifications where user_id = '00000000-0000-0000-0000-000000000001' and kind = 'decision';
 
--- ===== الاعتماد ثم التحقق ثم التحويل للمزج
+-- ===== الاعتماد يرسل الدورة إلى المزج مباشرة (الملف 14: لا تحقق صيدلي ولا تحويل يدوي)
 select id as c1 from cycles where treatment_id = :'tid' and cycle_no = 1 \gset
 select approve_cycle(:'c1');
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000005';
-select verify_cycle(:'c1');
--- التحويل يتطلب الصورتين
 select set_config('my.c1', :'c1', false);
+do $$ begin perform verify_cycle(current_setting('my.c1')::uuid); raise exception 'FAIL';
+exception when others then if sqlerrm = 'FAIL' then raise; end if; raise notice 'T19 verify step removed: %', sqlerrm; end $$;
 do $$ begin perform transfer_to_mixing(current_setting('my.c1')::uuid, null, null); raise exception 'FAIL';
-exception when others then raise notice 'T19 transfer without images: %', sqlerrm; end $$;
-select add_attachment(:'pt', 'id_card', 'patients/' || :'pt' || '/id.jpg') as a_id \gset
-select add_attachment(:'pt', 'prescription', 'patients/' || :'pt' || '/rx.jpg') as a_rx \gset
+exception when others then if sqlerrm = 'FAIL' then raise; end if; raise notice 'T19a manual transfer removed: %', sqlerrm; end $$;
 select set_config('my.pt2', :'pt', false);
 do $$ begin perform add_attachment(current_setting('my.pt2')::uuid, 'lab', 'patients/other/x.jpg'); raise exception 'FAIL';
 exception when others then raise notice 'T19b wrong path: %', sqlerrm; end $$;
-select transfer_to_mixing(:'c1', :'a_id', :'a_rx') as ord \gset
+select id as ord from mixing_orders where cycle_id = :'c1' and day = 1 \gset
 select 'T20 mixing items (IV only): ' || count(*) from mixing_items where order_id = :'ord';
 
 -- ===== قسم المزج: علامة صح على دواء واحد ثم إرسال

@@ -25,22 +25,26 @@ const B = 'http://localhost:8788/';
   const nav = async (page, url) => { if (page.url() === url) await page.reload(); else await page.goto(url); };
   const shot = async (page, name, full = true) => { await page.waitForTimeout(600); await page.screenshot({ path: `${OUT}/pf-${String(++n).padStart(2, '0')}-${name}.png`, fullPage: full }); };
   const openProto = async (page, name) => { await nav(page, B + '#/protocols'); await page.waitForSelector('main .row'); await page.locator('main .row', { hasText: name }).first().click(); await page.waitForSelector('text=الملف المرجعي'); };
+  // المتصفح التجريبي قد ينزّل الـ PDF بدل عرضه فيبقى عنوان النافذة فارغاً؛ نتحقق من الطلب الذي فتحته النافذة
   const opensPdf = async (page, label) => {
     const [popup] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: label }).click()]);
-    await popup.waitForURL(/object\/sign\//, { timeout: 8000 }).catch(() => {});
-    const u = popup.url(); await popup.close(); return /object\/sign\/patient-files\/protocols\//.test(u);
+    const seen = [popup.url()];
+    popup.on('request', (r) => seen.push(r.url()));
+    await popup.waitForURL(/object\/sign\//, { timeout: 4000 }).catch(() => {});
+    seen.push(popup.url()); await popup.close();
+    return seen.some((u) => /object\/sign\/patient-files\/protocols\//.test(u));
   };
 
   const chief = await login('admin@test.iq');
   const sara = await login('sara@test.iq');
 
-  // 1. مسؤول الصيادلة يرفق أول ملف لبروتوكول معتمد (ABVD)، ثم لا يستطيع استبداله
+  // 1. مسؤول الصيادلة يرفق أول ملف لبروتوكول معتمد (ABVD)، ويستطيع استبداله (الملف 14)
   await openProto(chief, 'ABVD');
   ok('no file notice shown', (await chief.locator('text=لم يُرفق ملف البروتوكول المعتمد في المركز بعد').count()) === 1);
   await chief.locator('#proto-file').setInputFiles(FIX + '/protocol.pdf');
   await chief.waitForSelector('text=فتح ملف البروتوكول');
   ok('chief attached first file', true);
-  ok('chief cannot replace approved file', (await chief.locator('label[for="proto-file"]').count()) === 0 && (await chief.locator('text=استبدال ملف بروتوكول معتمد لطبيب الاختصاص فقط').count()) === 1);
+  ok('chief can replace approved file (file 14)', (await chief.locator('label[for="proto-file"]').count()) === 1);
   ok('opens signed PDF link', await opensPdf(chief, 'فتح ملف البروتوكول'));
   await shot(chief, 'protocol-with-file');
 

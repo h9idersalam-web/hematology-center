@@ -25,13 +25,21 @@ export async function render(root, params) {
       .order('created_at', { ascending: false }).limit(200));
   } catch (e) { list.replaceChildren(notice('err', 'warn', h('p', { text: e.message }))); return; }
   // التعديلات المباشرة للأطباء تُسجَّل طلباتٍ موافَقاً عليها؛ لا تظهر هنا إلا في «تقرّرت»
-  const mine = (r) => r.patients?.specialist_id === me.id || (!r.patients?.specialist_id && me.role === 'specialist');
+  // من يقرّر (نفس قاعدة can_decide_request في القاعدة)
+  //   طلب الصيدلي السريري: المختص بالمريض، المقيم الأقدم، مسؤول الصيادلة
+  //   طلب مسؤول الصيادلة أو المزج: المختص بالمريض، المقيم الأقدم
+  const decidable = (r) => r.requested_by !== me.id && (
+    (me.role === 'specialist' && (!r.patients?.specialist_id || r.patients.specialist_id === me.id))
+    || me.role === 'senior_resident'
+    || (me.role === 'chief_clinical_pharmacist' && r.requester_role === 'clinical_pharmacist'));
+  const approver = can('decide');
+  const pending = rows.filter((r) => r.status === 'pending');
   const tabs = [
-    ['pending', me.role === 'specialist' ? 'بانتظار قراري' : 'بانتظار القرار', rows.filter((r) => r.status === 'pending' && (me.role !== 'specialist' || mine(r)))],
+    ['pending', approver ? 'بانتظار قراري' : 'بانتظار القرار', approver ? pending.filter(decidable) : pending],
     ['mine', 'طلباتي', rows.filter((r) => r.requested_by === me.id)],
     ['done', 'تقرّرت', rows.filter((r) => r.status !== 'pending' && r.requester_role.includes('pharmacist'))],
   ];
-  if (me.role === 'specialist') tabs.splice(1, 1, ['others', 'لأطباء آخرين', rows.filter((r) => r.status === 'pending' && !mine(r))]);
+  if (approver) tabs.splice(1, 0, ['others', 'لغيري', pending.filter((r) => !decidable(r))]);
 
   function drawSeg() {
     seg.replaceChildren(...tabs.map(([id, label, arr]) => h('button', {
@@ -41,8 +49,8 @@ export async function render(root, params) {
   }
   function draw() {
     const cur = (tabs.find((x) => x[0] === tab) || tabs[0])[2];
-    intro.replaceChildren(tab === 'pending' && me.role === 'specialist' && cur.length
-      ? notice('info', 'info', h('p', { text: 'افتح كل طلب لتقرأ تقرير الصيدلاني وتوافق على بنوده كلها أو بعضها أو ترفضه.' })) : null);
+    intro.replaceChildren(tab === 'pending' && approver && cur.length
+      ? notice('info', 'info', h('p', { text: 'افتح كل طلب لتقرأ التقرير وتوافق على بنوده كلها أو بعضها أو ترفضه.' })) : null);
     list.replaceChildren(...(cur.length ? cur.map(row) : [empty({ pending: 'لا توجد طلبات معلّقة', mine: 'لم ترسل طلبات بعد', done: 'لا توجد طلبات مقرّرة', others: 'لا توجد طلبات لأطباء آخرين' }[tab], 'check')]));
   }
   drawSeg(); draw();

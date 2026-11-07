@@ -21,8 +21,14 @@ export async function render(root, params) {
   const [stL, stK] = CR_STATUS[r.status];
   const me = state.profile;
   const p = r.patients;
-  const isMine = !p.specialist_id || p.specialist_id === me.id;
+  // من يقرّر: تحدده القاعدة (can_decide_request) حسب نوع مرسل الطلب
   const deciding = r.status === 'pending' && can('decide');
+  const isMine = deciding ? await rpc('can_decide_request', { p_req: id }).catch(() => false) : false;
+  const whoDecides = r.requester_role === 'clinical_pharmacist'
+    ? 'الطبيب المختص بهذا المريض أو المقيم الأقدم أو مسؤول الصيادلة'
+    : 'الطبيب المختص بهذا المريض أو المقيم الأقدم';
+  // تعديل جاء من المزج أو مسؤول الصيادلة، أو قرّره غير طبيب، يُسقط اعتماد الدورة
+  const dropsApproval = ['mixing_pharmacist', 'chief_clinical_pharmacist'].includes(r.requester_role) || !['specialist', 'senior_resident'].includes(me.role);
 
   const checks = new Map();
   const itemCard = (it) => {
@@ -39,7 +45,7 @@ export async function render(root, params) {
       verdict);
   };
 
-  const note = h('textarea', { class: 'input', rows: 2, placeholder: 'سبب الرفض أو ملاحظة للصيدلاني (اختياري)' });
+  const note = h('textarea', { class: 'input', rows: 2, placeholder: 'سبب الرفض أو ملاحظة لمرسل الطلب (اختياري)' });
   const approveBtn = h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), 'موافقة على البنود المحددة');
   const rejectBtn = h('button', { type: 'button', class: 'btn danger block' }, icon('x', 22), 'رفض الطلب كاملاً');
   const decide = async (btn, all) => busy(btn, async () => {
@@ -47,7 +53,10 @@ export async function render(root, params) {
     if (!all && !ids.length) return toast('حدّد بنداً واحداً على الأقل، أو اضغط «رفض الطلب كاملاً»', true);
     const ok = await confirmDialog({
       title: all ? 'رفض الطلب' : `الموافقة على ${count(ids.length, 'item')} من ${items.length}`,
-      body: all ? 'لن يُطبَّق أي بند، ويُبلَّغ الصيدلاني بقرارك.' : 'تُطبَّق البنود المحددة فوراً على الدورة، ويُلغى اعتمادها السابق ليُعاد. وتُرفض البنود غير المحددة.',
+      body: all ? 'لن يُطبَّق أي بند، ويُبلَّغ مرسل الطلب بقرارك.'
+        : 'تُطبَّق البنود المحددة فوراً، وتُرفض غير المحددة. ' + (dropsApproval
+          ? 'ويُسقط اعتماد الدورة ويُعلَّق مزجها حتى يعيد الطبيب المختص أو المقيم الأقدم اعتمادها.'
+          : 'ويبقى اعتماد الدورة، ويُبلَّغ قسم المزج بالتغيير.'),
       okText: all ? 'رفض' : 'موافقة', danger: all,
     });
     if (!ok) return;
@@ -82,7 +91,7 @@ export async function render(root, params) {
       r.status !== 'pending' ? notice(r.status === 'rejected' ? 'warn' : 'ok', r.status === 'rejected' ? 'x' : 'check',
         h('p', { style: 'font-weight: 700', text: `${stL} · ${r.decider?.full_name || ''} · ${fmtDate(r.decided_at, { day: 'numeric', month: 'short' })} ${fmtTime(r.decided_at)}` }),
         r.decision_note ? h('p', { text: r.decision_note }) : null) : null,
-      deciding && !isMine ? notice('info', 'lock', h('p', { text: 'القرار للطبيب المختص بهذا المريض.' })) : null,
+      r.status === 'pending' && !isMine ? notice('info', 'lock', h('p', { text: `القرار لـ${whoDecides}.` })) : null,
       deciding && isMine ? h('section', { class: 'card' }, h('h2', { text: 'قرارك' }),
         h('p', { class: 'hint', text: 'ألغِ تحديد أي بند لا توافق عليه.' }), field('ملاحظة', note), approveBtn, rejectBtn) : null,
       r.cycles ? h('a', { class: 'btn secondary block', href: '#/cycle?id=' + r.cycles.id }, 'فتح الدورة') : null),

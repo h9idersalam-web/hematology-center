@@ -9,18 +9,18 @@ import { postponeDialog } from './postpone.js';
 import { latestCbc } from './labs.js';
 import { flag } from '../labs.js';
 import { daysList } from '../dose.js';
-import { protocolFileLink } from '../files.js';
+import { protocolFileLink, uploadAttachment, signedUrl, openFile, isImage } from '../files.js';
 
-export const CR_STATUS = { pending: ['بانتظار القرار', 'warn'], approved: ['وافق الطبيب', 'ok'], partially_approved: ['موافقة جزئية', 'info'], rejected: ['رُفض', 'muted'] };
+export const CR_STATUS = { pending: ['بانتظار القرار', 'warn'], approved: ['وُوفق عليه', 'ok'], partially_approved: ['موافقة جزئية', 'info'], rejected: ['رُفض', 'muted'] };
 const C_STATUS = { planned: ['مجدولة', 'muted'], held: ['موقوفة', 'warn'], given: ['أُعطيت', 'ok'], cancelled: ['أُلغيت', 'muted'] };
 
 export async function render(root, params) {
   const id = params.get('id');
   const [c, doses, reqs, orders] = await Promise.all([
-    q(sb.from('cycles').select('*, doctor:profiles!cycles_doctor_approved_by_fkey(full_name), pharm:profiles!cycles_pharmacist_verified_by_fkey(full_name), treatments(*, protocols(file_path), patients(id, full_name, file_no, allergies, archived_at))').eq('id', id).maybeSingle()),
+    q(sb.from('cycles').select('*, doctor:profiles!cycles_doctor_approved_by_fkey(full_name), charter:profiles!cycles_chart_by_fkey(full_name), chart:attachments!cycles_chart_attachment_id_fkey(file_path), treatments(*, protocols(file_path), patients(id, full_name, file_no, allergies, archived_at, specialist_id))').eq('id', id).maybeSingle()),
     q(sb.from('cycle_doses').select('*').eq('cycle_id', id).order('sort').order('drug_name')),
     q(sb.from('change_requests').select('id, status, requester_role, created_at, report, requester:profiles!change_requests_requested_by_fkey(full_name), change_request_items(id)').eq('cycle_id', id).order('created_at', { ascending: false })),
-    q(sb.from('mixing_orders').select('id, day, status').eq('cycle_id', id)),
+    q(sb.from('mixing_orders').select('id, day, status, hold_reason').eq('cycle_id', id)),
   ]);
   if (!c) throw new Error('الدورة غير موجودة');
   const t = c.treatments, p = t.patients;
@@ -37,14 +37,8 @@ export async function render(root, params) {
   const actions = [];
   if (live && can('approveCycle') && !c.doctor_approved_at && c.status === 'planned') {
     actions.push(actionBtn('ok', 'check', 'اعتماد الدورة', async () => {
-      const ok = await confirmDialog({ title: `اعتماد الدورة ${c.cycle_no}`, body: 'تؤكد أن الجرعات مناسبة لحالة المريض الحالية وتحاليله.', okText: 'اعتماد' });
-      if (ok) { await rpc('approve_cycle', { p_cycle: id }); toast('اعتُمدت الدورة'); reload(); }
-    }));
-  }
-  if (live && can('verifyCycle') && c.doctor_approved_at && !c.pharmacist_verified_at) {
-    actions.push(actionBtn('ok', 'shield', 'تحقق الصيدلاني', async () => {
-      const ok = await confirmDialog({ title: 'تحقق الصيدلاني', body: 'تؤكد مراجعة الحساب والسقوف والتداخلات والحساسية ومحلول التخفيف.', okText: 'تأكيد التحقق' });
-      if (ok) { await rpc('verify_cycle', { p_cycle: id }); toast('سُجّل تحققك'); reload(); }
+      const ok = await confirmDialog({ title: `اعتماد الدورة ${c.cycle_no}`, body: 'تؤكد أن الجرعات مناسبة لحالة المريض الحالية وتحاليله. تصل الدورة إلى قسم المزج فور اعتمادها.', okText: 'اعتماد' });
+      if (ok) { await rpc('approve_cycle', { p_cycle: id }); toast('اعتُمدت الدورة ووصلت إلى المزج'); reload(); }
     }));
   }
   if (open && can('doctorEdit')) actions.push(h('a', { class: 'btn secondary block', href: '#/cycle-edit?id=' + id }, icon('edit', 22), 'تعديل الجرعات أو الخطة'));
@@ -52,9 +46,9 @@ export async function render(root, params) {
   if (live && can('postpone')) {
     actions.push(actionBtn('secondary', 'clock', 'تأجيل الدورة', async () => { if (await postponeDialog({ ...c, patient_name: p.full_name })) reload(); }));
   }
-  if (live && can('completeCycle') && c.doctor_approved_at && c.pharmacist_verified_at && daysUntil(c.planned_date) <= 0) {
-    actions.push(actionBtn('secondary', 'check', 'تسجيل الدورة كمُعطاة', async () => {
-      const ok = await confirmDialog({ title: `إغلاق الدورة ${c.cycle_no}`, body: 'تُسجَّل الدورة مُعطاة ولا يمكن تعديل جرعاتها بعد ذلك. تسجيل الإعطاء لكل دواء من التمريض يأتي في الخطوة 5.', okText: 'تسجيل' });
+  if (live && can('completeCycle') && c.doctor_approved_at && daysUntil(c.planned_date) <= 0) {
+    actions.push(actionBtn('secondary', 'check', 'إغلاق الدورة', async () => {
+      const ok = await confirmDialog({ title: `إغلاق الدورة ${c.cycle_no}`, body: 'تُسجَّل الدورة مُعطاة ولا يمكن تعديل جرعاتها بعد ذلك، ويُغلق ما لم يُرسل من طلبات المزج. أغلقها بعد اكتمال الإعطاء.', okText: 'إغلاق' });
       if (ok) { await rpc('complete_cycle', { p_cycle: id }); toast('سُجّلت الدورة مُعطاة'); reload(); }
     }));
   }
@@ -72,11 +66,14 @@ export async function render(root, params) {
       p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null,
       t.status === 'pending_approval' ? notice('info', 'info', h('p', { text: 'خطة العلاج بانتظار موافقة الطبيب المختص. لا تُعتمد الدورة قبلها.' })) : null,
       t.status === 'stopped' ? notice('warn', 'warn', h('p', { text: 'أُوقفت الخطة: ' + (t.stop_reason || '') })) : null,
-      steps(c),
+      steps(c, orders),
+      c.status === 'planned' && !c.doctor_approved_at && orders.some((o) => o.status === 'held')
+        ? notice('warn', 'lock', h('p', { text: 'عُدّلت الدورة بطلب من المزج أو الصيادلة، فعُلّق المزج حتى يعيد الطبيب اعتمادها.' })) : null,
+      chartCard(c, p, open, reload),
       cbcCard(cbc, p.id),
       flowCard(c, active, orders, live),
       pendingReqs.length ? h('a', { href: '#/request?id=' + pendingReqs[0].id, class: 'notice warn', style: 'text-decoration: none; align-items: center' },
-        icon('warn', 22), h('span', { style: 'flex: 1', text: `${count(pendingReqs.length, 'request')} تعديل بانتظار قرار الطبيب المختص. لا يتحقق الصيدلاني قبل القرار.` }),
+        icon('warn', 22), h('span', { style: 'flex: 1', text: `${count(pendingReqs.length, 'request')} تعديل بانتظار القرار.` }),
         h('b', { text: 'عرض' })) : null,
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'الجرعات' }), h('span', { class: 'meta', text: count(active.length, 'drug') })),
@@ -98,16 +95,16 @@ function actionBtn(kind, ic, label, fn) {
   return b;
 }
 
-function steps(c) {
+function steps(c, orders) {
   const step = (done, title, by, at, waiting) => h('div', { class: 'step' + (done ? ' done' : waiting ? ' now' : '') },
     h('span', { class: 'dot' }, done ? icon('check', 16, '#fff', 3) : null),
     h('span', { style: 'display: flex; flex-direction: column' },
       h('b', { style: 'font-size: 15px', text: title }),
       h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: done ? `${by || ''} · ${fmtDate(at, { day: 'numeric', month: 'short' })} ${fmtTime(at)}` : waiting ? 'بانتظار' : 'لاحقاً' })));
   return h('div', { class: 'card steps' },
-    step(!!c.doctor_approved_at, 'اعتماد الطبيب', c.doctor?.full_name, c.doctor_approved_at, !c.doctor_approved_at),
-    step(!!c.pharmacist_verified_at, 'تحقق الصيدلاني', c.pharm?.full_name, c.pharmacist_verified_at, !!c.doctor_approved_at && !c.pharmacist_verified_at),
-    step(c.status === 'given', 'المزج والإعطاء', null, null, false));
+    step(!!c.doctor_approved_at, 'اعتماد الطبيب ووصول الدورة إلى المزج', c.doctor?.full_name, c.doctor_approved_at, !c.doctor_approved_at),
+    step(!!c.chart_at, 'صورة الطبلة من الصيدلي', c.charter?.full_name, c.chart_at, !!c.doctor_approved_at && !c.chart_at),
+    step(c.status === 'given', 'الإعطاء وإغلاق الدورة', null, null, !!c.doctor_approved_at && c.status !== 'given'));
 }
 
 // آخر تعداد دم: يراه الطبيب قبل الاعتماد والصيدلاني قبل التحقق
@@ -131,19 +128,18 @@ function cbcCard(cbc, pid) {
 function flowCard(c, doses, orders, live) {
   if (!live) return null;
   const days = [...new Set(doses.flatMap((d) => daysList(d.days)))].sort((a, b) => a - b);
-  const ready = c.doctor_approved_at && c.pharmacist_verified_at;
-  const O = { incoming: 'وصل قسم المزج', in_progress: 'قيد التحضير', partially_sent: 'أُرسل جزء', sent: 'أُرسل كاملاً', held: 'موقوف' };
+  const ready = !!c.doctor_approved_at;
+  const O = { incoming: 'وصل قسم المزج', in_progress: 'قيد التحضير', partially_sent: 'أُرسل جزء', sent: 'أُرسل كاملاً', held: 'معلّق' };
   return h('section', { class: 'section' },
     h('div', { class: 'section-head' }, h('h2', { text: 'المزج والإعطاء' })),
-    !ready ? notice('info', 'lock', h('p', { text: 'يبدأ التحويل للمزج والإعطاء بعد اعتماد الطبيب وتحقق الصيدلاني.' })) : null,
+    !ready ? notice('info', 'lock', h('p', { text: 'تصل الدورة إلى المزج تلقائياً بعد اعتماد الطبيب، ويبدأ الإعطاء بعدها.' })) : null,
     h('div', { class: 'card flush' }, days.map((n) => {
       const mixed = doses.some((d) => d.is_mixed && daysList(d.days).includes(n));
       const o = orders.find((x) => x.day === n);
       let mix;
       if (!mixed) mix = h('span', { class: 'pill muted', text: 'بلا مزج' });
-      else if (o) mix = h('a', { class: 'pill info', href: '#/mixing-order?id=' + o.id, style: 'text-decoration: none', text: O[o.status] });
-      else if (ready && can('transfer')) mix = h('a', { class: 'btn primary sm', href: `#/transfer?cycle=${c.id}&day=${n}`, text: 'تحويل للمزج' });
-      else mix = h('span', { class: 'pill muted', text: 'لم يُحوَّل' });
+      else if (o) mix = h('a', { class: 'pill ' + (o.status === 'held' ? 'warn' : 'info'), href: '#/mixing-order?id=' + o.id, style: 'text-decoration: none', text: O[o.status], title: o.hold_reason || '' });
+      else mix = h('span', { class: 'pill muted', text: 'بعد الاعتماد' });
       return h('div', { class: 'row' },
         h('a', { href: `#/administer?cycle=${c.id}&day=${n}`, style: 'display: flex; flex-direction: column; flex: 1; text-decoration: none; color: inherit' },
           h('b', { style: 'font-size: 15px', text: `اليوم ${n}` }),
@@ -151,6 +147,36 @@ function flowCard(c, doses, orders, live) {
         mix);
     })));
 }
+// صورة الدورة من طبلة المريض: يرفقها الصيدلي السريري أو مسؤوله، وتصل إلى المزج للتحقق
+function chartCard(c, p, open, reload) {
+  const mine = can('chart') && open;
+  if (!c.chart && !mine) return null;
+  const img = h('span', { class: 'ft-img', style: 'height: 120px' }, icon('file', 28, '#8A929C'));
+  if (c.chart && isImage(c.chart.file_path)) signedUrl(c.chart.file_path).then((u) => img.replaceChildren(h('img', { src: u, alt: 'صورة الطبلة' }))).catch(() => {});
+  const status = h('p', { class: 'hint' });
+  const input = h('input', { type: 'file', accept: 'image/*,application/pdf', class: 'sr-only', id: 'chart-in' });
+  input.addEventListener('change', async () => {
+    if (!input.files[0]) return;
+    status.textContent = 'جارٍ الرفع…';
+    try {
+      const aid = await uploadAttachment(p.id, input.files[0], { kind: 'chart', title: `طبلة الدورة ${c.cycle_no}` });
+      await rpc('set_cycle_chart', { p_cycle: c.id, p_attachment: aid });
+      toast('أُرسلت صورة الطبلة إلى المزج'); reload();
+    } catch (e) { status.textContent = e.message; }
+  });
+  const due = mine && !c.chart && c.doctor_approved_at;
+  return h('section', { class: 'card' + (due ? ' due' : ''), style: due ? 'border-color: var(--warn)' : '' },
+    h('div', { style: 'display: flex; justify-content: space-between; align-items: baseline; gap: 8px' },
+      h('h2', { text: 'صورة الدورة من طبلة المريض' }),
+      c.chart_at ? h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: `${c.charter?.full_name || ''} · ${fmtDate(c.chart_at, { day: 'numeric', month: 'short' })}` }) : null),
+    c.chart ? h('button', { type: 'button', class: 'file-tile', style: 'max-width: 220px', onclick: () => openFile(c.chart.file_path).catch((e) => toast(e.message, true)) }, img, h('span', { class: 'ft-t', text: 'فتح الصورة' })) : null,
+    due ? notice('warn', 'warn', h('p', { text: 'مطلوب منك: صوّر الدورة من طبلة المريض وأرفقها. تصل إلى المزج للتحقق، ولا تؤخر التحضير.' }))
+      : !c.chart ? h('p', { class: 'hint', text: 'تُرفق بعد اعتماد الطبيب، وتصل إلى قسم المزج للتحقق.' }) : null,
+    mine ? input : null,
+    mine ? h('label', { for: 'chart-in', class: 'btn secondary block' }, icon('plus', 22), c.chart ? 'استبدال الصورة' : 'إرفاق صورة الطبلة') : null,
+    status);
+}
+
 const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 
 function doseRow(d, t) {

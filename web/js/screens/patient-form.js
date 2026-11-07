@@ -84,7 +84,7 @@ export async function render(root, params) {
       field('الأدوية التي يتحسس منها', allergies)),
     h('div', { class: 'card' },
       h('h2', { text: 'الطبيب المختص' }),
-      field('المسؤول عن قرارات العلاج والموافقات', spSelect)),
+      field('المسؤول عن قرارات العلاج والموافقات (إلزامي)', spSelect, 'وحده يوافق على خطة العلاج أو يرفضها، ويقرّر طلبات تعديل هذا المريض.')),
     errBox, submit);
 
   form.addEventListener('submit', (e) => {
@@ -131,6 +131,7 @@ export async function render(root, params) {
     if (full.length < 3) return { error: 'اكتب اسم المريض الكامل' };
     if (full.split(' ').length < 2) return { error: 'اكتب الاسم مع اسم الأب على الأقل، لتمييز المرضى المتشابهين' };
     if (!sex) return { error: 'اختر جنس المريض' };
+    if (!spSelect.value) return { error: 'اختر الطبيب المختص بالمريض' };
     if (birth.value && birth.value > todayISO()) return { error: 'تاريخ الميلاد في المستقبل' };
     const ph = latinDigits(phone.value).replace(/[\s-]/g, '').replace(/^\+?964/, '0');
     if (ph && !/^07\d{9}$/.test(ph)) return { error: 'رقم الهاتف غير صحيح، اكتبه بصيغة 07XXXXXXXXX' };

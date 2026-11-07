@@ -37,7 +37,7 @@ export async function render(root, params) {
       catch (e) { toast(e.message, true); }
     });
   });
-  const archiveBtn = can('approveProtocol') && !p.archived_at
+  const archiveBtn = can('manageProtocol') && !p.archived_at
     ? h('button', { class: 'btn danger block', type: 'button', onclick: async () => {
         const ok = await confirmDialog({ title: 'أرشفة ' + p.name, body: 'لن يظهر في قائمة اختيار البروتوكول للخطط الجديدة. الخطط القائمة لا تتأثر.', okText: 'أرشفة', danger: true });
         if (!ok) return;
@@ -67,7 +67,9 @@ export async function render(root, params) {
 
 function fileSection(p, reload) {
   const isSpecialist = state.profile.role === 'specialist';
-  const canAttach = can('createProtocol') && !p.archived_at && (!p.file_path || !p.approved_at || isSpecialist);
+  // استبدال ملف بروتوكول معتمد: طبيب الاختصاص ومسؤول الصيادلة ومدير البرنامج
+  const manager = can('manageProtocol');
+  const canAttach = (can('createProtocol') || manager) && !p.archived_at && (!p.file_path || !p.approved_at || manager);
   const status = h('p', { class: 'hint', 'aria-live': 'polite' });
   let input = null, picker = null;
   if (canAttach) {
@@ -90,8 +92,8 @@ function fileSection(p, reload) {
     p.file_path ? protocolFileLink(p.file_path, 'فتح ملف البروتوكول')
       : notice('warn', 'file', h('p', { text: 'لم يُرفق ملف البروتوكول المعتمد في المركز بعد. إرفاقه يتيح لكل من يعتمد أو يتحقق أو يحضّر الجرعات أن يطابق مع المصدر نفسه.' })),
     input, picker, status,
-    p.file_path && p.approved_at && !isSpecialist && can('createProtocol')
-      ? h('p', { class: 'hint', text: 'استبدال ملف بروتوكول معتمد لطبيب الاختصاص فقط.' }) : null);
+    p.file_path && p.approved_at && !manager && can('createProtocol')
+      ? h('p', { class: 'hint', text: 'استبدال ملف بروتوكول معتمد لطبيب الاختصاص ومسؤول الصيادلة ومدير البرنامج.' }) : null);
 }
 
 function drugRow(d) {

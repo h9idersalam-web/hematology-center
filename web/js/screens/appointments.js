@@ -35,7 +35,7 @@ export async function render(root, params) {
     const today = todayISO();
     try {
       let x = sb.from('cycles')
-        .select('id, cycle_no, planned_date, status, postpone_reason, doctor_approved_at, pharmacist_verified_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name, file_no, allergies, archived_at))')
+        .select('id, cycle_no, planned_date, status, postpone_reason, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name, file_no, allergies, archived_at))')
         .in('status', ['planned', 'held'])
         .in('treatments.status', ['active', 'pending_approval'])
         .is('treatments.patients.archived_at', null);
@@ -51,10 +51,10 @@ export async function render(root, params) {
         return;
       }
 
-      const ready = rows.filter((c) => c.pharmacist_verified_at).length;
+      const ready = rows.filter((c) => c.doctor_approved_at).length;
       summary.textContent = view === 'late'
         ? `${count(rows.length, 'session')} تجاوزت موعدها. أعطِها أو أجّلها بسبب واضح.`
-        : `${count(rows.length, 'session')} · ${ready} جاهزة للمزج`;
+        : `${count(rows.length, 'session')} · ${ready} معتمدة ووصلت إلى المزج`;
 
       // التجميع حسب اليوم
       const groups = new Map();
@@ -87,8 +87,7 @@ function row(c, reload) {
   if (t.status === 'pending_approval') pill = h('span', { class: 'pill info', text: 'الخطة بانتظار الموافقة' });
   else if (c.status === 'held') pill = h('span', { class: 'pill warn', text: 'موقوفة' });
   else if (late) pill = h('span', { class: 'pill warn', text: 'متأخرة' });
-  else if (c.pharmacist_verified_at) pill = h('span', { class: 'pill ok', text: 'جاهزة' });
-  else if (c.doctor_approved_at) pill = h('span', { class: 'pill info', text: 'بانتظار الصيدلاني' });
+  else if (c.doctor_approved_at) pill = h('span', { class: 'pill ok', text: 'في المزج' });
   else pill = h('span', { class: 'pill muted', text: 'بانتظار الطبيب' });
 
   const hasAllergy = pt.allergies && !/لا توجد/.test(pt.allergies);

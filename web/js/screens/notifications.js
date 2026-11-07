@@ -20,6 +20,8 @@ const LINKS = {
   treatment: (id) => '#/treatment?id=' + id,
   change_request: (id) => '#/request?id=' + id,
   protocol: (id) => '#/protocol?id=' + id,
+  cycle: (id) => '#/cycle?id=' + id,
+  mixing_order: (id) => '#/mixing-order?id=' + id,
 };
 
 export async function render(root, params) {

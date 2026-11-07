@@ -1,7 +1,7 @@
 // ملف المريض: البيانات، والحساسية، وخطة العلاج ودوراتها، والخطط السابقة
 import { sb, q, rpc, countOf } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, empty, fmtDate, fmtDay, daysUntil, ageText, bsa, SEX, toast, confirmDialog, initials, count, busy } from '../ui.js';
-import { go } from '../app.js';
+import { go, state } from '../app.js';
 import { can } from '../perms.js';
 import { NKDA } from './patient-form.js';
 import { postponeDialog } from './postpone.js';
@@ -35,7 +35,7 @@ export async function render(root, params) {
   const current = treatments.find((t) => t.status === 'active' || t.status === 'pending_approval') || null;
   const previous = treatments.filter((t) => t !== current);
   const cycles = current
-    ? await q(sb.from('cycles').select('id, cycle_no, planned_date, status, postpone_reason, doctor_approved_at, pharmacist_verified_at')
+    ? await q(sb.from('cycles').select('id, cycle_no, planned_date, status, postpone_reason, doctor_approved_at')
         .eq('treatment_id', current.id).order('cycle_no'))
     : [];
 
@@ -166,7 +166,7 @@ function cycleRow(c, isNext, p, reload) {
   const late = (c.status === 'planned' || c.status === 'held') && d < 0;
   let readiness = null;
   if (c.status === 'planned' && isNext) {
-    readiness = c.pharmacist_verified_at ? 'معتمدة ومتحقق منها' : c.doctor_approved_at ? 'بانتظار تحقق الصيدلاني' : 'بانتظار اعتماد الطبيب';
+    readiness = c.doctor_approved_at ? 'معتمدة ووصلت إلى المزج' : 'بانتظار اعتماد الطبيب';
   }
   return h('div', { class: 'row', style: isNext ? 'background: #FFFBFB' : null },
     h('a', { href: '#/cycle?id=' + c.id, 'aria-label': `الدورة ${c.cycle_no}، ${fmtDay(c.planned_date)}`, style: 'display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; text-decoration: none; color: inherit' },
@@ -185,7 +185,9 @@ function cycleRow(c, isNext, p, reload) {
 function planActions(p, t, reload) {
   if (p.archived_at) return null;
   const out = [];
-  if (t.status === 'pending_approval' && can('approvePlan')) {
+  // الموافقة على الخطة ورفضها للطبيب المختص بهذا المريض حصراً
+  const mineToDecide = can('approvePlan') && p.specialist_id === state.profile.id;
+  if (t.status === 'pending_approval' && mineToDecide) {
     const b = h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), 'الموافقة على الخطة');
     b.addEventListener('click', () => busy(b, async () => {
       const ok = await confirmDialog({ title: 'الموافقة على خطة ' + t.protocol_name, body: 'راجع البروتوكول والتشخيص وجرعات الدورة الأولى قبل الموافقة. تُفعَّل الخطة ويُبلَّغ من أنشأها.', okText: 'موافقة' });
@@ -193,6 +195,17 @@ function planActions(p, t, reload) {
       try { await rpc('approve_treatment', { p_tid: t.id }); toast('فُعّلت الخطة'); reload(); } catch (e) { toast(e.message, true); }
     }));
     out.push(b);
+    const r = h('button', { type: 'button', class: 'btn danger block' }, icon('x', 22), 'رفض الخطة');
+    r.addEventListener('click', () => busy(r, async () => {
+      const reason = await confirmDialog({ title: 'رفض خطة ' + t.protocol_name, body: 'تُلغى الخطة ودوراتها، ويُبلَّغ من أنشأها بسببك.', okText: 'رفض', danger: true,
+        input: { label: 'سبب الرفض', placeholder: 'مثال: البروتوكول غير مناسب، التشخيص يحتاج تأكيداً' } });
+      if (reason === null) return;
+      if (!reason) return toast('اكتب سبب الرفض', true);
+      try { await rpc('reject_treatment', { p_tid: t.id, p_reason: reason }); toast('رُفضت الخطة'); reload(); } catch (e) { toast(e.message, true); }
+    }));
+    out.push(r);
+  } else if (t.status === 'pending_approval') {
+    out.push(notice('info', 'lock', h('p', { text: `الموافقة على الخطة أو رفضها للطبيب المختص بالمريض${p.specialist_name ? ': ' + p.specialist_name : ''}.` })));
   }
   if (can('stopPlan')) {
     out.push(h('button', { type: 'button', class: 'link-btn', style: 'color: var(--muted)', onclick: async () => {

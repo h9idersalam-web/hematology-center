@@ -101,6 +101,15 @@ export const ROLES = {
   nurse: 'ممرض',
 };
 
+// اسم الدور كما يظهر للمستخدم نفسه (الرديف يُميَّز عن مسؤول الصيادلة الأصلي)
+export function roleLabel(p) {
+  if (!p) return '';
+  if (p.is_deputy && (p.base_role || p.role) === 'clinical_pharmacist') {
+    return p.deputy_active ? 'رديف مسؤول الصيادلة (الصلاحيات مفعّلة)' : 'صيدلي سريري · رديف (الصلاحيات موقوفة)';
+  }
+  return ROLES[p.base_role || p.role] || '';
+}
+
 export const ROLE_GROUPS = [
   { id: 'doc', label: 'طبيب', legend: 'نوع الطبيب', subs: [
     { role: 'specialist', desc: 'يعتمد العلاج، ويوافق على تعديلات الصيادلة أو يرفضها.' },

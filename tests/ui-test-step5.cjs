@@ -72,34 +72,26 @@ const B = 'http://localhost:8788/';
   const notifs = await sara.evaluate(async () => 0);
   void notifs;
 
-  // ===== 2. الاعتماد والتحقق مع آخر تعداد
+  // ===== 2. الاعتماد مع آخر تعداد: تصل الدورة إلى المزج فوراً (الملف 14: لا تحقق ولا تحويل يدوي)
   await nav(sara, ali); await sara.waitForSelector('.cbc');
   ok('cycle shows latest CBC with flags', (await sara.locator('.cbc-i.low').count()) === 4);
   await sara.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(sara, 'اعتماد');
   await sara.waitForSelector('.step.done');
-  await nav(cp, ali); await cp.waitForSelector('text=تحقق الصيدلاني');
-  await cp.getByRole('button', { name: 'تحقق الصيدلاني' }).click(); await confirm(cp, 'تأكيد التحقق');
-  await cp.waitForSelector('text=تحويل للمزج');
-  await shot(cp, 'cycle-ready');
+  ok('approval sends cycle to mixing', await sara.locator('.pill', { hasText: 'وصل قسم المزج' }).waitFor({ timeout: 5000 }).then(() => true, () => false));
+  await nav(cp, ali); await cp.waitForSelector('text=صورة الدورة من طبلة المريض');
+  ok('no verify or transfer for pharmacist', (await cp.getByRole('button', { name: 'تحقق الصيدلاني' }).count()) === 0 && (await cp.getByRole('link', { name: 'تحويل للمزج' }).count()) === 0);
+  await shot(cp, 'cycle-chart-due');
 
-  // ===== 3. التحويل إلى المزج
-  async function transfer(page, url, day) {
-    await nav(page, url); await page.waitForSelector('text=تحويل للمزج');
-    await page.locator('.row', { hasText: `اليوم ${day}` }).getByRole('link', { name: 'تحويل للمزج' }).click();
-    await page.waitForSelector('text=ملف تعريف المريض');
-    if (!(await page.locator('.card', { hasText: 'ملف تعريف المريض' }).locator('.file-tile[aria-pressed="true"]').count())) {
-      await page.locator('#tf-id_card').setInputFiles(FIX + '/idcard.jpg');
-      await page.locator('.card', { hasText: 'ملف تعريف المريض' }).locator('.file-tile[aria-pressed="true"]').waitFor();
-    }
-    await page.locator('#tf-prescription').setInputFiles(FIX + '/rx.jpg');
-    await page.locator('.card', { hasText: 'وصفة طبية' }).locator('.file-tile[aria-pressed="true"]').waitFor();
-  }
-  await transfer(cp, ali, 1);
-  await shot(cp, 'transfer');
-  await cp.getByRole('button', { name: 'تحويل إلى قسم المزج' }).click();
-  await cp.waitForSelector('text=المستندات');
+  // ===== 3. الصيدلي يرفق صورة الطبلة فتصل إلى المزج للتحقق
+  await cp.locator('#chart-in').setInputFiles(FIX + '/rx.jpg');
+  await cp.waitForSelector('.step.done >> text=صورة الطبلة من الصيدلي');
+  ok('chart attached by pharmacist', (await cp.locator('.step.done', { hasText: 'رسل عادل' }).count()) === 1);
+  await cp.locator('.pill', { hasText: 'وصل قسم المزج' }).click();
+  await cp.waitForSelector('text=التحقق');
   ok('order created', (await cp.locator('.pill', { hasText: 'وارد' }).count()) === 1);
+  ok('chart visible to order', (await cp.locator('.file-tile', { hasText: 'صورة الطبلة' }).count()) === 1 && (await cp.locator('text=لم تصل بعد').count()) === 0);
   ok('pharmacist sees no prepare boxes', (await cp.locator('main input[type=checkbox]').count()) === 0);
+  await shot(cp, 'order-with-chart');
 
   // ===== 4. صيدلي المزج: تحضير وإرسال على دفعتين
   await nav(mix, B + '#/home'); await mix.waitForSelector('.dept');
@@ -157,25 +149,27 @@ const B = 'http://localhost:8788/';
   // الطبيبة أُبلغت بالتفاعل
   await nav(sara, B + '#/notifications'); await sara.waitForSelector('main .row');
   ok('specialist notified of reaction', (await sara.locator('text=تفاعل أثناء الإعطاء').count()) >= 1);
+  await nav(mix, B + '#/notifications'); await mix.waitForSelector('main .row');
+  ok('mixing pharmacist notified of reaction too', (await mix.locator('text=تفاعل أثناء الإعطاء').count()) >= 1);
 
-  // ===== 6. دورة كاملة لرقية: تبدأ قبل 4 أيام، تُغلق في اليوم 5
+  // ===== 6. دورة كاملة لرقية: تبدأ قبل 4 أيام، والمزج يبدأ دون انتظار صورة الطبلة، ويغلقها مسؤول الصيادلة
   const ruq = await cycleUrlOf(sara, 'رقية', 1);
   await sara.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(sara, 'اعتماد');
   await sara.waitForSelector('.step.done');
-  await nav(cp, ruq); await cp.getByRole('button', { name: 'تحقق الصيدلاني' }).click(); await confirm(cp, 'تأكيد التحقق');
-  await cp.waitForSelector('text=تحويل للمزج');
-  await transfer(cp, ruq, 1);
-  await cp.getByRole('button', { name: 'تحويل إلى قسم المزج' }).click(); await cp.waitForSelector('text=المستندات');
-  const orderUrl = cp.url();
-  await nav(mix, orderUrl); await mix.waitForSelector('text=ضع علامة على ما حضّرته');
+  const orderHref = await sara.locator('.pill', { hasText: 'وصل قسم المزج' }).first().getAttribute('href');
+  await nav(mix, B + orderHref); await mix.waitForSelector('text=ضع علامة على ما حضّرته');
+  ok('mixing starts before chart arrives', (await mix.locator('text=لم تصل بعد').count()) === 1);
   for (const d of ['Rituximab', 'Cyclophosphamide', 'Doxorubicin', 'Vincristine']) await tick(d);
   await mix.getByRole('button', { name: /إرسال المحضَّر/ }).click(); await confirm(mix, 'إرسال');
   await mix.waitForSelector('.pill >> text=أُرسل كاملاً');
   const cid = ruq.split('id=')[1];
   for (let day = 1; day <= 5; day++) await giveAll(nurse, `${B}#/administer?cycle=${cid}&day=${day}`, day);
-  ok('close button on last day', (await nurse.getByRole('button', { name: 'إغلاق الدورة 1' }).count()) === 1);
-  await nurse.getByRole('button', { name: 'إغلاق الدورة 1' }).click(); await confirm(nurse, 'إغلاق');
-  await nurse.waitForTimeout(800);
+  ok('nurse cannot close cycle', (await nurse.getByRole('button', { name: 'إغلاق الدورة 1' }).count()) === 0);
+  const chief = await login('admin@test.iq');
+  await nav(chief, `${B}#/administer?cycle=${cid}&day=5`); await chief.waitForSelector('main .row');
+  ok('chief sees close button on last day', await chief.getByRole('button', { name: 'إغلاق الدورة 1' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
+  await chief.getByRole('button', { name: 'إغلاق الدورة 1' }).click(); await confirm(chief, 'إغلاق');
+  await chief.waitForTimeout(800);
   await nav(sara, ruq); await sara.waitForSelector('text=الجرعات');
   ok('cycle closed as given', (await sara.locator('.pill', { hasText: 'أُعطيت' }).count()) >= 1);
 
@@ -184,7 +178,7 @@ const B = 'http://localhost:8788/';
   await openPatient(intern, 'علي حسين');
   ok('intern has no upload button', (await intern.getByRole('link', { name: 'رفع تحليل أو وصفة أو مرفق' }).count()) === 0);
   await intern.getByRole('link', { name: /الملفات المرفقة/ }).click(); await intern.waitForSelector('.file-tile');
-  ok('intern can view files (3)', (await intern.locator('.file-tile').count()) === 3);
+  ok('intern can view files (cbc + chart)', (await intern.locator('.file-tile').count()) === 2);
   await shot(intern, 'files', false);
 
   checks.forEach((c) => console.log(c));

@@ -1,5 +1,6 @@
 // تعديل الدورة. الطبيب (اختصاص أو مقيم أقدم): يُطبَّق فوراً ويُسجَّل.
-// الصيدلاني: يُرسل طلباً مع تقرير، ولا يُطبَّق قبل موافقة الطبيب المختص.
+// الصيدلاني: يُرسل طلباً مع تقرير، ولا يُطبَّق قبل القرار.
+// صيدلي المزج: الجرعات فقط. الصيدلي السريري: الجرعة والمحلول والأدوية الداعمة.
 import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, field, notice, toast, busy, latinDigits, confirmDialog, todayISO, count } from '../ui.js';
 import { go, state } from '../app.js';
@@ -14,7 +15,8 @@ export async function render(root, params) {
   const back = '#/cycle?id=' + id;
   const doctor = can('doctorEdit');
   const pharm = can('requestEdit');
-  const clinical = state.profile.role === 'clinical_pharmacist';
+  const mixing = state.profile.role === 'mixing_pharmacist';
+  const clinical = state.profile.role === 'clinical_pharmacist' || mixing;   // كلاهما: لا تشخيص ولا بروتوكول ولا حذف
   const shell = (...c) => mount(root, h('div', { class: 'screen' }, topbar({ title: doctor ? 'تعديل الدورة' : 'اقتراح تعديل', back }), h('main', { class: 'main' }, ...c)));
   if (!doctor && !pharm) return shell(notice('info', 'lock', h('p', { text: 'التعديل للأطباء والصيادلة.' })));
 
@@ -28,7 +30,7 @@ export async function render(root, params) {
   if (!['planned', 'held'].includes(c.status) || t.patients.archived_at) return shell(notice('warn', 'lock', h('p', { text: 'لا يمكن تعديل دورة أُعطيت أو أُلغيت، أو ملف مؤرشف.' })));
 
   // ----------------------------------------------------------- الجرعات
-  const doseEds = doses.map((d) => doseEditor(d, !clinical));
+  const doseEds = doses.map((d) => doseEditor(d, !clinical, mixing));
 
   // ----------------------------------------------------------- إضافة دواء
   const add = addEditor(clinical);
@@ -56,7 +58,7 @@ export async function render(root, params) {
 
   const summary = h('div');
   const err = h('div');
-  const submit = h('button', { class: 'btn primary block', type: 'button', text: doctor ? 'تطبيق التعديلات' : 'إرسال للطبيب المختص' });
+  const submit = h('button', { class: 'btn primary block', type: 'button', text: doctor ? 'تطبيق التعديلات' : 'إرسال الطلب' });
 
   function collect() {
     if (protoSel.value) {
@@ -66,7 +68,7 @@ export async function render(root, params) {
     }
     const items = [], labels = [];
     for (const e of doseEds) { const r = e.items(); if (r.error) return r; items.push(...r.items); labels.push(...r.labels); }
-    const a = add.item(); if (a.error) return a; if (a.item) { items.push(a.item); labels.push(a.label); }
+    if (!mixing) { const a = add.item(); if (a.error) return a; if (a.item) { items.push(a.item); labels.push(a.label); } }
     if (!clinical) {
       const nd = dx.value.trim(), ni = icd.value.trim().toUpperCase(), ns = stage.value.trim();
       if (nd !== t.diagnosis || ni !== (t.icd10 || '') || ns !== (t.stage || '')) {
@@ -91,7 +93,7 @@ export async function render(root, params) {
     }
     const ok = await confirmDialog({
       title: doctor ? `تطبيق ${count(r.items.length, 'item')}` : `إرسال ${count(r.items.length, 'item')} للطبيب`,
-      body: r.labels.join(' ؛ ') + (doctor ? '. يُطبَّق فوراً، ويُلغى اعتماد الدورة وتحقق الصيدلاني ليُعاد بعد التعديل.' : '. لا يُطبَّق شيء قبل موافقة الطبيب المختص.'),
+      body: r.labels.join(' ؛ ') + (doctor ? '. يُطبَّق فوراً ويبقى اعتماد الدورة، ويُبلَّغ قسم المزج إن وصلته.' : '. لا يُطبَّق شيء قبل القرار.'),
       okText: doctor ? 'تطبيق' : 'إرسال',
     });
     if (!ok) return;
@@ -102,7 +104,7 @@ export async function render(root, params) {
         go(r.items[0].kind === 'protocol' ? '/patient?id=' + t.patients.id : '/cycle?id=' + id);
       } else {
         const reqId = await rpc('submit_change_request', { p_cycle: id, p_items: r.items, p_reason_category: reason, p_report: report.value.trim() });
-        toast('أُرسل الطلب للطبيب المختص');
+        toast('أُرسل الطلب');
         go('/request?id=' + reqId);
       }
     } catch (e) { fail(e.message); }
@@ -113,11 +115,14 @@ export async function render(root, params) {
     h('main', { class: 'main' },
       notice(doctor ? 'info' : 'warn', 'info', h('p', { text: doctor
         ? 'تُطبَّق تعديلاتك فوراً وتُسجَّل باسمك.' + (state.profile.role === 'senior_resident' ? ' ويُبلَّغ الطبيب المختص بها.' : '')
-        : 'يُرسل اقتراحك مع تقريرك إلى الطبيب المختص بالمريض. يوافق على كل بند أو يرفضه، ولا يتغير شيء قبل قراره.' })),
+        : (state.profile.role === 'clinical_pharmacist'
+          ? 'يُرسل اقتراحك مع تقريرك إلى الطبيب المختص بالمريض والمقيم الأقدم ومسؤول الصيادلة، ويقرّره أحدهم. لا يتغير شيء قبل القرار.'
+          : 'يُرسل اقتراحك مع تقريرك إلى الطبيب المختص بالمريض والمقيم الأقدم، ويقرّره أحدهما. لا يتغير شيء قبل القرار، وبعد الموافقة يعيد الطبيب اعتماد الدورة.')
+          + (mixing ? ' صيدلي المزج يقترح تعديل الجرعات فقط.' : '') })),
       h('div', { class: 'section-head' }, h('h2', { text: 'الجرعات' })),
       ...doseEds.map((e) => e.el),
-      h('div', { class: 'section-head' }, h('h2', { text: clinical ? 'إضافة دواء داعم' : 'إضافة دواء' })),
-      add.el,
+      mixing ? null : h('div', { class: 'section-head' }, h('h2', { text: clinical ? 'إضافة دواء داعم' : 'إضافة دواء' })),
+      mixing ? null : add.el,
       !clinical ? h('div', { class: 'card' }, h('h2', { text: 'التشخيص والمرحلة' }), field('التشخيص', dx),
         h('div', { class: 'grid-2' }, field('ICD-10', icd), field('المرحلة', stage))) : null,
       !clinical ? h('div', { class: 'card' }, h('h2', { text: 'تغيير البروتوكول' }), field('البروتوكول الجديد', protoSel), field('تاريخ أول دورة', protoStart), protoNote) : null,
@@ -128,7 +133,7 @@ export async function render(root, params) {
       summary, err, submit)));
 }
 
-function doseEditor(d, canRemove) {
+function doseEditor(d, canRemove, doseOnly = false) {
   const cur = Number(d.final_dose);
   const val = h('input', { class: 'input ltr', type: 'number', inputmode: 'decimal', step: 'any', min: 0, style: 'text-align: right', placeholder: num(cur) });
   const onward = h('input', { type: 'checkbox', checked: true });
@@ -156,7 +161,7 @@ function doseEditor(d, canRemove) {
       h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(cur) }), h('span', { text: OUT_UNITS[d.final_unit] || d.final_unit }))),
     field(`الجرعة الجديدة (${OUT_UNITS[d.final_unit] || d.final_unit})`, val), quick, pctOut,
     h('label', { class: 'check' }, onward, h('span', { text: 'تطبيق على هذه الدورة والدورات التالية' })),
-    h('details', null, h('summary', { style: 'cursor: pointer; font-weight: 600; min-height: 36px', text: 'المحلول ومعدل التسريب' }),
+    doseOnly ? null : h('details', null, h('summary', { style: 'cursor: pointer; font-weight: 600; min-height: 36px', text: 'المحلول ومعدل التسريب' }),
       h('div', { class: 'grid-2', style: 'margin-top: 8px' }, field('المحلول', dil), field('معدل التسريب', rate))),
     canRemove ? h('div', { class: 'grid-2', style: 'align-items: center' }, h('label', { class: 'check' }, remove, h('span', { text: 'حذف الدواء' })), removeReason) : null);
 
@@ -178,7 +183,7 @@ function doseEditor(d, canRemove) {
           labels.push(`${d.drug_name}: من ${num(cur)} إلى ${num(v)} ${OUT_UNITS[d.final_unit] || ''}${onward.checked ? ' (وما بعدها)' : ''}`);
         }
       }
-      if (dil.value.trim() !== (d.diluent || '') || rate.value.trim() !== (d.infusion_rate || '')) {
+      if (!doseOnly && (dil.value.trim() !== (d.diluent || '') || rate.value.trim() !== (d.infusion_rate || ''))) {
         items.push({ kind: 'infusion', target_dose_id: d.id, payload: { diluent: dil.value.trim() || null, infusion_rate: rate.value.trim() || null } });
         labels.push(`${d.drug_name}: المحلول والتسريب`);
       }

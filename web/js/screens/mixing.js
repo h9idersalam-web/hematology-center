@@ -1,78 +1,23 @@
 // قسم المزج الكيميائي: التحويل من الصيدلي السريري، والطلبات الواردة، والتحضير والإرسال
 import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDate, fmtTime, relTime, initials, count, confirmDialog } from '../ui.js';
-import { go } from '../app.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
-import { uploadAttachment, signedUrl, openFile, isImage, KINDS } from '../files.js';
+import { signedUrl, openFile, isImage } from '../files.js';
 import { NKDA } from './patient-form.js';
 import { protocolFileLink } from '../files.js';
 
-const O_STATUS = { incoming: ['وارد', 'brand'], in_progress: ['قيد التحضير', 'info'], partially_sent: ['أُرسل جزء', 'warn'], sent: ['أُرسل كاملاً', 'ok'], held: ['موقوف', 'muted'] };
+const O_STATUS = { incoming: ['وارد', 'brand'], in_progress: ['قيد التحضير', 'info'], partially_sent: ['أُرسل جزء', 'warn'], sent: ['أُرسل كاملاً', 'ok'], held: ['معلّق', 'muted'] };
+const dueDate = (o) => addDays(o.cycles.planned_date, o.day - 1);
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 
-// --------------------------------------------------------------- التحويل إلى المزج
+// --------------------------------------------------------------- التحويل اليدوي (أُلغي)
+// تصل الدورة إلى المزج تلقائياً بعد اعتماد الطبيب، فيُعاد من يفتح الرابط القديم إلى الدورة
 export async function transfer(root, params) {
-  const cid = params.get('cycle'), day = Number(params.get('day') || 1);
-  const back = '#/cycle?id=' + cid;
-  const c = await q(sb.from('cycles').select('id, cycle_no, planned_date, doctor_approved_at, pharmacist_verified_at, treatments(status, protocol_name, patients(id, full_name, file_no, allergies))').eq('id', cid).maybeSingle());
-  if (!c) throw new Error('الدورة غير موجودة');
-  const p = c.treatments.patients;
-  const shell = (...x) => mount(root, h('div', { class: 'screen' }, topbar({ title: `تحويل اليوم ${day} إلى المزج`, sub: `${p.full_name} · الدورة ${c.cycle_no}`, back }), h('main', { class: 'main' }, ...x)));
-  if (!can('transfer')) return shell(notice('info', 'lock', h('p', { text: 'التحويل إلى المزج للصيادلة السريريين.' })));
-
-  const [doses, files] = await Promise.all([
-    q(sb.from('cycle_doses').select('id, drug_name, final_dose, final_unit, route, days, diluent, infusion_rate, instructions, is_mixed').eq('cycle_id', cid).is('archived_at', null).eq('is_mixed', true)),
-    q(sb.from('attachments').select('id, kind, title, file_path, created_at').eq('patient_id', p.id).in('kind', ['id_card', 'prescription']).order('created_at', { ascending: false })),
-  ]);
-  const todays = doses.filter((d) => daysList(d.days).includes(day));
-  const pick = { id_card: files.find((f) => f.kind === 'id_card')?.id || null, prescription: null };
-
-  const pickers = ['id_card', 'prescription'].map((kind) => {
-    const box = h('div', { class: 'files-grid' });
-    const status = h('p', { class: 'hint' });
-    const input = h('input', { type: 'file', accept: 'image/*,application/pdf', class: 'sr-only', id: 'tf-' + kind });
-    const draw = () => {
-      const list = files.filter((f) => f.kind === kind).slice(0, 5);
-      box.replaceChildren(...list.map((f) => {
-        const img = h('span', { class: 'ft-img' }, icon('file', 26, '#8A929C'));
-        if (isImage(f.file_path)) signedUrl(f.file_path).then((u) => img.replaceChildren(h('img', { src: u, alt: '' }))).catch(() => {});
-        return h('button', { type: 'button', class: 'file-tile', 'aria-pressed': pick[kind] === f.id ? 'true' : 'false', onclick: () => { pick[kind] = f.id; draw(); } },
-          img, h('span', { class: 'ft-t', text: f.title || fmtDate(f.created_at, { day: 'numeric', month: 'short' }) }));
-      }), h('label', { for: 'tf-' + kind, class: 'file-tile add' }, icon('plus', 26), h('span', { class: 'ft-t', text: 'التقاط جديد' })));
-      status.textContent = pick[kind] ? '' : kind === 'prescription' ? 'صوّر وصفة هذه الدورة، أو اختر صورة رُفعت اليوم.' : 'اختر صورة ملف التعريف أو التقط صورة جديدة.';
-    };
-    input.addEventListener('change', async () => {
-      if (!input.files[0]) return;
-      status.textContent = 'جارٍ الرفع…';
-      try {
-        const id = await uploadAttachment(p.id, input.files[0], { kind, title: kind === 'prescription' ? `وصفة الدورة ${c.cycle_no} اليوم ${day}` : 'ملف التعريف' });
-        const f = await q(sb.from('attachments').select('id, kind, title, file_path, created_at').eq('id', id).single());
-        files.unshift(f); pick[kind] = id; draw();
-      } catch (e) { status.textContent = e.message; }
-    });
-    draw();
-    return h('div', { class: 'card' }, h('h2', { text: KINDS[kind][0] }), input, box, status);
-  });
-
-  const err = h('div');
-  const submit = h('button', { class: 'btn primary block', type: 'button' }, icon('move', 22, '#fff'), 'تحويل إلى قسم المزج');
-  submit.addEventListener('click', () => busy(submit, async () => {
-    err.replaceChildren();
-    if (!pick.id_card || !pick.prescription) return err.replaceChildren(notice('err', 'warn', h('p', { text: 'أرفق صورة ملف التعريف وصورة الوصفة' })));
-    try {
-      const id = await rpc('transfer_to_mixing', { p_cycle: cid, p_id_card: pick.id_card, p_prescription: pick.prescription, p_day: day });
-      toast('حُوّل الطلب إلى قسم المزج');
-      go('/mixing-order?id=' + id);
-    } catch (e) { err.replaceChildren(notice('err', 'warn', h('p', { text: e.message }))); }
-  }));
-
-  shell(
-    p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null,
-    !c.doctor_approved_at || !c.pharmacist_verified_at ? notice('warn', 'lock', h('p', { text: 'يجب اعتماد الطبيب وتحقق الصيدلاني قبل التحويل.' })) : null,
-    h('section', { class: 'section' },
-      h('div', { class: 'section-head' }, h('h2', { text: `أدوية اليوم ${day}` }), h('span', { class: 'meta', text: count(todays.length, 'drug') })),
-      h('div', { class: 'card flush' }, todays.length ? todays.map(itemLine) : empty('لا توجد أدوية تُحضَّر في هذا اليوم', 'pill'))),
-    ...pickers, err, submit);
+  const cid = params.get('cycle');
+  mount(root, h('div', { class: 'screen' }, topbar({ title: 'التحويل إلى المزج', back: cid ? '#/cycle?id=' + cid : '#/home' }),
+    h('main', { class: 'main' }, notice('info', 'info', h('p', { text: 'أُلغي التحويل اليدوي: تصل الدورة إلى قسم المزج تلقائياً فور اعتماد الطبيب.' })),
+      cid ? h('a', { class: 'btn secondary block', href: '#/cycle?id=' + cid, text: 'فتح الدورة' }) : null)));
 }
 
 function itemLine(d) {
@@ -95,11 +40,16 @@ export async function list(root, params) {
     bottomNav('home')));
   if (!can('seeMixing')) return box.replaceChildren(notice('info', 'lock', h('p', { text: 'قسم المزج للصيادلة والأطباء.' })));
 
+  // الطلبات المفتوحة كلها مرتبة بموعد يوم الإعطاء، والمرسلة خلال الأيام الثلاثة الماضية
   const since = new Date(); since.setDate(since.getDate() - 3);
-  const rows = await q(sb.from('mixing_orders')
-    .select('id, day, status, transferred_at, patients(full_name, file_no, allergies), cycles(cycle_no, treatments(protocol_name)), mixing_items(id, prepared_at, sent_at)')
-    .gte('transferred_at', since.toISOString()).order('transferred_at', { ascending: false }));
-  const groups = { open: rows.filter((r) => r.status !== 'sent' && r.status !== 'held'), sent: rows.filter((r) => r.status === 'sent') };
+  const sel = 'id, day, status, hold_reason, transferred_at, patients(full_name, file_no, allergies), cycles(cycle_no, planned_date, status, chart_attachment_id, treatments(protocol_name)), mixing_items(id, prepared_at, sent_at)';
+  const [openRows, sentRows] = await Promise.all([
+    q(sb.from('mixing_orders').select(sel).neq('status', 'sent').order('transferred_at')),
+    q(sb.from('mixing_orders').select(sel).eq('status', 'sent').gte('transferred_at', since.toISOString()).order('transferred_at', { ascending: false })),
+  ]);
+  const live = openRows.filter((r) => ['planned', 'held'].includes(r.cycles.status));   // الدورات المغلقة أو الملغاة لا تظهر
+  live.sort((a, b) => dueDate(a).localeCompare(dueDate(b)));
+  const groups = { open: live, sent: sentRows };
 
   const draw = () => {
     seg.replaceChildren(...[['open', 'الواردة'], ['sent', 'أُرسلت']].map(([id, label]) => h('button', {
@@ -123,7 +73,8 @@ function orderRow(o) {
         hasAllergy ? h('span', { style: 'color: var(--brand); display: flex', title: 'حساسية' }, icon('alert', 16, 'currentColor', 2.2)) : null),
       h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
         h('span', { class: 'tag', text: o.cycles.treatments.protocol_name }), h('span', { text: `الدورة ${o.cycles.cycle_no} · اليوم ${o.day}` })),
-      h('span', { class: 's', text: `${prep} من ${count(o.mixing_items.length, 'drug')} محضَّرة · ${relTime(o.transferred_at)}` })),
+      h('span', { class: 's', text: o.status === 'held' ? (o.hold_reason || 'معلّق')
+        : `الموعد ${fmtDate(dueDate(o), { weekday: 'short', day: 'numeric', month: 'short' })} · ${prep} من ${count(o.mixing_items.length, 'drug')} محضَّرة${o.cycles.chart_attachment_id ? ' · وصلت صورة الطبلة' : ''}` })),
     h('span', { class: 'pill ' + k, text: l }));
 }
 
@@ -131,21 +82,28 @@ function orderRow(o) {
 export async function order(root, params) {
   const id = params.get('id');
   const o = await q(sb.from('mixing_orders')
-    .select('*, sender:profiles(full_name), patients(id, full_name, file_no, allergies, weight_kg), cycles(id, cycle_no, treatments(protocol_name, bsa, weight_kg, protocols(file_path))), idcard:attachments!mixing_orders_id_card_attachment_id_fkey(file_path), rx:attachments!mixing_orders_prescription_attachment_id_fkey(file_path), mixing_items(id, prepared_at, sent_at, cycle_doses(drug_name, final_dose, final_unit, route, diluent, infusion_rate, instructions, dose_value, dose_unit, calculated, capped, source, edited_from), preparer:profiles!mixing_items_prepared_by_fkey(full_name))')
+    .select('*, sender:profiles(full_name), patients(id, full_name, file_no, allergies, weight_kg), cycles(id, cycle_no, planned_date, chart_at, chart:attachments!cycles_chart_attachment_id_fkey(file_path), charter:profiles!cycles_chart_by_fkey(full_name), treatments(protocol_name, bsa, weight_kg, protocols(file_path))), idcard:attachments!mixing_orders_id_card_attachment_id_fkey(file_path), rx:attachments!mixing_orders_prescription_attachment_id_fkey(file_path), mixing_items(id, prepared_at, sent_at, cycle_doses(drug_name, final_dose, final_unit, route, diluent, infusion_rate, instructions, dose_value, dose_unit, calculated, capped, source, edited_from, archived_at), preparer:profiles!mixing_items_prepared_by_fkey(full_name))')
     .eq('id', id).maybeSingle());
   if (!o) throw new Error('طلب المزج غير موجود');
   const p = o.patients, t = o.cycles.treatments;
   const [l, k] = O_STATUS[o.status];
-  const mine = can('prepare');
+  const held = o.status === 'held';
+  const mine = can('prepare') && !held;
   const reload = () => order(root, params);
 
-  const docs = h('div', { class: 'grid-2' }, [['ملف التعريف', o.idcard], ['الوصفة', o.rx]].map(([label, f]) => {
+  // صورة الطبلة من الصيدلي للتحقق (والهوية والوصفة في الطلبات القديمة فقط)
+  const chart = o.cycles.chart;
+  const docList = [['صورة الطبلة', chart]];
+  if (o.idcard) docList.push(['ملف التعريف', o.idcard]);
+  if (o.rx) docList.push(['الوصفة', o.rx]);
+  const docs = h('div', { class: 'grid-2' }, docList.map(([label, f]) => {
     const img = h('span', { class: 'ft-img', style: 'height: 110px' }, icon('file', 28, '#8A929C'));
     if (f && isImage(f.file_path)) signedUrl(f.file_path).then((u) => img.replaceChildren(h('img', { src: u, alt: label }))).catch(() => {});
-    return h('button', { type: 'button', class: 'file-tile', onclick: () => f && openFile(f.file_path).catch((e) => toast(e.message, true)) }, img, h('span', { class: 'ft-t', text: label }));
+    return h('button', { type: 'button', class: 'file-tile', disabled: !f, onclick: () => f && openFile(f.file_path).catch((e) => toast(e.message, true)) },
+      img, h('span', { class: 'ft-t', text: f ? label : label + ': لم تصل بعد' }));
   }));
 
-  const items = o.mixing_items.map((it) => {
+  const items = o.mixing_items.filter((it) => !it.cycle_doses.archived_at || it.sent_at).map((it) => {
     const d = it.cycle_doses;
     const box = mine ? h('input', { type: 'checkbox', checked: !!it.prepared_at, disabled: !!it.sent_at, 'aria-label': 'تم تحضير ' + d.drug_name }) : null;
     box?.addEventListener('change', async () => {
@@ -182,12 +140,14 @@ export async function order(root, params) {
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
           h('span', { class: 'tag', style: 'align-self: flex-start', text: p.file_no }),
-          h('span', { style: 'font-size: 14px; color: var(--muted-2)', text: `حوّله ${o.sender?.full_name || ''} · ${fmtTime(o.transferred_at)}` }),
+          h('span', { style: 'font-size: 14px; color: var(--muted-2)', text: `الموعد ${fmtDate(addDays(o.cycles.planned_date, o.day - 1), { weekday: 'long', day: 'numeric', month: 'long' })} · اعتمدها ${o.sender?.full_name || ''}` }),
           h('span', { class: 'ltr', style: 'font-size: 14px; color: var(--muted-2); text-align: right', text: `BSA ${num(t.bsa)} m² · ${num(t.weight_kg)} kg` })),
         h('span', { class: 'pill ' + k, text: l })),
       p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null,
-      h('section', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', { text: 'المستندات' })), docs,
-        h('p', { class: 'hint', text: 'طابق اسم المريض في ملف التعريف والوصفة مع هذا الطلب قبل التحضير.' })),
+      held ? notice('warn', 'lock', h('p', { style: 'font-weight: 700', text: 'الطلب معلّق: ' + (o.hold_reason || 'بانتظار الطبيب') }),
+        h('p', { text: 'لا يُحضَّر ولا يُرسل شيء حتى يعيد الطبيب اعتماد الدورة.' })) : null,
+      h('section', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', { text: 'التحقق' })), docs,
+        h('p', { class: 'hint', text: chart ? 'طابق الدورة في صورة الطبلة مع الأدوية والجرعات أدناه.' : 'تصلك صورة الطبلة من الصيدلي السريري للتحقق. لا تنتظرها لتبدأ التحضير.' })),
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'الأدوية' }), h('span', { class: 'meta', text: mine ? 'ضع علامة على ما حضّرته' : '' })),
         h('div', { class: 'card flush' }, items)),

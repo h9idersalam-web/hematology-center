@@ -26,7 +26,7 @@ function psql(file) {
   execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499', '-U', 'postgres', '-q', '-v', 'ON_ERROR_STOP=1', '-f', file], { stdio: ['ignore', 'ignore', 'pipe'] });
 }
 const RESET = `drop schema if exists public cascade; create schema public; grant all on schema public to postgres, public;
-  drop schema if exists auth cascade; drop schema if exists storage cascade; drop schema if exists extensions cascade;
+  drop schema if exists auth cascade; drop schema if exists storage cascade; drop schema if exists extensions cascade; drop schema if exists t cascade;
   drop role if exists anon; drop role if exists authenticated;`;
 
 export const USERS = [

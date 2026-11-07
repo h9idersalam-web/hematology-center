@@ -1,6 +1,6 @@
 // الرئيسية: ملخص اليوم حسب الدور، وقسم الإدارة للمدير وحده
-import { sb, q, countOf } from '../api.js';
-import { h, mount, icon, ROLES, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil } from '../ui.js';
+import { sb, q, countOf, rpc } from '../api.js';
+import { h, mount, icon, roleLabel, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil, toast, busy } from '../ui.js';
 import { state, logout } from '../app.js';
 import { can } from '../perms.js';
 
@@ -9,7 +9,7 @@ function greeting() {
   return hr < 12 ? 'صباح الخير' : 'مساء الخير';
 }
 
-const CAN_APPROVE = ['specialist'];
+const CAN_APPROVE = ['specialist', 'senior_resident', 'chief_clinical_pharmacist'];
 const SEES_REQUESTS = ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'];
 
 export async function render(root) {
@@ -21,6 +21,8 @@ export async function render(root) {
   const alertBox = h('div');
   const adminBox = p.is_admin ? h('div') : null;
   const deptBox = departments(p);
+  const chartBox = can('chart') ? h('div') : null;
+  const deputyBox = can('toggleDeputy') ? h('div') : null;
 
   const profileBtn = h('button', { class: 'icon-btn boxed', 'aria-label': 'حسابي', onclick: () => profileDialog() },
     h('span', { style: 'font-weight: 700; font-size: 14px; color: var(--brand)', text: initials(p.full_name) || '؟' }));
@@ -32,16 +34,18 @@ export async function render(root) {
           h('p', { style: 'font-size: 14px; color: var(--muted-2)', text: fmtDay(today) }),
           h('h1', { style: 'font-size: 26px; font-weight: 700', text: greeting() }),
           h('span', { class: 'pill ' + (p.is_admin ? 'dark' : 'brand'), style: 'align-self: flex-start; margin-top: 4px',
-            text: (p.is_admin ? 'مدير النظام · ' : '') + ROLES[p.role] })),
+            text: (p.is_admin ? 'مدير النظام · ' : '') + roleLabel(p) })),
         h('div', { style: 'display: flex; gap: 8px' }, bell, profileBtn)),
       p.role === 'intern' ? h('div', { class: 'notice info' }, icon('info', 20), h('p', { text: 'حسابك للعرض فقط، دون إضافة أو تعديل.' })) : null,
       deptBox,
+      chartBox,
       statsBox,
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'جلسات اليوم' }),
           h('a', { href: '#/appointments', style: 'font-size: 15px; font-weight: 600; text-decoration: none', text: 'عرض الكل' })),
         todayBox),
       alertBox,
+      deputyBox,
       adminBox),
     bottomNav('home')));
 
@@ -76,7 +80,7 @@ export async function render(root) {
   // جلسات اليوم
   try {
     const rows = await q(sb.from('cycles')
-      .select('id, cycle_no, status, doctor_approved_at, pharmacist_verified_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name))')
+      .select('id, cycle_no, status, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name))')
       .eq('planned_date', today).in('status', ['planned', 'held']).eq('treatments.status', 'active')
       .order('cycle_no').limit(30));
     todayBox.replaceChildren(...(rows.length ? rows.map(cycleRow) : [empty('لا توجد جلسات مجدولة اليوم', 'calendar')]));
@@ -85,6 +89,57 @@ export async function render(root) {
   }
 
   if (adminBox) renderAdminPanel(adminBox);
+  if (chartBox) renderChartTasks(chartBox);
+  if (deputyBox) renderDeputies(deputyBox);
+}
+
+// مهمة الصيدلي: دورات اعتمدها الطبيب ولم تُرفق صورة طبلتها بعد
+async function renderChartTasks(box) {
+  try {
+    const rows = await q(sb.from('cycles')
+      .select('id, cycle_no, planned_date, treatments!inner(protocol_name, status, patients!inner(full_name, archived_at))')
+      .not('doctor_approved_at', 'is', null).is('chart_attachment_id', null).in('status', ['planned', 'held'])
+      .eq('treatments.status', 'active').is('treatments.patients.archived_at', null)
+      .order('planned_date').limit(20));
+    if (!rows.length) return box.replaceChildren();
+    box.replaceChildren(h('section', { class: 'section' },
+      h('div', { class: 'section-head' }, h('h2', { text: 'بانتظار صورة الطبلة منك' }), h('span', { class: 'count', text: rows.length })),
+      h('div', { class: 'card flush' }, rows.map((c) => h('a', { class: 'row', href: '#/cycle?id=' + c.id },
+        h('span', { class: 'avatar', text: initials(c.treatments.patients.full_name) }),
+        h('span', { class: 'grow' }, h('span', { class: 't', text: c.treatments.patients.full_name }),
+          h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
+            h('span', { class: 'tag', text: c.treatments.protocol_name }),
+            h('span', { text: `الدورة ${c.cycle_no} · ${fmtDate(c.planned_date, { day: 'numeric', month: 'short' })}` }))),
+        h('span', { class: 'pill warn', text: 'أرفق الصورة' }))))));
+  } catch (e) { box.replaceChildren(); }
+}
+
+// مسؤول الصيادلة يفعّل صلاحيات رديفه أو يوقفها
+async function renderDeputies(box) {
+  let rows = [];
+  try { rows = await q(sb.from('profiles').select('id, full_name, deputy_active, deputy_changed_at').eq('is_deputy', true).eq('role', 'clinical_pharmacist').eq('status', 'active').order('full_name')); }
+  catch (e) { return; }
+  if (!rows.length) return box.replaceChildren();
+  box.replaceChildren(h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', { text: 'رديف مسؤول الصيادلة' })),
+    h('p', { class: 'hint', text: 'حين تفعّل صلاحياته يعمل بكل صلاحياتك. حين توقفها يعود صيدلياً سريرياً.' }),
+    h('div', { class: 'card flush' }, rows.map((u) => {
+      const b = h('button', { type: 'button', class: 'btn sm ' + (u.deputy_active ? 'danger' : 'ok'), text: u.deputy_active ? 'إيقاف الصلاحيات' : 'تفعيل الصلاحيات' });
+      b.addEventListener('click', () => busy(b, async () => {
+        const on = !u.deputy_active;
+        const ok = await confirmDialog({ title: (on ? 'تفعيل صلاحيات ' : 'إيقاف صلاحيات ') + u.full_name,
+          body: on ? 'يحصل على كل صلاحيات مسؤول الصيادلة حتى توقفها، ويُبلَّغ بذلك.' : 'يعود صيدلياً سريرياً بصلاحياته المعتادة، ويُبلَّغ بذلك.',
+          okText: on ? 'تفعيل' : 'إيقاف', danger: !on });
+        if (!ok) return;
+        try { await rpc('chief_set_deputy_active', { p_user: u.id, p_active: on }); toast(on ? 'فُعّلت صلاحيات الرديف' : 'أُوقفت صلاحيات الرديف'); renderDeputies(box); }
+        catch (e) { toast(e.message, true); }
+      }));
+      return h('div', { class: 'row' },
+        h('span', { class: 'avatar', text: initials(u.full_name) }),
+        h('span', { class: 'grow' }, h('span', { class: 't', text: u.full_name }),
+          h('span', { class: 's', text: u.deputy_active ? 'الصلاحيات مفعّلة' : 'الصلاحيات موقوفة' })),
+        b);
+    }))));
 }
 
 // اختصارات الأقسام حسب الدور: المزج والتمريض والطلبات
@@ -116,8 +171,7 @@ function cycleRow(c) {
   const t = c.treatments; const pt = t.patients;
   let pill;
   if (c.status === 'held') pill = h('span', { class: 'pill warn', text: 'موقوفة' });
-  else if (c.pharmacist_verified_at) pill = h('span', { class: 'pill ok', text: 'جاهزة' });
-  else if (c.doctor_approved_at) pill = h('span', { class: 'pill info', text: 'بانتظار الصيدلاني' });
+  else if (c.doctor_approved_at) pill = h('span', { class: 'pill ok', text: 'في المزج' });
   else pill = h('span', { class: 'pill muted', text: 'بانتظار اعتماد الطبيب' });
   return h('a', { class: 'row', href: '#/cycle?id=' + c.id },
     h('span', { class: 'avatar', text: initials(pt.full_name) }),
@@ -159,7 +213,7 @@ async function profileDialog() {
   const left = daysUntil(p.subscription_ends);
   const ok = await confirmDialog({
     title: p.full_name,
-    body: `${ROLES[p.role]}${p.is_admin ? ' · مدير النظام' : ''}. ` +
+    body: `${roleLabel(p)}${p.is_admin ? ' · مدير النظام' : ''}. ` +
       (p.subscription_ends ? `الاشتراك حتى ${fmtDate(p.subscription_ends)}${left !== null && left <= 14 ? ` (باقٍ ${left} يوماً)` : ''}.` : 'اشتراك دائم.'),
     okText: 'تسجيل الخروج', danger: true,
   });

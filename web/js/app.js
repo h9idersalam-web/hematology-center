@@ -71,7 +71,14 @@ export function go(path) {
 
 export async function loadProfile() {
   if (!state.session) { state.profile = null; return null; }
-  state.profile = await q(sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle());
+  const p = await q(sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle());
+  // الرديف المفعّل يعمل بدور مسؤول الصيادلة في كل الشاشات (كما في my_role بالقاعدة)
+  if (p) {
+    p.base_role = p.role;
+    p.acting = p.role === 'clinical_pharmacist' && p.is_deputy && p.deputy_active;
+    if (p.acting) p.role = 'chief_clinical_pharmacist';
+  }
+  state.profile = p;
   state.profileAt = Date.now();
   return state.profile;
 }

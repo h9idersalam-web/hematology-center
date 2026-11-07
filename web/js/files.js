@@ -11,6 +11,7 @@ export const KINDS = {
   imaging: ['أشعة أو صورة', 'file'],
   report: ['تقرير طبي', 'file'],
   other: ['أخرى', 'file'],
+  chart: ['صورة الطبلة', 'file'],
 };
 const MAX = 10 * 1024 * 1024;
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];

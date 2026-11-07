@@ -19,7 +19,7 @@ export async function list(root) {
 
   const today = todayISO();
   const cycles = await q(sb.from('cycles')
-    .select('id, cycle_no, planned_date, doctor_approved_at, pharmacist_verified_at, treatments!inner(status, protocol_name, total_cycles, patients!inner(id, full_name, file_no, allergies, archived_at)), cycle_doses(id, drug_name, days, is_mixed, archived_at), mixing_orders(day, status)')
+    .select('id, cycle_no, planned_date, doctor_approved_at, treatments!inner(status, protocol_name, total_cycles, patients!inner(id, full_name, file_no, allergies, archived_at)), cycle_doses(id, drug_name, days, is_mixed, archived_at), mixing_orders(day, status)')
     .in('status', ['planned', 'held']).eq('treatments.status', 'active').is('treatments.patients.archived_at', null)
     .gte('planned_date', addDaysISO(today, -60)).lte('planned_date', today).order('planned_date'));
   const ids = cycles.map((c) => c.id);
@@ -31,7 +31,7 @@ export async function list(root) {
     const doses = c.cycle_doses.filter((d) => !d.archived_at && daysList(d.days).includes(day));
     if (!doses.length) continue;
     const done = doses.filter((d) => given.some((g) => g.cycle_dose_id === d.id && g.day === day)).length;
-    due.push({ c, day, doses, done, ready: !!(c.doctor_approved_at && c.pharmacist_verified_at), mixing: c.mixing_orders.find((m) => m.day === day) });
+    due.push({ c, day, doses, done, ready: !!c.doctor_approved_at, mixing: c.mixing_orders.find((m) => m.day === day) });
   }
   due.sort((a, b) => (a.done === a.doses.length) - (b.done === b.doses.length));
 
@@ -45,7 +45,7 @@ function dueRow({ c, day, doses, done, ready, mixing }) {
   let pill;
   if (done === doses.length) pill = h('span', { class: 'pill ok', text: 'اكتملت' });
   else if (!ready) pill = h('span', { class: 'pill muted', text: 'بانتظار الاعتماد' });
-  else if (doses.some((d) => d.is_mixed) && (!mixing || mixing.status === 'incoming' || mixing.status === 'in_progress')) pill = h('span', { class: 'pill info', text: mixing ? 'قيد المزج' : 'لم يُحوَّل للمزج' });
+  else if (doses.some((d) => d.is_mixed) && (!mixing || ['incoming', 'in_progress', 'held'].includes(mixing.status))) pill = h('span', { class: 'pill info', text: mixing?.status === 'held' ? 'المزج معلّق' : mixing ? 'قيد المزج' : 'بانتظار المزج' });
   else pill = h('span', { class: 'pill brand', text: 'جاهزة للإعطاء' });
   return h('a', { class: 'row', href: `#/administer?cycle=${c.id}&day=${day}` },
     h('span', { class: 'avatar', text: initials(p.full_name) }),
@@ -62,7 +62,7 @@ function dueRow({ c, day, doses, done, ready, mixing }) {
 export async function administer(root, params) {
   const cid = params.get('cycle'), day = Number(params.get('day') || 1);
   const c = await q(sb.from('cycles')
-    .select('id, cycle_no, planned_date, status, doctor_approved_at, pharmacist_verified_at, treatments(status, protocol_name, patients(id, full_name, file_no, allergies)), cycle_doses(id, drug_name, final_dose, final_unit, route, days, diluent, infusion_rate, instructions, is_mixed, archived_at, sort)')
+    .select('id, cycle_no, planned_date, status, doctor_approved_at, treatments(status, protocol_name, patients(id, full_name, file_no, allergies)), cycle_doses(id, drug_name, final_dose, final_unit, route, days, diluent, infusion_rate, instructions, is_mixed, archived_at, sort)')
     .eq('id', cid).maybeSingle());
   if (!c) throw new Error('الدورة غير موجودة');
   const p = c.treatments.patients;
@@ -72,7 +72,7 @@ export async function administer(root, params) {
     ids.length ? q(sb.from('administrations').select('id, cycle_dose_id, day, given_at, vitals, reaction, notes, nurse:profiles(full_name)').in('cycle_dose_id', ids).eq('day', day)) : [],
     ids.length ? q(sb.from('mixing_items').select('cycle_dose_id, sent_at, mixing_orders!inner(day)').in('cycle_dose_id', ids).eq('mixing_orders.day', day)) : [],
   ]);
-  const approved = c.doctor_approved_at && c.pharmacist_verified_at;
+  const approved = !!c.doctor_approved_at;
   const live = c.treatments.status === 'active' && (c.status === 'planned' || c.status === 'held');
   const reload = () => administer(root, params);
   const allDays = [...new Set(c.cycle_doses.filter((d) => !d.archived_at).flatMap((d) => daysList(d.days)))];
@@ -120,7 +120,7 @@ export async function administer(root, params) {
           h('b', { style: 'margin-top: 4px', text: fmtDay(addDaysISO(c.planned_date, day - 1)) })),
         h('a', { href: '#/cycle?id=' + cid, class: 'link-btn', text: 'الدورة' })),
       p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null,
-      !approved ? notice('warn', 'lock', h('p', { text: 'لا يُعطى أي دواء قبل اعتماد الطبيب وتحقق الصيدلاني.' })) : null,
+      !approved ? notice('warn', 'lock', h('p', { text: 'لا يُعطى أي دواء قبل اعتماد الطبيب.' })) : null,
       daysNav ? h('p', { style: 'font-size: 14px; font-weight: 600', text: 'أيام الإعطاء في الدورة' }) : null,
       daysNav,
       h('div', { class: 'card flush' }, rows.length ? rows : empty(`لا توجد أدوية في اليوم ${day}`, 'pill')),
