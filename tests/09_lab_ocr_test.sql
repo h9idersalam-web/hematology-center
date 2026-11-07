@@ -12,6 +12,12 @@ select 'L1 saved: ' || add_lab_results(:'pt', current_date,
   '[{"test_name":"WBC","value":7.85,"unit":"×10⁹/L","ref_low":4,"ref_high":11,"entry_method":"ocr"},
     {"test_name":"Hb","value":12.4,"unit":"g/dL","ref_low":13.5,"ref_high":17.5,"entry_method":"ocr"},
     {"test_name":"ANC","value":5.1,"unit":"×10⁹/L","ref_low":1.5,"ref_high":8}]'::jsonb, :'att');
+reset role;
+select 'L1b alert links to the out-of-range result: ' || n.link_type || ' → ' || l.test_name || ' ' || l.value
+  from notifications n join lab_results l on l.id = n.link_id
+ where n.title = 'تحليل خارج المرجع' and l.patient_id = :'pt';
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000035';
 select 'L2 methods: ' || string_agg(test_name || '=' || entry_method, ',' order by test_name) from lab_results where patient_id = :'pt';
 select 'L3 ' || t.err('ocr without image', format($q$select add_lab_results(%L, current_date, '[{"test_name":"PLT","value":245,"entry_method":"ocr"}]'::jsonb)$q$, :'pt'));
 select add_lab_results(:'pt', current_date, '[{"test_name":"PLT","value":245,"entry_method":"magic"}]'::jsonb, :'att') as n4 \gset

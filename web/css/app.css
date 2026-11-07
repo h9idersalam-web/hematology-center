@@ -335,3 +335,5 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .ocr-progress span { display: block; height: 100%; width: 0; background: var(--brand); transition: width .3s; }
 /* زر دور العمل للمدير */
 .role-switch { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; }
+/* شاشة إشعار التحليل خارج المرجع */
+.card.lab-alert { gap: 10px; border-inline-start: 4px solid var(--brand); }

@@ -40,3 +40,57 @@ export function flag(value, low, high) {
   if (high != null && v > Number(high)) return 'high';
   return 'ok';
 }
+
+// ------------------------------------------------------------------ درجة الشدة حسب CTCAE v5.0
+// المرجع: Common Terminology Criteria for Adverse Events v5.0 (NCI، 2017). القيم بوحدات التطبيق.
+// الدرجة وصف لشدة الانحراف، وليست قراراً علاجياً: قرار الإعطاء أو التأجيل للطبيب حسب البروتوكول.
+const ALIAS = { platelets: 'PLT', platelet: 'PLT', hgb: 'Hb', hemoglobin: 'Hb', haemoglobin: 'Hb', neutrophils: 'ANC', tlc: 'WBC',
+  'total bilirubin': 'T. Bilirubin', bilirubin: 'T. Bilirubin', creatinine: 'Creatinine', potassium: 'K', calcium: 'Ca' };
+export const testKey = (name) => ALIAS[String(name || '').trim().toLowerCase()] || name;
+
+export const GRADE_AR = { 1: 'خفيف', 2: 'متوسط', 3: 'شديد', 4: 'مهدد للحياة' };
+
+// يرجع { grade, label, what } أو null إن لم ينطبق
+export function ctcae(name, value, low, high) {
+  const v = Number(value), t = testKey(name);
+  const lo = low == null || low === '' ? null : Number(low), hi = high == null || high === '' ? null : Number(high);
+  const below = (cuts, what) => {                 // cuts: حدود الدرجات 2 و3 و4 تنازلياً
+    if (lo == null || !(v < lo)) return null;
+    const g = v < cuts[2] ? 4 : v < cuts[1] ? 3 : v < cuts[0] ? 2 : 1;
+    return { grade: g, what };
+  };
+  const timesUln = (cuts, what) => {             // cuts: مضاعفات الحد الأعلى للدرجات 2 و3 و4
+    if (hi == null || !(v > hi)) return null;
+    const r = v / hi;
+    const g = r > cuts[2] ? 4 : r > cuts[1] ? 3 : r > cuts[0] ? 2 : 1;
+    return { grade: g, what };
+  };
+  let res = null;
+  switch (t) {
+    case 'ANC': res = below([1.5, 1.0, 0.5], 'نقص العدلات'); break;
+    case 'PLT': res = below([75, 50, 25], 'نقص الصفيحات'); break;
+    case 'WBC':
+      res = below([3.0, 2.0, 1.0], 'نقص كريات الدم البيض');
+      if (!res && v > 100) res = { grade: 3, what: 'فرط كريات الدم البيض' };
+      break;
+    case 'Hb':
+      if (lo != null && v < lo) res = { grade: v < 8 ? 3 : v < 10 ? 2 : 1, what: 'فقر الدم' };
+      break;
+    case 'Creatinine': res = timesUln([1.5, 3, 6], 'ارتفاع الكرياتينين'); break;
+    case 'ALT': res = timesUln([3, 5, 20], 'ارتفاع ALT'); break;
+    case 'AST': res = timesUln([3, 5, 20], 'ارتفاع AST'); break;
+    case 'T. Bilirubin': res = timesUln([1.5, 3, 10], 'ارتفاع البيليروبين'); break;
+    case 'ALP': res = timesUln([2.5, 5, 20], 'ارتفاع ALP'); break;
+    case 'K':
+      if (lo != null && v < lo) res = { grade: v < 2.5 ? 4 : v < 3.0 ? 3 : 1, what: 'نقص البوتاسيوم' };
+      else if (hi != null && v > hi) res = { grade: v > 7 ? 4 : v > 6 ? 3 : v > 5.5 ? 2 : 1, what: 'فرط البوتاسيوم' };
+      break;
+    case 'Ca':
+      if (lo != null && v < lo) res = { grade: v < 6 ? 4 : v < 7 ? 3 : v < 8 ? 2 : 1, what: 'نقص الكالسيوم' };
+      else if (hi != null && v > hi) res = { grade: v > 13.5 ? 4 : v > 12.5 ? 3 : v > 11.5 ? 2 : 1, what: 'فرط الكالسيوم' };
+      break;
+    default: return null;
+  }
+  if (!res) return null;
+  return { ...res, label: `الدرجة ${res.grade} (${GRADE_AR[res.grade]})` };
+}

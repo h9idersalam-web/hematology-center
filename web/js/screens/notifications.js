@@ -22,6 +22,7 @@ const LINKS = {
   protocol: (id) => '#/protocol?id=' + id,
   cycle: (id) => '#/cycle?id=' + id,
   mixing_order: (id) => '#/mixing-order?id=' + id,
+  lab_result: (id) => '#/lab-alert?id=' + id,
 };
 
 export async function render(root, params) {
@@ -63,7 +64,10 @@ export async function render(root, params) {
 
   function row(n) {
     const k = KIND[n.kind] || KIND.info;
-    const href = LINKS[n.link_type] ? LINKS[n.link_type](n.link_id) : null;
+    // إشعارات «تحليل خارج المرجع» القديمة كانت تشير إلى المريض: تفتح الآن شاشة التحليل نفسها
+    const href = n.link_type === 'patient' && n.title === 'تحليل خارج المرجع'
+      ? `#/lab-alert?patient=${n.link_id}&at=${encodeURIComponent(n.created_at)}`
+      : LINKS[n.link_type] ? LINKS[n.link_type](n.link_id) : null;
     const el = h(href ? 'a' : 'div', { class: 'row', href, style: n.read_at ? null : 'background: #FFFBFB' },
       h('span', { class: 'avatar', style: `border-radius: 10px; width: 38px; height: 38px; background: var(--${k.tone === 'muted' ? 'chip' : k.tone + '-soft'}); color: var(--${k.tone === 'muted' ? 'muted' : k.tone === 'brand' ? 'brand' : k.tone})` }, icon(k.icon, 20)),
       h('span', { class: 'grow' },

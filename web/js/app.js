@@ -20,6 +20,7 @@ import * as requests from './screens/requests.js';
 import * as request from './screens/request.js';
 import * as files from './screens/files.js';
 import * as labs from './screens/labs.js';
+import * as labAlert from './screens/lab-alert.js';
 import * as mixing from './screens/mixing.js';
 import * as nursing from './screens/nursing.js';
 
@@ -52,6 +53,7 @@ const ROUTES = {
   '/files': { screen: files.list },
   '/labs': { screen: labs.view },
   '/labs-new': { screen: labs.entry },
+  '/lab-alert': { screen: labAlert.render },
   '/transfer': { screen: mixing.transfer },
   '/mixing': { screen: mixing.list },
   '/mixing-order': { screen: mixing.order },
