@@ -72,7 +72,7 @@ export function doseBig(value, unit) {
 
 // ------------------------------------------------------------------ حالة الجرعة في المزج
 // تحمّل لكل جرعة: الأيام التي حُضّرت ولم تُرسل، والتي أُرسلت ولم تُعطَ.
-// الجرعة المرسلة غير المعطاة لا تُعدَّل (تمنعها القاعدة أيضاً). الجرعة المحضّرة: يظهر للجميع أنها حُضّرت.
+// الجرعة المحضّرة أو المرسلة غير المعطاة لا تُعدَّل (تمنعها القاعدة أيضاً، الملف 21)، ويظهر ذلك للجميع.
 export async function loadMixState(sb, q, doseIds) {
   const map = new Map();
   if (!doseIds.length) return map;
@@ -88,7 +88,7 @@ export async function loadMixState(sb, q, doseIds) {
     if (it.sent_at) s.sent.push(day); else if (it.prepared_at) s.prepared.push(day);
     map.set(it.cycle_dose_id, s);
   }
-  for (const s of map.values()) { s.sent.sort((a, b) => a - b); s.prepared.sort((a, b) => a - b); s.locked = s.sent.length > 0; }
+  for (const s of map.values()) { s.sent.sort((a, b) => a - b); s.prepared.sort((a, b) => a - b); s.locked = s.sent.length > 0 || s.prepared.length > 0; }
   return map;
 }
 
@@ -98,6 +98,6 @@ export function mixNote(s) {
   if (!s) return null;
   const parts = [];
   if (s.sent.length) parts.push(`حُضّرت وأُرسلت من المزج (${daysWord(s.sent)}) ولم تُعطَ بعد: لا تُعدَّل`);
-  if (s.prepared.length) parts.push(`حضّرها صيدلي المزج (${daysWord(s.prepared)}) ولم تُرسل بعد`);
+  if (s.prepared.length) parts.push(`حضّرها صيدلي المزج (${daysWord(s.prepared)}) ولم تُرسل بعد: لا تُعدَّل إلا بعد أن يزيل صيدلي المزج علامة التحضير`);
   return parts.length ? parts.join(' · ') : null;
 }

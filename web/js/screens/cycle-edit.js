@@ -166,9 +166,9 @@ function doseEditor(d, canRemove, doseOnly = false, ms = null) {
       h('div', { class: 'grid-2', style: 'margin-top: 8px' }, field('المحلول', dil), field('معدل التسريب', rate))),
     canRemove ? h('div', { class: 'grid-2', style: 'align-items: center' }, h('label', { class: 'check' }, remove, h('span', { text: 'حذف الدواء' })), removeReason) : null);
 
-  // حالة المزج: المرسلة غير المعطاة لا تُعدَّل، والمحضّرة يظهر أن التعديل يلغي تحضيرها
+  // حالة المزج: المحضّرة والمرسلة غير المعطاة لا تُعدَّل (الملف 21)
   const note = mixNote(ms);
-  if (note) el.insertBefore(h('p', { class: 'notice ' + (ms.locked ? 'ok' : 'warn'), style: 'margin: 0', text: note + (ms.locked ? '' : '. أي تعديل عليها يُلغي تحضيرها ويُعاد.') }), el.children[1]);
+  if (note) el.insertBefore(h('p', { class: 'notice ' + (ms.locked ? 'ok' : 'warn'), style: 'margin: 0', text: note }), el.children[1]);
   if (ms?.locked) {
     el.classList.add('locked');
     el.querySelectorAll('input, select, button').forEach((x) => { x.disabled = true; });

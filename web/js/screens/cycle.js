@@ -195,7 +195,7 @@ function doseRow(d, t, ms) {
       h('span', { class: 's', text: calcLine(d, t.bsa, t.weight_kg) }),
       d.diluent || d.infusion_rate ? h('span', { class: 's', text: [d.diluent, d.infusion_rate].filter(Boolean).join(' · ') }) : null,
       h('span', { style: 'display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px' }, badges),
-      note ? h('span', { class: 'pill wrap ' + (ms.locked ? 'ok' : 'info'), style: 'align-self: flex-start; margin-top: 4px', text: note }) : null),
+      note ? h('span', { class: 'pill wrap ok', style: 'align-self: flex-start; margin-top: 4px', text: note }) : null),
     h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(d.final_dose) }), h('span', { text: OUT_UNITS[d.final_unit] || d.final_unit })));
 }
 

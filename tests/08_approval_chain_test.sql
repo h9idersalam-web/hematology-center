@@ -152,13 +152,19 @@ select 'P4d mixing told chart arrived: ' || count(*) from notifications where us
 set role authenticated;
 
 -- =====================================================================
--- 11. تعديل الطبيب المباشر لا يُسقط الاعتماد، ويُعاد تحضير الجرعة المعدّلة فقط
+-- 11. تعديل الطبيب المباشر لا يُسقط الاعتماد؛ والجرعة المحضّرة لا تُعدَّل (الملف 21)
 -- =====================================================================
 set request.jwt.claim.sub = :'SR';
 select cycle_dose_id as d_dox from mixing_items where id = :'mi_dox' \gset
+select 'P11z ' || t.err('edit prepared dose', format($q$select doctor_edit(%L, jsonb_build_array(jsonb_build_object('kind','dose','target_dose_id',%L,'new_value','40','apply_onward',false)))$q$, :'c1', :'d_dox'));
+select 'P11y ' || t.err('remove prepared dose', format($q$select doctor_edit(%L, jsonb_build_array(jsonb_build_object('kind','remove_drug','target_dose_id',%L,'payload','{"reason":"x"}'::jsonb)))$q$, :'c1', :'d_dox'));
+-- صيدلي المزج يزيل علامة التحضير، فيصبح التعديل ممكناً
+set request.jwt.claim.sub = :'MX';
+select mark_prepared(:'mi_dox', false);
+set request.jwt.claim.sub = :'SR';
 select doctor_edit(:'c1', jsonb_build_array(jsonb_build_object('kind', 'dose', 'target_dose_id', :'d_dox', 'new_value', '40', 'apply_onward', false)), 'تخفيض');
 select 'P11a doctor edit keeps approval: ' || (doctor_approved_by is not null) from cycles where id = :'c1';
-select 'P11b dox prep cleared, vbl kept: ' || (select prepared_at is null from mixing_items where id = :'mi_dox')
+select 'P11b dox edited after untick, vbl still prepared: ' || (select final_dose = 40 from cycle_doses where id = :'d_dox')
        || '/' || (select prepared_at is not null from mixing_items where id = :'mi_vbl');
 select 'P11c orders not held: ' || string_agg(status, ',' order by day) from mixing_orders where cycle_id = :'c1';
 

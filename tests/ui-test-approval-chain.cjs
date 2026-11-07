@@ -121,8 +121,8 @@ const B = 'http://localhost:8788/';
   await shot(sr, 'cycle-mix-notes');
   await sr.getByRole('link', { name: 'تعديل الجرعات أو الخطة' }).click(); await sr.waitForSelector('text=التشخيص والمرحلة');
   ok('sent dose locked in editor', await sr.locator('.dose-edit.locked', { hasText: 'Rituximab' }).locator('input[type=number]').isDisabled());
-  ok('prepared dose editable with warning', !(await sr.locator('.dose-edit', { hasText: 'Cyclophosphamide' }).locator('input[type=number]').isDisabled())
-     && (await sr.locator('.dose-edit', { hasText: 'Cyclophosphamide' }).locator('text=يُلغي تحضيرها').count()) === 1);
+  ok('prepared dose locked too (file 21)', await sr.locator('.dose-edit.locked', { hasText: 'Cyclophosphamide' }).locator('input[type=number]').isDisabled()
+     && (await sr.locator('.dose-edit', { hasText: 'Cyclophosphamide' }).locator('text=يزيل صيدلي المزج علامة التحضير').count()) === 1);
   await shot(sr, 'editor-locked');
 
   // ===== 5. الصيدلي السريري العادي: صورة الطبلة مهمة على صفحته الرئيسية
