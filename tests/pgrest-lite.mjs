@@ -286,6 +286,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/auth/v1/token') {
       if (passwords[json.email] !== json.password) return send(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
+      // كما في Supabase: الحساب المحذوف (تغيّر بريده) أو المحظور لا يدخل
+      const { rows: au } = await pool.query('select banned_until from auth.users where email = $1', [json.email]);
+      if (!au.length || (au[0].banned_until && new Date(au[0].banned_until) > new Date())) return send(res, 400, { code: 400, error_code: 'user_banned', msg: 'User is banned' });
       return send(res, 200, await session(json.email));
     }
     if (url.pathname === '/auth/v1/logout') return send(res, 204);

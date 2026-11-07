@@ -100,18 +100,17 @@ export async function render(root, params) {
     const btn = (cls, text, onclick) => h('button', { type: 'button', class: 'btn sm ' + cls, onclick }, text);
     const actions = [];
     if (u.is_admin) actions.push(h('span', { class: 'pill ok', text: isSelf ? 'أنت المدير' : 'مدير' }));
-    else if (u.status === 'pending') {
-      actions.push(btn('primary', u.code && !u.code.expired ? 'إصدار كود جديد' : 'إصدار كود', () => issueDialog(u)));
-      actions.push(btn('secondary', 'إيقاف', () => suspend(u)));
-    } else if (u.status === 'active') {
-      actions.push(btn('secondary', 'كود تجديد', () => issueDialog(u)));
+    else {
+      if (u.status === 'pending') actions.push(btn('primary', u.code && !u.code.expired ? 'إصدار كود جديد' : 'إصدار كود', () => issueDialog(u)));
+      else if (u.status === 'active') actions.push(btn('secondary', 'كود تجديد', () => issueDialog(u)));
+      else actions.push(btn('ok', 'إعادة التفعيل', () => reactivate(u)));
+      // تغيير الصلاحية لكل حساب، أياً كانت حالته
       actions.push(btn('secondary', 'الصلاحية والاشتراك', () => userDialog(u)));
-      if (u.role === 'clinical_pharmacist') {
+      if (u.status === 'active' && u.role === 'clinical_pharmacist') {
         actions.push(btn('secondary', u.is_deputy ? 'إلغاء تعيينه رديفاً' : 'تعيينه رديفاً لمسؤول الصيادلة', () => deputy(u)));
       }
-      actions.push(btn('danger', 'إيقاف', () => suspend(u)));
-    } else {
-      actions.push(btn('ok', 'إعادة التفعيل', () => reactivate(u)));
+      if (u.status !== 'suspended') actions.push(btn(u.status === 'active' ? 'danger' : 'secondary', 'إيقاف', () => suspend(u)));
+      actions.push(btn('danger', 'حذف', () => removeUser(u)));
     }
     if (!u.is_admin && u.code && !u.code.expired) actions.push(h('button', { type: 'button', class: 'link-btn', onclick: () => revoke(u) }, 'إلغاء الكود'));
 
@@ -140,6 +139,23 @@ export async function render(root, params) {
     if (!ok) return;
     try { await rpc('admin_set_deputy', { p_user: u.id, p_on: on }); toast(on ? 'عُيّن رديفاً' : 'أُلغي التعيين'); draw(); }
     catch (e) { toast(e.message, true); }
+  }
+
+  // الحذف: كامل لمن لا أثر له، وإلا يُحذف حساب الدخول ويبقى اسمه على ما سجّله
+  async function removeUser(u) {
+    const reason = await confirmDialog({ title: 'حذف حساب ' + u.full_name,
+      body: u.has_records
+        ? 'له أثر في سجلات المرضى (إنشاء أو اعتماد أو إعطاء…). يُحذف حساب دخوله فلا يدخل أبداً ولا يظهر في القوائم، ويبقى اسمه على ما سجّله لأن السجل الطبي يجب أن يبيّن من فعل ماذا. لا يمكن التراجع.'
+        : 'ليس له أي أثر في السجلات، فيُحذف حسابه نهائياً. يستطيع التسجيل من جديد إن احتاج. لا يمكن التراجع.',
+      okText: 'حذف نهائي', danger: true,
+      input: { label: 'سبب الحذف (يُحفظ في سجل التعديلات)', placeholder: 'مثال: انتهى عمله في المركز، سُجّل بالخطأ' } });
+    if (reason === null) return;
+    if (!reason) return toast('اكتب سبب الحذف', true);
+    try {
+      const r = await rpc('admin_delete_user', { p_user: u.id, p_reason: reason });
+      toast(r === 'deleted' ? 'حُذف الحساب نهائياً' : 'حُذف حساب الدخول، وبقي اسمه على سجلاته');
+      draw();
+    } catch (e) { toast(e.message, true); }
   }
 
   async function suspend(u) {
@@ -279,7 +295,9 @@ export async function render(root, params) {
     const groupTitle = (t) => h('h2', { style: 'font-size: 15px; font-weight: 700; color: var(--muted-2); margin-top: 6px', text: t });
     body.replaceChildren(
       notice('info', 'info', h('p', { text: 'الحذف في كل الأنواع أرشفة مع السبب، ويبقى في سجل التعديلات. هذه الصلاحيات مفروضة من قاعدة البيانات نفسها.' })),
-      notice('info', 'edit', h('p', { text: 'لتغيير صلاحية مستخدم: «إدارة المستخدمين» ← «الصلاحية والاشتراك» عند اسمه. ولتعمل أنت بأي دور: زر «أعمل بدور» في صفحتك الرئيسية.' })),
+      h('button', { type: 'button', class: 'btn primary block', onclick: () => { tab = 'users'; history.replaceState(null, '', '#/admin?tab=users'); drawTabs(); draw(); } },
+        icon('users', 22, '#fff'), 'تغيير صلاحية مستخدم أو حذفه'),
+      h('p', { class: 'hint', text: 'في «إدارة المستخدمين» تجد عند كل مستخدم: «الصلاحية والاشتراك» و«إيقاف» و«حذف». ولتعمل أنت بأي دور: زر «أعمل بدور» في صفحتك الرئيسية.' }),
       groupTitle('الأطباء'),
       card('طبيب اختصاص', [Y('عرض'), Y('إضافة'), Y('تعديل'), Y('أرشفة')], [
         ['خطة العلاج', 'الطبيب المختص بالمريض وحده يوافق عليها أو يرفضها، ولكل مريض طبيب مختص إلزاماً'],

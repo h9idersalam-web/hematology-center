@@ -11,6 +11,7 @@ export const sb = configured
 
 const AUTH_ERRORS = [
   [/invalid login credentials/i, 'البريد أو كلمة المرور غير صحيحة'],
+  [/user is banned|user_banned/i, 'هذا الحساب محذوف أو محظور. راجع إدارة المركز'],
   [/already registered|already been registered|user already exists/i, 'هذا البريد مسجّل من قبل، سجّل الدخول بدلاً من ذلك'],
   [/password should be at least|weak password/i, 'كلمة المرور قصيرة أو ضعيفة، استخدم 8 أحرف على الأقل'],
   [/unable to validate email|invalid email|email address .* is invalid/i, 'صيغة البريد غير صحيحة'],
