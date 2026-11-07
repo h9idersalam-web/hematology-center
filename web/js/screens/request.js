@@ -3,7 +3,7 @@ import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, fmtTime, fmtDay, toast, busy, confirmDialog, ROLES, count, field } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
-import { OUT_UNITS, daysText, num } from '../dose.js';
+import { OUT_UNITS, daysText, num, loadMixState, mixNote } from '../dose.js';
 import { CR_STATUS } from './cycle.js';
 import { NKDA } from './patient-form.js';
 
@@ -19,6 +19,7 @@ export async function render(root, params) {
   const protoIds = items.filter((i) => i.kind === 'protocol').map((i) => i.payload.protocol_id);
   const protos = protoIds.length ? await q(sb.from('protocols').select('id, name').in('id', protoIds)) : [];
   const [stL, stK] = CR_STATUS[r.status];
+  const mixState = await loadMixState(sb, q, items.map((i) => i.target_dose_id).filter(Boolean)).catch(() => new Map());
   const me = state.profile;
   const p = r.patients;
   // من يقرّر: تحدده القاعدة (can_decide_request) حسب نوع مرسل الطلب
@@ -41,7 +42,8 @@ export async function render(root, params) {
       h('span', { class: 'grow' },
         h('span', { class: 's', style: 'font-weight: 600', text: KIND_AR[it.kind] }),
         h('span', { class: 't', style: 'font-size: 16px', text: main }),
-        sub ? h('span', { class: 's', text: sub }) : null),
+        sub ? h('span', { class: 's', text: sub }) : null,
+        r.status === 'pending' && mixNote(mixState.get(it.target_dose_id)) ? h('span', { class: 'pill wrap ' + (mixState.get(it.target_dose_id).locked ? 'ok' : 'warn'), style: 'align-self: flex-start; margin-top: 4px', text: mixNote(mixState.get(it.target_dose_id)) }) : null),
       verdict);
   };
 

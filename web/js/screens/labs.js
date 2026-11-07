@@ -4,7 +4,8 @@ import { h, mount, icon, topbar, bottomNav, field, notice, toast, busy, empty, f
 import { go } from '../app.js';
 import { can } from '../perms.js';
 import { PANELS, ref, flag } from '../labs.js';
-import { openFile } from '../files.js';
+import { openFile, signedUrl, isImage } from '../files.js';
+import { readCbcImage } from '../ocr-labs.js';
 
 // --------------------------------------------------------------- الإدخال
 export async function entry(root, params) {
@@ -36,10 +37,14 @@ export async function entry(root, params) {
         v.classList.toggle('out', f === 'low' || f === 'high');
       };
       [v, lo, hi].forEach((x) => x.addEventListener('input', redraw));
-      rows.push({ t, v, lo, hi });
+      const src = h('div', { class: 'lab-src', hidden: true });
+      const row = { t, v, lo, hi, src, redraw, ocr: null, ok: null };
+      // المستخدم كتب القيمة بيده: تصبح إدخالاً عادياً ولا تُنسب للقراءة الآلية
+      v.addEventListener('input', () => { if (row.ocr && !row.filling) clearOcr(row); });
+      rows.push(row);
       return h('div', { class: 'lab-row' },
         h('span', { class: 'lab-n' }, h('b', { class: 'ltr', text: t.name }), h('span', { class: 'ltr', text: t.unit })),
-        v, h('span', { class: 'lab-ref' }, lo, h('span', { text: '–' }), hi), mark);
+        v, h('span', { class: 'lab-ref' }, lo, h('span', { text: '–' }), hi), mark, src);
     }));
     return h('details', { class: 'card', open: i === 0 },
       h('summary', { style: 'font-weight: 700; font-size: 17px; cursor: pointer', text: panel.label }),
@@ -47,16 +52,28 @@ export async function entry(root, params) {
       body);
   });
 
+  // ------------------------------------------------- القراءة الآلية لصورة التحليل
+  const reviewed = h('input', { type: 'checkbox' });
+  const reviewBox = h('label', { class: 'check card', hidden: true, style: 'font-weight: 700' }, reviewed,
+    h('span', { text: 'راجعت كل قيمة مقروءة آلياً مقابل صورة التحليل، وهي صحيحة' }));
+  const ocrBox = att && can('labs') ? ocrCard(att, rows, (fresh) => { reviewBox.hidden = !rows.some((r) => r.ocr); if (fresh) reviewed.checked = false; }) : null;
+
   const err = h('div');
   const submit = h('button', { class: 'btn primary block', type: 'button', text: 'حفظ النتائج' });
   submit.addEventListener('click', () => busy(submit, async () => {
     err.replaceChildren();
+    const fail = (m) => { err.replaceChildren(notice('err', 'warn', h('p', { text: m }))); err.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
+    const ocrRows = rows.filter((r) => r.ocr && r.v.value !== '');
+    const unchecked = ocrRows.filter((r) => r.ocr.uncertain && !r.ok?.checked);
+    if (unchecked.length) return fail(`تحقق من القيم غير المؤكدة (${unchecked.map((r) => r.t.name).join('، ')}) مقابل الصورة وضع علامة عليها، أو صحّحها بيدك.`);
+    if (ocrRows.length && !reviewed.checked) return fail('أكّد أنك راجعت القيم المقروءة آلياً مقابل الصورة.');
     const results = [];
     for (const r of rows) {
       if (r.v.value === '') continue;
       const v = Number(latinDigits(r.v.value));
       if (!(v >= 0)) return err.replaceChildren(notice('err', 'warn', h('p', { text: `قيمة ${r.t.name} غير صحيحة` })));
-      results.push({ test_name: r.t.name, value: v, unit: r.t.unit, ref_low: r.lo.value === '' ? '' : Number(latinDigits(r.lo.value)), ref_high: r.hi.value === '' ? '' : Number(latinDigits(r.hi.value)) });
+      results.push({ test_name: r.t.name, value: v, unit: r.t.unit, ref_low: r.lo.value === '' ? '' : Number(latinDigits(r.lo.value)), ref_high: r.hi.value === '' ? '' : Number(latinDigits(r.hi.value)),
+        entry_method: r.ocr ? 'ocr' : 'manual' });
     }
     if (!results.length) return err.replaceChildren(notice('err', 'warn', h('p', { text: 'أدخل نتيجة واحدة على الأقل' })));
     try {
@@ -68,11 +85,103 @@ export async function entry(root, params) {
   }));
 
   shell(
-    att ? h('button', { type: 'button', class: 'notice info', style: 'border: 0; text-align: right; width: 100%', onclick: () => openFile(att.file_path).catch((e) => toast(e.message, true)) },
-      icon('file', 20), h('span', { text: 'مرتبط بصورة التحليل المرفوعة. اضغط لفتحها أثناء الإدخال.' })) : null,
+    ocrBox || (att ? h('button', { type: 'button', class: 'notice info', style: 'border: 0; text-align: right; width: 100%', onclick: () => openFile(att.file_path).catch((e) => toast(e.message, true)) },
+      icon('file', 20), h('span', { text: 'مرتبط بملف التحليل المرفوع. اضغط لفتحه أثناء الإدخال.' })) : null),
+    !att && can('upload') ? h('a', { class: 'btn secondary block', href: `#/upload?patient=${pid}&kind=lab` }, icon('share', 20), 'التقط صورة التحليل لتُقرأ قيمها آلياً') : null,
     h('div', { class: 'card' }, field('تاريخ سحب العينة', date)),
     notice('info', 'info', h('p', { text: 'المراجع جاهزة لبالغ ' + (sex === 'female' ? 'أنثى' : 'ذكر') + '. عدّلها لتطابق ورقة مختبركم. اترك أي تحليل فارغاً إن لم يُجرَ.' })),
-    ...panels, err, submit);
+    ...panels, reviewBox, err, submit);
+}
+
+// --------------------------------------------------------------- القراءة الآلية
+const OCR_TESTS = ['WBC', 'ANC', 'Hb', 'PLT'];
+
+function clearOcr(row) {
+  row.ocr = null; row.ok = null;
+  row.v.classList.remove('ocr', 'ocr-doubt');
+  row.src.hidden = true; row.src.replaceChildren();
+  row.onChange?.();
+}
+
+// بطاقة الصورة: تقرأ تلقائياً عند الفتح، وتملأ تعداد الدم للمراجعة
+function ocrCard(att, rows, onChange) {
+  const status = h('p', { style: 'font-size: 14px; color: var(--muted)' });
+  const bar = h('span');
+  const progress = h('div', { class: 'ocr-progress', hidden: true }, bar);
+  const summary = h('div');
+  const again = h('button', { type: 'button', class: 'btn secondary block', hidden: true }, icon('refresh', 20), 'إعادة القراءة');
+  const img = h('img', { class: 'ocr-img', alt: 'صورة التحليل', onclick: () => openFile(att.file_path).catch((e) => toast(e.message, true)) });
+  const card = h('section', { class: 'card' },
+    h('div', { style: 'display: flex; justify-content: space-between; align-items: baseline; gap: 8px' },
+      h('h2', { text: 'صورة التحليل' }), h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: 'اضغط الصورة لتكبيرها' })),
+    img, status, progress, summary, again);
+  for (const r of rows) r.onChange = onChange;
+
+  if (!isImage(att.file_path)) {
+    img.replaceWith(h('button', { type: 'button', class: 'btn secondary block', onclick: () => openFile(att.file_path).catch((e) => toast(e.message, true)) }, icon('file', 20), 'فتح الملف'));
+    status.textContent = 'القراءة الآلية للصور فقط (لا لملفات PDF). أدخل القيم بيدك.';
+    return card;
+  }
+
+  const run = async () => {
+    again.hidden = true; summary.replaceChildren(); progress.hidden = false; bar.style.width = '5%';
+    status.textContent = 'جارٍ تحميل أداة القراءة (مرة واحدة فقط على هذا الجهاز)…';
+    try {
+      const url = await signedUrl(att.file_path);
+      img.src = url;
+      const blob = await (await fetch(url)).blob();
+      const steps = { 'loading tesseract core': 10, 'loading language traineddata': 30, 'initializing api': 45, 'تجهيز الصورة': 50, 'القراءة الأولى': 60, 'القراءة الثانية للتأكد': 80 };
+      const { result } = await readCbcImage(blob, (m) => {
+        if (steps[m.status] != null) bar.style.width = steps[m.status] + '%';
+        if (m.status === 'تجهيز الصورة' || m.status?.startsWith('القراءة')) status.textContent = m.status + '…';
+      });
+      bar.style.width = '100%';
+      fill(result);
+    } catch (e) {
+      status.textContent = 'تعذّرت القراءة الآلية: ' + e.message + ' أدخل القيم بيدك.';
+    } finally {
+      progress.hidden = true; again.hidden = false;
+    }
+  };
+
+  function fill(result) {
+    let n = 0, doubt = 0;
+    const rejected = [];
+    for (const r of rows) if (OCR_TESTS.includes(r.t.name)) clearOcr(r);
+    for (const test of OCR_TESTS) {
+      const res = result[test];
+      const row = rows.find((r) => r.t.name === test);
+      if (!res || !row) continue;
+      if (res.rejected) { rejected.push(`${test} (قُرئ ${res.raw})`); continue; }
+      row.filling = true;
+      row.v.value = String(res.value);
+      if (res.low != null) { row.lo.value = String(res.low); row.hi.value = String(res.high); }
+      row.filling = false;
+      row.ocr = res; n++;
+      row.v.classList.add(res.uncertain ? 'ocr-doubt' : 'ocr');
+      const parts = [h('span', { text: (res.uncertain ? '⚠ غير مؤكدة: ' : 'مقروءة آلياً') + (res.reasons.length ? (res.uncertain ? '' : ' · ') + res.reasons.join('؛ ') : '') })];
+      if (res.line) parts.push(h('code', { text: res.line }));
+      if (res.uncertain) {
+        row.ok = h('input', { type: 'checkbox' });
+        parts.push(h('label', { class: 'check' }, row.ok, h('span', { text: `تحققت من ${test} في الصورة` })));
+        doubt++;
+      }
+      row.src.replaceChildren(...parts); row.src.hidden = false;
+      row.redraw();
+    }
+    status.textContent = '';
+    summary.replaceChildren(n
+      ? notice(doubt ? 'warn' : 'info', 'info',
+          h('p', { style: 'font-weight: 700', text: `قُرئت ${n} من قيم تعداد الدم من الصورة${doubt ? `، منها ${doubt} غير مؤكدة (بالأصفر)` : ''}.` }),
+          h('p', { text: 'قارن كل قيمة ومرجعها بالصورة قبل الحفظ. القراءة الآلية اقتراح وقد تخطئ، والمسؤولية على من يحفظ.' }),
+          rejected.length ? h('p', { text: 'لم تُملأ لأنها خارج الحدود المعقولة: ' + rejected.join('، ') }) : null)
+      : notice('warn', 'warn', h('p', { text: 'لم تُقرأ قيم تعداد الدم من هذه الصورة. صوّر الورقة مستوية وواضحة وبإضاءة جيدة ثم ارفعها مجدداً، أو أدخل القيم بيدك.' })));
+    onChange(true);   // قراءة جديدة: يُطلب التأكيد من جديد
+  }
+
+  again.addEventListener('click', () => busy(again, run));
+  run();
+  return card;
 }
 
 // --------------------------------------------------------------- العرض والمنحنيات

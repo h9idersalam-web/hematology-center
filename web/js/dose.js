@@ -69,3 +69,35 @@ export function calcLine(d, bsa, weight) {
 export function doseBig(value, unit) {
   return h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(value) }), ' ', h('span', { text: OUT_UNITS[unit] || unit }));
 }
+
+// ------------------------------------------------------------------ حالة الجرعة في المزج
+// تحمّل لكل جرعة: الأيام التي حُضّرت ولم تُرسل، والتي أُرسلت ولم تُعطَ.
+// الجرعة المرسلة غير المعطاة لا تُعدَّل (تمنعها القاعدة أيضاً). الجرعة المحضّرة: يظهر للجميع أنها حُضّرت.
+export async function loadMixState(sb, q, doseIds) {
+  const map = new Map();
+  if (!doseIds.length) return map;
+  const [items, given] = await Promise.all([
+    q(sb.from('mixing_items').select('cycle_dose_id, prepared_at, sent_at, mixing_orders!inner(day)').in('cycle_dose_id', doseIds)),
+    q(sb.from('administrations').select('cycle_dose_id, day').in('cycle_dose_id', doseIds)),
+  ]);
+  for (const it of items) {
+    const day = it.mixing_orders.day;
+    const done = given.some((g) => g.cycle_dose_id === it.cycle_dose_id && g.day === day);
+    if (done) continue;
+    const s = map.get(it.cycle_dose_id) || { prepared: [], sent: [] };
+    if (it.sent_at) s.sent.push(day); else if (it.prepared_at) s.prepared.push(day);
+    map.set(it.cycle_dose_id, s);
+  }
+  for (const s of map.values()) { s.sent.sort((a, b) => a - b); s.prepared.sort((a, b) => a - b); s.locked = s.sent.length > 0; }
+  return map;
+}
+
+const daysWord = (arr) => (arr.length === 1 ? `اليوم ${arr[0]}` : `الأيام ${arr.join('، ')}`);
+// نص الملاحظة كما يراها الجميع، أو null
+export function mixNote(s) {
+  if (!s) return null;
+  const parts = [];
+  if (s.sent.length) parts.push(`حُضّرت وأُرسلت من المزج (${daysWord(s.sent)}) ولم تُعطَ بعد: لا تُعدَّل`);
+  if (s.prepared.length) parts.push(`حضّرها صيدلي المزج (${daysWord(s.prepared)}) ولم تُرسل بعد`);
+  return parts.length ? parts.join(' · ') : null;
+}

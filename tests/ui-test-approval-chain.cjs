@@ -109,6 +109,22 @@ const B = 'http://localhost:8788/';
   await nav(mix, B + orderHref); await mix.waitForSelector('text=ضع علامة على ما حضّرته');
   ok('order resumes after re-approval', (await mix.locator('main input[type=checkbox]').count()) >= 1);
 
+  // ===== 4ب. ملاحظة حالة المزج للجميع: المرسلة غير المعطاة مقفلة، والمحضّرة ظاهرة
+  const tickDrug = async (drug) => { await mix.locator('label.row', { hasText: drug }).locator('input').check(); await mix.waitForSelector(`.mix-item.done >> text=${drug}`); };
+  await tickDrug('Rituximab');
+  await mix.getByRole('button', { name: /إرسال المحضَّر/ }).click(); await confirm(mix, 'إرسال');
+  await mix.waitForSelector('.pill >> text=أُرسل جزء');
+  await tickDrug('Cyclophosphamide');
+  await nav(sr, cycleUrl); await sr.waitForSelector('text=الجرعات');
+  ok('everyone sees sent note', (await sr.locator('.row', { hasText: 'Rituximab' }).locator('text=أُرسلت من المزج (اليوم 1) ولم تُعطَ بعد').count()) === 1);
+  ok('everyone sees prepared note', (await sr.locator('.row', { hasText: 'Cyclophosphamide' }).locator('text=حضّرها صيدلي المزج (اليوم 1) ولم تُرسل بعد').count()) === 1);
+  await shot(sr, 'cycle-mix-notes');
+  await sr.getByRole('link', { name: 'تعديل الجرعات أو الخطة' }).click(); await sr.waitForSelector('text=التشخيص والمرحلة');
+  ok('sent dose locked in editor', await sr.locator('.dose-edit.locked', { hasText: 'Rituximab' }).locator('input[type=number]').isDisabled());
+  ok('prepared dose editable with warning', !(await sr.locator('.dose-edit', { hasText: 'Cyclophosphamide' }).locator('input[type=number]').isDisabled())
+     && (await sr.locator('.dose-edit', { hasText: 'Cyclophosphamide' }).locator('text=يُلغي تحضيرها').count()) === 1);
+  await shot(sr, 'editor-locked');
+
   // ===== 5. الصيدلي السريري العادي: صورة الطبلة مهمة على صفحته الرئيسية
   await nav(chief, B + '#/home'); await chief.waitForSelector('text=بانتظار صورة الطبلة منك');
   ok('chart task listed on pharmacist home', (await chief.locator('section', { hasText: 'بانتظار صورة الطبلة منك' }).locator('.row').count()) >= 1);

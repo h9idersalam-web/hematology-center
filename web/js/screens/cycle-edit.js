@@ -5,7 +5,7 @@ import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, field, notice, toast, busy, latinDigits, confirmDialog, todayISO, count } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
-import { ROUTES, ROUTE_AR, OUT_UNITS, validDays, daysText, num } from '../dose.js';
+import { ROUTES, ROUTE_AR, OUT_UNITS, validDays, daysText, num, loadMixState, mixNote } from '../dose.js';
 
 export const REASONS = ['تعداد الدم', 'وظائف الكبد', 'وظائف الكلى', 'سمّية أو أعراض جانبية', 'تداخل دوائي', 'خطأ في الحساب أو السقف', 'تغيّر الوزن', 'أخرى'];
 const round = (x) => (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10);
@@ -30,7 +30,8 @@ export async function render(root, params) {
   if (!['planned', 'held'].includes(c.status) || t.patients.archived_at) return shell(notice('warn', 'lock', h('p', { text: 'لا يمكن تعديل دورة أُعطيت أو أُلغيت، أو ملف مؤرشف.' })));
 
   // ----------------------------------------------------------- الجرعات
-  const doseEds = doses.map((d) => doseEditor(d, !clinical, mixing));
+  const mixState = await loadMixState(sb, q, doses.map((d) => d.id)).catch(() => new Map());
+  const doseEds = doses.map((d) => doseEditor(d, !clinical, mixing, mixState.get(d.id)));
 
   // ----------------------------------------------------------- إضافة دواء
   const add = addEditor(clinical);
@@ -133,7 +134,7 @@ export async function render(root, params) {
       summary, err, submit)));
 }
 
-function doseEditor(d, canRemove, doseOnly = false) {
+function doseEditor(d, canRemove, doseOnly = false, ms = null) {
   const cur = Number(d.final_dose);
   const val = h('input', { class: 'input ltr', type: 'number', inputmode: 'decimal', step: 'any', min: 0, style: 'text-align: right', placeholder: num(cur) });
   const onward = h('input', { type: 'checkbox', checked: true });
@@ -164,6 +165,15 @@ function doseEditor(d, canRemove, doseOnly = false) {
     doseOnly ? null : h('details', null, h('summary', { style: 'cursor: pointer; font-weight: 600; min-height: 36px', text: 'المحلول ومعدل التسريب' }),
       h('div', { class: 'grid-2', style: 'margin-top: 8px' }, field('المحلول', dil), field('معدل التسريب', rate))),
     canRemove ? h('div', { class: 'grid-2', style: 'align-items: center' }, h('label', { class: 'check' }, remove, h('span', { text: 'حذف الدواء' })), removeReason) : null);
+
+  // حالة المزج: المرسلة غير المعطاة لا تُعدَّل، والمحضّرة يظهر أن التعديل يلغي تحضيرها
+  const note = mixNote(ms);
+  if (note) el.insertBefore(h('p', { class: 'notice ' + (ms.locked ? 'ok' : 'warn'), style: 'margin: 0', text: note + (ms.locked ? '' : '. أي تعديل عليها يُلغي تحضيرها ويُعاد.') }), el.children[1]);
+  if (ms?.locked) {
+    el.classList.add('locked');
+    el.querySelectorAll('input, select, button').forEach((x) => { x.disabled = true; });
+    return { el, items: () => ({ items: [], labels: [] }) };
+  }
 
   return {
     el,

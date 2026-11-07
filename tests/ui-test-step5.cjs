@@ -44,8 +44,10 @@ const B = 'http://localhost:8788/';
   await nurse.getByLabel('العنوان (اختياري)').fill('تعداد دم كامل');
   await shot(nurse, 'upload');
   await nurse.getByRole('button', { name: 'رفع وحفظ في ملف المريض' }).click();
-  await nurse.waitForSelector('text=مرتبط بصورة التحليل المرفوعة');
-  ok('upload → lab entry linked to image', true);
+  await nurse.waitForSelector('text=صورة التحليل');
+  ok('upload → lab entry with image and auto-read', true);
+  // الصورة هنا بلا قيم: تفشل القراءة بهدوء ويبقى الإدخال اليدوي
+  ok('unreadable image → manual entry', await nurse.locator('text=لم تُقرأ قيم تعداد الدم من هذه الصورة').waitFor({ timeout: 120000 }).then(() => true, () => false));
   await nurse.getByLabel('WBC (×10⁹/L)').fill('3.1');
   await nurse.getByLabel('ANC (×10⁹/L)').fill('1.2');
   await nurse.getByLabel('Hb (g/dL)').fill('10.4');

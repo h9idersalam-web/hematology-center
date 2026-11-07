@@ -3,7 +3,7 @@ import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, fmtDay, fmtTime, toast, confirmDialog, busy, daysUntil, count, ROLES } from '../ui.js';
 import { go } from '../app.js';
 import { can } from '../perms.js';
-import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num, instrLine } from '../dose.js';
+import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num, instrLine, loadMixState, mixNote } from '../dose.js';
 import { NKDA } from './patient-form.js';
 import { postponeDialog } from './postpone.js';
 import { latestCbc } from './labs.js';
@@ -32,6 +32,7 @@ export async function render(root, params) {
   const [stL, stK] = C_STATUS[c.status];
   const reload = () => render(root, params);
   const cbc = await latestCbc(p.id).catch(() => ({}));
+  const mixState = await loadMixState(sb, q, active.map((d) => d.id)).catch(() => new Map());
 
   // الأزرار حسب الدور والحالة
   const actions = [];
@@ -77,7 +78,7 @@ export async function render(root, params) {
         h('b', { text: 'عرض' })) : null,
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'الجرعات' }), h('span', { class: 'meta', text: count(active.length, 'drug') })),
-        h('div', { class: 'card flush' }, active.length ? active.map((d) => doseRow(d, t)) : h('div', { class: 'empty', text: 'لا توجد أدوية' }))),
+        h('div', { class: 'card flush' }, active.length ? active.map((d) => doseRow(d, t, mixState.get(d.id))) : h('div', { class: 'empty', text: 'لا توجد أدوية' }))),
       protocolFileLink(t.protocols?.file_path, 'ملف البروتوكول ' + t.protocol_name),
       removed.length ? h('details', { class: 'card' },
         h('summary', { style: 'font-weight: 700; cursor: pointer', text: `أدوية حُذفت من هذه الدورة (${removed.length})` }),
@@ -179,8 +180,9 @@ function chartCard(c, p, open, reload) {
 
 const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 
-function doseRow(d, t) {
+function doseRow(d, t, ms) {
   const badges = [];
+  const note = mixNote(ms);
   if (d.capped) badges.push(h('span', { class: 'pill warn', text: `بالسقف (المحسوب ${num(d.calculated)})` }));
   if (d.source === 'edited') badges.push(h('span', { class: 'pill info', text: `عُدّلت من ${num(d.edited_from)}` }));
   if (d.source === 'added') badges.push(h('span', { class: 'pill brand', text: 'دواء مضاف' }));
@@ -192,7 +194,8 @@ function doseRow(d, t) {
       instrLine(d),
       h('span', { class: 's', text: calcLine(d, t.bsa, t.weight_kg) }),
       d.diluent || d.infusion_rate ? h('span', { class: 's', text: [d.diluent, d.infusion_rate].filter(Boolean).join(' · ') }) : null,
-      h('span', { style: 'display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px' }, badges)),
+      h('span', { style: 'display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px' }, badges),
+      note ? h('span', { class: 'pill wrap ' + (ms.locked ? 'ok' : 'info'), style: 'align-self: flex-start; margin-top: 4px', text: note }) : null),
     h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(d.final_dose) }), h('span', { text: OUT_UNITS[d.final_unit] || d.final_unit })));
 }
 
