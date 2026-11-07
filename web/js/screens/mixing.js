@@ -1,6 +1,6 @@
 // قسم المزج الكيميائي: التحويل من الصيدلي السريري، والطلبات الواردة، والتحضير والإرسال
 import { sb, q, rpc } from '../api.js';
-import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDate, fmtTime, relTime, initials, count, confirmDialog } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDate, fmtTime, initials, count, confirmDialog, todayISO } from '../ui.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
 import { signedUrl, openFile, isImage } from '../files.js';
@@ -31,51 +31,79 @@ function itemLine(d) {
 
 // --------------------------------------------------------------- قائمة قسم المزج
 export async function list(root, params) {
+  // يُعرض يوم واحد: اليوم افتراضياً، أو غداً، أو أي تاريخ؛ و«المتأخرة» لما فات ولم يُرسل
+  const today = todayISO();
+  let day = /^\d{4}-\d{2}-\d{2}$/.test(params.get('d') || '') ? params.get('d') : today;
   let tab = params.get('t') || 'open';
+  const dayBar = h('div');
   const seg = h('div', { class: 'segmented', role: 'group' });
+  const lateBox = h('div');
   const box = h('div', { class: 'card flush' });
   mount(root, h('div', { class: 'screen' },
     topbar({ title: 'قسم المزج الكيميائي', back: '#/home' }),
-    h('main', { class: 'main with-nav' }, seg, box),
+    h('main', { class: 'main with-nav' }, dayBar, lateBox, seg, box),
     bottomNav('home')));
   if (!can('seeMixing')) return box.replaceChildren(notice('info', 'lock', h('p', { text: 'قسم المزج للصيادلة والأطباء.' })));
 
-  // الطلبات المفتوحة كلها مرتبة بموعد يوم الإعطاء، والمرسلة خلال الأيام الثلاثة الماضية
-  const since = new Date(); since.setDate(since.getDate() - 3);
-  const sel = 'id, day, status, hold_reason, transferred_at, patients(full_name, file_no, allergies), cycles(cycle_no, planned_date, status, chart_attachment_id, treatments(protocol_name)), mixing_items(id, prepared_at, sent_at)';
-  const [openRows, sentRows] = await Promise.all([
-    q(sb.from('mixing_orders').select(sel).neq('status', 'sent').order('transferred_at')),
-    q(sb.from('mixing_orders').select(sel).eq('status', 'sent').gte('transferred_at', since.toISOString()).order('transferred_at', { ascending: false })),
-  ]);
-  const live = openRows.filter((r) => ['planned', 'held'].includes(r.cycles.status));   // الدورات المغلقة أو الملغاة لا تظهر
-  live.sort((a, b) => dueDate(a).localeCompare(dueDate(b)));
-  const groups = { open: live, sent: sentRows };
+  // طلبات الدورات المفتوحة، وطلبات الأيام الماضية القريبة المرسلة؛ ثم يُفرز كل طلب بتاريخ يومه
+  const sel = 'id, day, status, hold_reason, transferred_at, patients(full_name, file_no, allergies), cycles!inner(id, cycle_no, planned_date, status, chart_attachment_id, treatments(protocol_name)), mixing_items(id, prepared_at, sent_at)';
+  const from = addDays(today, -120);
+  const rows = await q(sb.from('mixing_orders').select(sel).gte('cycles.planned_date', from).order('transferred_at'));
+  const openCycle = (r) => ['planned', 'held'].includes(r.cycles.status);
+  const late = rows.filter((r) => r.status !== 'sent' && openCycle(r) && dueDate(r) < today);
 
-  const draw = () => {
-    seg.replaceChildren(...[['open', 'الواردة'], ['sent', 'أُرسلت']].map(([id, label]) => h('button', {
+  const setDay = (d) => { day = d; tab = tab === 'late' ? 'open' : tab; sync(); draw(); };
+  const sync = () => history.replaceState(null, '', `#/mixing?d=${day}&t=${tab}`);
+
+  function draw() {
+    const picked = h('input', { class: 'input', type: 'date', value: day, 'aria-label': 'تاريخ الإعطاء' });
+    picked.addEventListener('change', () => picked.value && setDay(picked.value));
+    const quick = (d, label) => h('button', { type: 'button', 'aria-pressed': tab !== 'late' && day === d ? 'true' : 'false', onclick: () => setDay(d), text: label });
+    dayBar.replaceChildren(h('div', { class: 'card', style: 'gap: 10px' },
+      h('div', { class: 'segmented', role: 'group', 'aria-label': 'اليوم' }, quick(today, 'اليوم'), quick(addDays(today, 1), 'غداً')),
+      h('label', { class: 'field', style: 'margin: 0' }, h('span', { class: 'label', text: 'أو اختر تاريخاً' }), picked),
+      h('p', { style: 'font-weight: 700', text: tab === 'late' ? 'طلبات أيام سابقة لم تُرسل' : 'جرعات ' + fmtDate(day, { weekday: 'long', day: 'numeric', month: 'long' }) })));
+
+    lateBox.replaceChildren(late.length && tab !== 'late'
+      ? h('button', { type: 'button', class: 'notice warn', style: 'border: 0; width: 100%; text-align: right; align-items: center', onclick: () => { tab = 'late'; sync(); draw(); } },
+          icon('warn', 22), h('span', { style: 'flex: 1; font-weight: 600', text: `${late.length} طلب من أيام سابقة لم يُرسل` }), h('b', { text: 'عرض' }))
+      : null);
+
+    const ofDay = rows.filter((r) => dueDate(r) === day);
+    const groups = {
+      open: ofDay.filter((r) => r.status !== 'sent' && openCycle(r)),
+      sent: ofDay.filter((r) => r.status === 'sent'),
+      late,
+    };
+    const tabs = tab === 'late' ? [['late', 'المتأخرة']] : [['open', 'للتحضير'], ['sent', 'أُرسلت']];
+    seg.replaceChildren(...tabs.map(([id, label]) => h('button', {
       type: 'button', 'aria-pressed': tab === id ? 'true' : 'false',
-      onclick: () => { tab = id; history.replaceState(null, '', '#/mixing?t=' + id); draw(); },
-    }, label, id === 'open' && groups.open.length ? h('span', { class: 'count', style: 'margin-right: 6px', text: groups.open.length }) : null)));
-    box.replaceChildren(...(groups[tab].length ? groups[tab].map(orderRow)
-      : [empty(tab === 'open' ? 'لا توجد طلبات مزج واردة' : 'لم يُرسل شيء خلال الأيام الثلاثة الماضية', 'check')]));
-  };
-  draw();
+      onclick: () => { tab = id; sync(); draw(); },
+    }, label, groups[id].length ? h('span', { class: 'count', style: 'margin-right: 6px', text: groups[id].length }) : null)));
+    const list = groups[tab] || [];
+    box.replaceChildren(...(list.length ? list.map(orderRow)
+      : [empty(tab === 'sent' ? 'لم يُرسل شيء لهذا اليوم' : 'لا توجد جرعات للتحضير في هذا اليوم', 'check')]));
+  }
+  sync(); draw();
 }
 
 function orderRow(o) {
   const [l, k] = O_STATUS[o.status];
   const prep = o.mixing_items.filter((i) => i.prepared_at).length;
   const hasAllergy = o.patients.allergies && o.patients.allergies !== NKDA;
-  return h('a', { class: 'row', href: '#/mixing-order?id=' + o.id },
-    h('span', { class: 'avatar', text: initials(o.patients.full_name) }),
-    h('span', { class: 'grow' },
-      h('span', { class: 't', style: 'display: flex; gap: 6px; align-items: center' }, h('span', { text: o.patients.full_name }),
-        hasAllergy ? h('span', { style: 'color: var(--brand); display: flex', title: 'حساسية' }, icon('alert', 16, 'currentColor', 2.2)) : null),
-      h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
-        h('span', { class: 'tag', text: o.cycles.treatments.protocol_name }), h('span', { text: `الدورة ${o.cycles.cycle_no} · اليوم ${o.day}` })),
-      h('span', { class: 's', text: o.status === 'held' ? (o.hold_reason || 'معلّق')
-        : `الموعد ${fmtDate(dueDate(o), { weekday: 'short', day: 'numeric', month: 'short' })} · ${prep} من ${count(o.mixing_items.length, 'drug')} محضَّرة${o.cycles.chart_attachment_id ? ' · وصلت صورة الطبلة' : ''}` })),
-    h('span', { class: 'pill ' + k, text: l }));
+  return h('div', { class: 'row', style: 'flex-wrap: wrap' },
+    h('a', { href: '#/mixing-order?id=' + o.id, style: 'display: flex; gap: 12px; align-items: center; flex: 1; min-width: 0; text-decoration: none; color: inherit' },
+      h('span', { class: 'avatar', text: initials(o.patients.full_name) }),
+      h('span', { class: 'grow' },
+        h('span', { class: 't', style: 'display: flex; gap: 6px; align-items: center' }, h('span', { text: o.patients.full_name }),
+          hasAllergy ? h('span', { style: 'color: var(--brand); display: flex', title: 'حساسية' }, icon('alert', 16, 'currentColor', 2.2)) : null),
+        h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
+          h('span', { class: 'tag', text: o.cycles.treatments.protocol_name }), h('span', { text: `الدورة ${o.cycles.cycle_no} · اليوم ${o.day}` })),
+        h('span', { class: 's', text: o.status === 'held' ? (o.hold_reason || 'معلّق')
+          : `${fmtDate(dueDate(o), { weekday: 'short', day: 'numeric', month: 'short' })} · ${prep} من ${count(o.mixing_items.length, 'drug')} محضَّرة${o.cycles.chart_attachment_id ? ' · وصلت صورة الطبلة' : ''}` })),
+      h('span', { class: 'pill ' + k, text: l })),
+    h('a', { class: 'link-btn', style: 'flex-basis: 100%; text-align: start; padding-inline-start: 56px; font-size: 14px',
+      href: '#/cycle?id=' + o.cycles.id, text: 'البروتوكول كاملاً للمريض ›' }));
 }
 
 // --------------------------------------------------------------- طلب مزج واحد
@@ -135,7 +163,7 @@ export async function order(root, params) {
   }));
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: p.full_name, sub: `${t.protocol_name} · الدورة ${o.cycles.cycle_no} · اليوم ${o.day}`, back: '#/mixing' }),
+    topbar({ title: p.full_name, sub: `${t.protocol_name} · الدورة ${o.cycles.cycle_no} · اليوم ${o.day}`, back: '#/mixing?d=' + dueDate(o) }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
@@ -154,6 +182,6 @@ export async function order(root, params) {
       sendBtn,
       protocolFileLink(t.protocols?.file_path, 'ملف البروتوكول ' + t.protocol_name),
       can('requestEdit') && o.status !== 'sent' ? h('a', { class: 'btn secondary block', href: '#/cycle-edit?id=' + o.cycles.id }, icon('edit', 22), 'اقتراح تعديل على الطبيب') : null,
-      h('a', { class: 'link-btn', href: '#/cycle?id=' + o.cycles.id, text: 'فتح الدورة' })),
+      h('a', { class: 'btn secondary block', href: '#/cycle?id=' + o.cycles.id }, icon('file', 20), 'البروتوكول كاملاً للمريض (كل أيام الدورة)')),
     bottomNav('home')));
 }

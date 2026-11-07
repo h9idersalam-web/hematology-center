@@ -152,10 +152,15 @@ function departments(p) {
   if (can('seeRequests')) tiles.push(['#/requests', 'edit', 'طلبات التعديل', 'req']);
   if (!tiles.length) return null;
   const box = h('div', { class: 'dept' }, tiles.map(([href, ic, label, key]) => h('a', { href, class: 'dept-t', 'data-k': key }, icon(ic, 24), h('span', { text: label }))));
-  // عدد الطلبات الواردة للمزج
-  if (can('seeMixing')) countOf('mixing_orders', (x) => x.in('status', ['incoming', 'in_progress', 'partially_sent'])).then((n) => {
-    if (n) box.querySelector('[data-k="mix"]').append(h('span', { class: 'count', text: n }));
-  }).catch(() => {});
+  // عدد طلبات المزج المستحقة اليوم ولم تُرسل
+  if (can('seeMixing')) {
+    const today = todayISO();
+    q(sb.from('mixing_orders').select('day, cycles!inner(planned_date, status)').in('status', ['incoming', 'in_progress', 'partially_sent'])
+      .in('cycles.status', ['planned', 'held']).lte('cycles.planned_date', today)).then((rows) => {
+      const n = rows.filter((r) => { const d = new Date(r.cycles.planned_date + 'T00:00:00'); d.setDate(d.getDate() + r.day - 1); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10) === today; }).length;
+      if (n) box.querySelector('[data-k="mix"]').append(h('span', { class: 'count', text: n, title: 'جرعات اليوم' }));
+    }).catch(() => {});
+  }
   return box;
 }
 
