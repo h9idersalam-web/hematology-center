@@ -1,4 +1,5 @@
-// قسم التقارير: تقرير الصيدلية الداخلية (أسبوعي من ملف إكسل) وتقرير الصيدلية السريرية (تسليم الشفتات)
+// الصيدلية الداخلية (تبويب في شريط التنقل): تقرير أسبوعي من ملف إكسل
+// قسم التقارير: تقرير الصيدلية السريرية (تسليم الشفتات)
 import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, field, fmtDate, fmtTime, todayISO, count, confirmDialog, arNorm, initials } from '../ui.js';
 import { can } from '../perms.js';
@@ -23,27 +24,16 @@ function dialog(title, build) {
 
 // ================================================================ الصفحة الرئيسية للقسم
 export async function hub(root) {
-  const invS = h('span', { class: 's', text: '…' });
   const hoS = h('span', { class: 's', text: '…' });
   mount(root, h('div', { class: 'screen' },
     topbar({ title: 'التقارير', back: '#/home' }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'report-tiles' },
-        h('a', { class: 'report-tile', href: '#/report-pharmacy' },
-          h('span', { class: 'report-ic' }, icon('pill', 30)),
-          h('span', { class: 't', text: 'تقرير الصيدلية الداخلية' }), invS),
         h('a', { class: 'report-tile', href: '#/report-handover' },
           h('span', { class: 'report-ic' }, icon('swap', 30)),
           h('span', { class: 't', text: 'تقرير الصيدلية السريرية' }), hoS))),
     bottomNav('home')));
 
-  q(sb.from('inventory_reports').select('id, report_date, inventory_items(status, archived_at)').is('archived_at', null)
-    .order('report_date', { ascending: false }).order('created_at', { ascending: false }).limit(1)).then((r) => {
-    if (!r.length) return invS.textContent = 'لم يُرفع تقرير بعد';
-    const items = r[0].inventory_items.filter((i) => !i.archived_at);
-    const low = items.filter((i) => i.status !== 'available').length;
-    invS.textContent = `أسبوع ${fmtShort(r[0].report_date)} · ${count(items.length, 'drug')}` + (low ? ` · ${low} شحيح أو نافد` : '');
-  }).catch(() => { invS.textContent = ''; });
   q(sb.from('shift_handovers').select('report_date, shift_handover_items(archived_at)').order('report_date', { ascending: false }).limit(2)).then((r) => {
     if (!r.length) return hoS.textContent = 'تسليم واستلام بين الشفتات';
     const d = r[0].report_date;
@@ -76,7 +66,7 @@ export async function pharmacy(root, params) {
     h('button', { type: 'button', class: 'btn secondary', onclick: (e) => createReport(e.currentTarget, [], 'إدخال يدوي') }, icon('plus', 20), h('span', { text: 'تقرير فارغ' }))) : null;
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: 'تقرير الصيدلية الداخلية', sub: rep ? `أسبوع ${fmtShort(rep.report_date)}` : null, back: '#/reports' }),
+    topbar({ title: 'الصيدلية الداخلية', sub: rep ? `تقرير أسبوع ${fmtShort(rep.report_date)}` : 'توافر الأدوية في المركز' }),
     h('main', { class: 'main with-nav' },
       fileIn,
       editor ? h('p', { class: 'hint', text: 'ارفع ملف الإكسل كل أسبوع (xlsx أو CSV): يتعرف التطبيق على أعمدة اسم الدواء والعدد والصلاحية والحالة، وتراجعها قبل الحفظ. ثم أضف أو عدّل أو احذف أي دواء.' }) : null,
@@ -98,7 +88,7 @@ export async function pharmacy(root, params) {
         editor ? h('button', { type: 'button', class: 'btn primary', onclick: () => itemDialog(null) }, icon('plus', 20, '#fff'), h('span', { text: 'إضافة دواء' })) : null,
         h('button', { type: 'button', class: 'btn secondary', onclick: exportXlsx }, icon('download', 20), h('span', { text: 'تنزيل كملف إكسل' })),
         editor ? h('button', { type: 'button', class: 'btn secondary', style: 'color: var(--brand-dark)', onclick: (e) => archiveReport(e.currentTarget) }, icon('archive', 20), h('span', { text: 'حذف التقرير' })) : null) : null),
-    bottomNav('home')));
+    bottomNav('pharmacy')));
   if (rep) { drawSeg(); drawList(); }
 
   function stats() {

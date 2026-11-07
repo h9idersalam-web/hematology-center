@@ -39,9 +39,11 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await shot('home-tile', false);
   await page.locator('a.dept-t[href="#/reports"]').click();
   await page.waitForSelector('text=تقرير الصيدلية السريرية');
-  ok('hub: two icons', await page.locator('.report-tile').count() === 2);
-  await shot('hub', false);
-  await page.locator('.report-tile', { hasText: 'الصيدلية الداخلية' }).click();
+  ok('hub: handover only', await page.locator('.report-tile').count() === 1);
+  ok('nav: 5 tabs with pharmacy', await page.locator('.bottom-nav a').count() === 5 && await page.locator('.bottom-nav a[href="#/report-pharmacy"]').count() === 1);
+  ok('nav fits on phone', await page.evaluate(() => [...document.querySelectorAll('.bottom-nav a span')].every((s) => s.scrollWidth <= s.parentElement.clientWidth + 1)));
+  await page.locator('.bottom-nav a[href="#/report-pharmacy"]').click();
+  ok('pharmacy tab active', await page.locator('.bottom-nav a[aria-current="page"][href="#/report-pharmacy"]').waitFor({ timeout: 5000 }).then(() => true, () => false));
   await page.waitForSelector('text=لا يوجد تقرير بعد');
   await page.locator('#inv-file').setInputFiles(`${FIX}/week.xlsx`);
   await page.waitForSelector('text=مراجعة ملف week.xlsx');
