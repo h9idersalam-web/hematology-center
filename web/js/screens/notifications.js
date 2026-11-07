@@ -1,6 +1,7 @@
 // الإشعارات: طلبات الموافقة والتنبيهات الذكية وردود الأطباء
 import { sb, q, rpc } from '../api.js';
 import { terms } from '../terms.js';
+import { hrefOf, soundEnabled, enableSound, disableSound, canSystemNotify } from '../notify.js';
 import { h, mount, icon, topbar, empty, relTime, toast } from '../ui.js';
 
 const KIND = {
@@ -15,21 +16,32 @@ const KIND = {
   account: { label: 'الحساب', icon: 'key', tone: 'muted' },
 };
 
-const LINKS = {
-  profile: () => '#/admin?tab=users',
-  patient: (id) => '#/patient?id=' + id,
-  treatment: (id) => '#/treatment?id=' + id,
-  change_request: (id) => '#/request?id=' + id,
-  protocol: (id) => '#/protocol?id=' + id,
-  cycle: (id) => '#/cycle?id=' + id,
-  mixing_order: (id) => '#/mixing-order?id=' + id,
-  lab_result: (id) => '#/lab-alert?id=' + id,
-};
-
 export async function render(root, params) {
   let tab = params.get('tab') || 'all';
   const list = h('div', { class: 'card flush' }, h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
   const tabs = h('div', { class: 'tabs', role: 'tablist' });
+  // التنبيه بالصوت على هذا الجهاز
+  const soundBox = h('div');
+  const drawSound = () => {
+    const on = soundEnabled();
+    const btn = h('button', { type: 'button', class: 'btn sm ' + (on ? 'secondary' : 'primary'), text: on ? 'إيقاف' : 'تفعيل' });
+    btn.addEventListener('click', async () => {
+      if (on) { disableSound(); toast('أُوقف التنبيه بالصوت على هذا الجهاز'); }
+      else {
+        const perm = await enableSound();
+        toast(perm === 'denied' ? 'فُعّل الصوت، لكن إشعارات الهاتف ممنوعة من إعدادات المتصفح' : 'فُعّل التنبيه بالصوت على هذا الجهاز');
+      }
+      drawSound();
+    });
+    soundBox.replaceChildren(h('div', { class: 'card', style: 'flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px' },
+      h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
+        h('b', { text: 'التنبيه بالصوت' + (on ? ': مفعّل' : ': متوقف') }),
+        h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: on
+          ? 'نغمة واهتزاز' + (canSystemNotify() && Notification.permission === 'granted' ? ' وإشعار على شاشة الهاتف' : '') + ' عند كل إشعار جديد، ما دام التطبيق مفتوحاً.'
+          : 'فعّله لتسمع نغمة عند وصول إشعار جديد أثناء فتح التطبيق.' })),
+      btn));
+  };
+  drawSound();
 
   const markAll = h('button', { class: 'link-btn', style: 'padding: 0 12px', text: 'قراءة الكل', onclick: async () => {
     try { await rpc('mark_notifications_read', { p_ids: null }); toast('عُلِّمت كل الإشعارات مقروءة'); load(); } catch (e) { toast(e.message, true); }
@@ -38,7 +50,7 @@ export async function render(root, params) {
   mount(root, h('div', { class: 'screen' },
     topbar({ title: 'الإشعارات', back: '#/home', actions: markAll }),
     tabs,
-    h('main', { class: 'main' }, list)));
+    h('main', { class: 'main' }, soundBox, list)));
 
   function drawTabs(counts) {
     const items = [['all', 'الكل'], ['approval', 'الموافقات'], ['alert', 'التنبيهات']];
@@ -65,10 +77,7 @@ export async function render(root, params) {
 
   function row(n) {
     const k = KIND[n.kind] || KIND.info;
-    // إشعارات «تحليل خارج الحد الطبيعي» القديمة كانت تشير إلى المريض: تفتح الآن شاشة التحليل نفسها
-    const href = n.link_type === 'patient' && /^تحليل خارج (المرجع|الحد الطبيعي)$/.test(n.title)
-      ? `#/lab-alert?patient=${n.link_id}&at=${encodeURIComponent(n.created_at)}`
-      : LINKS[n.link_type] ? LINKS[n.link_type](n.link_id) : null;
+    const href = n.link_type ? hrefOf(n) : null;
     const el = h(href ? 'a' : 'div', { class: 'row', href, style: n.read_at ? null : 'background: #FFFBFB' },
       h('span', { class: 'avatar', style: `border-radius: 10px; width: 38px; height: 38px; background: var(--${k.tone === 'muted' ? 'chip' : k.tone + '-soft'}); color: var(--${k.tone === 'muted' ? 'muted' : k.tone === 'brand' ? 'brand' : k.tone})` }, icon(k.icon, 20)),
       h('span', { class: 'grow' },

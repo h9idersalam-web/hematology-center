@@ -1,5 +1,6 @@
 // نقطة البداية: الجلسة، الملف الشخصي، والتنقل بين الشاشات
 import { APP_NAME } from './config.js';
+import * as notifier from './notify.js';
 import { sb, configured, q } from './api.js';
 import { h, mount, icon, notice } from './ui.js';
 import * as auth from './screens/auth.js';
@@ -97,6 +98,7 @@ export function accountState(p = state.profile) {
 }
 
 export async function logout() {
+  notifier.stop();
   await sb.auth.signOut();
   state.session = null; state.profile = null;
   go('/login');
@@ -120,6 +122,7 @@ async function route() {
     if (st !== 'active' && !r.inactive) return go('/activate');
     if (st === 'active' && r.inactive) return go('/home');
     if (r.admin && !state.profile.is_admin) return go('/home');
+    if (st === 'active') notifier.start();   // فحص الإشعارات الجديدة كل دقيقة (والتنبيه بالصوت إن فُعّل)
   }
 
   root.classList.toggle('wide', !!r.wide);

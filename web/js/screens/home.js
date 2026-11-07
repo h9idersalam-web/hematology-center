@@ -4,6 +4,7 @@ import { h, mount, icon, roleLabel, ROLES, ROLE_GROUPS, fmtDay, todayISO, initia
 import { state, logout, loadProfile } from '../app.js';
 import { can } from '../perms.js';
 import { APP_NAME } from '../config.js';
+import { soundAsked, enableSound, disableSound } from '../notify.js';
 
 function greeting() {
   const hr = new Date().getHours();
@@ -42,6 +43,7 @@ export async function render(root) {
               onclick: () => roleSwitcher(root) }, icon('refresh', 14, 'currentColor', 2.4), h('span', { text: 'أعمل بدور: ' + ROLES[p.role] })) : null)),
         h('div', { style: 'display: flex; gap: 8px' }, bell, profileBtn)),
       p.role === 'intern' ? h('div', { class: 'notice info' }, icon('info', 20), h('p', { text: 'حسابك للعرض فقط، دون إضافة أو تعديل.' })) : null,
+      soundCard(),
       deptBox,
       chartBox,
       statsBox,
@@ -96,6 +98,22 @@ export async function render(root) {
   if (adminBox) renderAdminPanel(adminBox);
   if (chartBox) renderChartTasks(chartBox);
   if (deputyBox) renderDeputies(deputyBox);
+}
+
+// يُعرض مرة واحدة على كل جهاز: تفعيل التنبيه بالصوت يحتاج ضغطة من المستخدم (شرط الهاتف)
+function soundCard() {
+  if (soundAsked()) return null;
+  const box = h('div', { class: 'notice info', style: 'align-items: center; flex-wrap: wrap' },
+    icon('bell', 22),
+    h('span', { style: 'flex: 1; min-width: 180px', text: 'فعّل التنبيه بالصوت لتسمع نغمة عند وصول إشعار جديد أثناء فتح التطبيق.' }),
+    h('span', { style: 'display: flex; gap: 6px' },
+      h('button', { type: 'button', class: 'btn sm primary', text: 'تفعيل', onclick: async () => {
+        const perm = await enableSound();
+        toast(perm === 'denied' ? 'فُعّل الصوت، لكن إشعارات الهاتف ممنوعة من إعدادات المتصفح' : 'فُعّل التنبيه بالصوت');
+        box.remove();
+      } }),
+      h('button', { type: 'button', class: 'btn sm secondary', text: 'لاحقاً', onclick: () => { disableSound(); box.remove(); } })));
+  return box;
 }
 
 // مهمة الصيدلي: دورات اعتمدها الطبيب ولم تُرفق صورة طبلتها بعد
