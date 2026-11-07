@@ -15,7 +15,10 @@
 
 ## الإعداد
 
-1. شغّل في Supabase الملفات `01_schema.sql` ثم `02_storage.sql` ثم `03_seed_protocols.sql` ثم `05_hardening.sql` ثم `06_patients_view.sql` ثم `07_step5.sql` ثم `08_protocol_file.sql`.
+1. شغّل في Supabase الملفات `01_schema.sql` ثم `02_storage.sql` ثم `03_seed_protocols.sql` ثم `05_hardening.sql` ثم `06_patients_view.sql` ثم `07_step5.sql` ثم `08_protocol_file.sql` ثم `09_dose_instructions.sql` ثم `10_drug_cycles.sql` ثم `12_remove_auc.sql` ثم `13_user_activation.sql` (ثم `seed_center_protocols.sql` لبروتوكولات المركز).
+   أطفئ Authentication › Email › **Confirm email**: التفعيل يتم بكود يصدره المدير.
+
+> **للمتابعة من حساب Claude آخر:** اقرأ [`HANDOFF.md`](HANDOFF.md) أولاً.
 2. ضع رابط المشروع والمفتاح العام (anon أو publishable) في `web/js/config.js`.
    لا تضع المفتاح السري (service_role أو secret) في أي ملف هنا.
 3. فعّل النشر: Settings › Pages › Source: **GitHub Actions**.
