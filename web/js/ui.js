@@ -78,8 +78,6 @@ const PATHS = {
   chevron: '<path d="M14.5 6l-6 6 6 6"/>',
   move: '<path d="M4 12h14M14 7l5 5-5 5"/>',
   pharm: '<path d="M4 9.5 12 4l8 5.5"/><path d="M5.5 9v11h13V9"/><path d="M12 11v6M9 14h6"/>',
-  report: '<rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"/>',
-  swap: '<path d="M4 8.5h14l-3.5-3.5M20 15.5H6l3.5 3.5"/>',
   upload: '<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>',
   download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>',
 };

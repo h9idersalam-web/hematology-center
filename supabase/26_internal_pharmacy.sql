@@ -1,13 +1,9 @@
 -- =====================================================================
---  26: قسم التقارير (بقرار صاحب المشروع)
---   (أ) تقرير الصيدلية الداخلية الأسبوعي: يرفعه مسؤول الصيدلية الداخلية من ملف إكسل
---       (أو ينسخه من الأسبوع السابق)، ويضيف ويعدّل ويحذف أدويته كل أسبوع.
---       لكل دواء: الاسم والعدد والوحدة وتاريخ انتهاء الصلاحية والحالة (متوفر/شحيح/نافد) وملاحظات.
---   (ب) تقرير الصيدلية السريرية: تسليم واستلام بين الشفتات (الصباحي ← الوسطي، الوسطي ← الخفر).
---       لكل مريض: اسم المريض والأدوية والملاحظات. يكتبه الصيادلة السريريون ومسؤولهم.
---       عند أول تقرير في يوم جديد يختفي تقرير اليوم السابق من الشاشة ويبقى محفوظاً؛
---       يراه بعدها المدير ومسؤول الصيادلة السريريين فقط.
---  الكل يقرأ التقارير. لا حذف فعلي: «الحذف» أرشفة، وكل تغيير في سجل التعديلات.
+--  26: الصيدلية الداخلية (بقرار صاحب المشروع)
+--   تقرير أسبوعي يرفعه مسؤول الصيدلية الداخلية من ملف إكسل (أو ينسخه من الأسبوع السابق)،
+--   ويضيف ويعدّل ويحذف أدويته كل أسبوع. لكل دواء: الاسم والعدد والوحدة وتاريخ انتهاء الصلاحية
+--   والحالة (متوفر/شحيح/نافد) وملاحظات. يظهر في تبويب «الصيدلية» لكل المستخدمين (قراءة).
+--  لا حذف فعلي: «الحذف» أرشفة، وكل تغيير في سجل التعديلات.
 --  يحتاج الملف 25 منفّذاً قبله (في تنفيذ منفصل).
 -- =====================================================================
 
@@ -102,37 +98,11 @@ create table if not exists public.inventory_items (
 );
 create index if not exists idx_inventory_items_report on public.inventory_items(report_id, sort);
 
-create table if not exists public.shift_handovers (
-  id           uuid primary key default gen_random_uuid(),
-  report_date  date not null,
-  shift        text not null check (shift in ('morning_middle', 'middle_night')),
-  created_by   uuid not null references public.profiles(id),
-  created_at   timestamptz not null default now(),
-  unique (report_date, shift)
-);
-
-create table if not exists public.shift_handover_items (
-  id            uuid primary key default gen_random_uuid(),
-  handover_id   uuid not null references public.shift_handovers(id),
-  patient_id    uuid references public.patients(id),
-  patient_name  text not null check (length(btrim(patient_name)) between 1 and 200),
-  medications   text check (medications is null or length(medications) <= 2000),
-  notes         text check (notes is null or length(notes) <= 2000),
-  created_by    uuid not null references public.profiles(id),
-  created_at    timestamptz not null default now(),
-  updated_by    uuid references public.profiles(id),
-  updated_at    timestamptz,
-  archived_at   timestamptz,
-  archived_by   uuid references public.profiles(id)
-);
-create index if not exists idx_handover_items_handover on public.shift_handover_items(handover_id);
-create index if not exists idx_handover_items_patient on public.shift_handover_items(patient_id);
-
 -- سجل التعديلات ومنع الحذف الفعلي، والقراءة فقط من الواجهة (الكتابة عبر الدوال)
 do $$
 declare t text;
 begin
-  foreach t in array array['inventory_reports', 'inventory_items', 'shift_handovers', 'shift_handover_items'] loop
+  foreach t in array array['inventory_reports', 'inventory_items'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from anon', t);
     execute format('revoke insert, update, delete, truncate, trigger, references on public.%I from authenticated', t);
@@ -149,12 +119,6 @@ end $$;
 -- ---------------------------------------------------------------------
 -- 3. القراءة
 -- ---------------------------------------------------------------------
--- آخر يوم كُتب فيه تقرير تسليم: ما قبله يختفي عن الجميع عدا المدير ومسؤول الصيادلة السريريين
-create or replace function public.handover_current_date() returns date
-language sql stable security definer set search_path = public as $$
-  select max(report_date) from shift_handovers
-$$;
-
 drop policy if exists inventory_reports_read on public.inventory_reports;
 create policy inventory_reports_read on public.inventory_reports for select to authenticated
   using ((select public.is_active_user()));
@@ -162,17 +126,6 @@ create policy inventory_reports_read on public.inventory_reports for select to a
 drop policy if exists inventory_items_read on public.inventory_items;
 create policy inventory_items_read on public.inventory_items for select to authenticated
   using ((select public.is_active_user()));
-
-drop policy if exists shift_handovers_read on public.shift_handovers;
-create policy shift_handovers_read on public.shift_handovers for select to authenticated
-  using ((select public.is_active_user())
-         and (report_date = (select public.handover_current_date())
-              or (select public.is_admin())
-              or (select public.my_role()) = 'chief_clinical_pharmacist'));
-
-drop policy if exists shift_handover_items_read on public.shift_handover_items;
-create policy shift_handover_items_read on public.shift_handover_items for select to authenticated
-  using (handover_id in (select id from public.shift_handovers));
 
 -- ---------------------------------------------------------------------
 -- 4. تقرير الصيدلية الداخلية
@@ -300,72 +253,16 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- 5. تقرير الصيدلية السريرية: تسليم الشفتات
--- ---------------------------------------------------------------------
--- إضافة مريض إلى تسليم شفت اليوم (p_item = null) أو تعديله. يُعدَّل تقرير اليوم الحالي فقط.
-create or replace function public.handover_save_item(p_item uuid, p_shift text, p_patient uuid,
-                                                     p_patient_name text, p_medications text, p_notes text)
-returns uuid language plpgsql security definer set search_path = public as $$
-declare v_today date := baghdad_today(); v_h uuid; v_id uuid; v_name text; v_meds text; v_notes text;
-begin
-  perform require_role('clinical_pharmacist', 'chief_clinical_pharmacist');
-  if p_patient is not null then
-    select full_name into v_name from patients where id = p_patient;
-    if v_name is null then raise exception 'المريض غير موجود'; end if;
-  else
-    v_name := nullif(btrim(coalesce(p_patient_name, '')), '');
-  end if;
-  if v_name is null then raise exception 'اكتب اسم المريض'; end if;
-  if length(v_name) > 200 then raise exception 'اسم المريض طويل جداً'; end if;
-  v_meds := nullif(btrim(coalesce(p_medications, '')), '');
-  v_notes := nullif(btrim(coalesce(p_notes, '')), '');
-  if v_meds is null and v_notes is null then raise exception 'اكتب الأدوية أو الملاحظات'; end if;
-  if length(coalesce(v_meds, '')) > 2000 or length(coalesce(v_notes, '')) > 2000 then raise exception 'النص طويل جداً'; end if;
-
-  if p_item is null then
-    if p_shift is null or p_shift not in ('morning_middle', 'middle_night') then raise exception 'اختر الشفت'; end if;
-    insert into shift_handovers(report_date, shift, created_by) values (v_today, p_shift, auth.uid())
-    on conflict (report_date, shift) do nothing;
-    select id into v_h from shift_handovers where report_date = v_today and shift = p_shift;
-    insert into shift_handover_items(handover_id, patient_id, patient_name, medications, notes, created_by)
-    values (v_h, p_patient, v_name, v_meds, v_notes, auth.uid())
-    returning id into v_id;
-  else
-    update shift_handover_items i
-       set patient_id = p_patient, patient_name = v_name, medications = v_meds, notes = v_notes,
-           updated_by = auth.uid(), updated_at = now()
-      from shift_handovers s
-     where i.id = p_item and s.id = i.handover_id and i.archived_at is null
-       and s.report_date = (select max(report_date) from shift_handovers)
-    returning i.id into v_id;
-    if v_id is null then raise exception 'لا يُعدَّل إلا تقرير التسليم الحالي'; end if;
-  end if;
-  return v_id;
-end $$;
-
-create or replace function public.handover_remove_item(p_item uuid)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  perform require_role('clinical_pharmacist', 'chief_clinical_pharmacist');
-  update shift_handover_items i set archived_at = now(), archived_by = auth.uid()
-    from shift_handovers s
-   where i.id = p_item and s.id = i.handover_id and i.archived_at is null
-     and s.report_date = (select max(report_date) from shift_handovers);
-  if not found then raise exception 'لا يُحذف إلا من تقرير التسليم الحالي'; end if;
-end $$;
-
--- ---------------------------------------------------------------------
--- 6. صلاحيات التنفيذ
+-- 5. صلاحيات التنفيذ
 -- ---------------------------------------------------------------------
 revoke all on function public._require_inventory() from public, anon, authenticated;
 revoke all on function public._inventory_clean(jsonb) from public, anon, authenticated;
 do $$
 declare f text;
 begin
-  foreach f in array array['public.baghdad_today()', 'public.handover_current_date()',
+  foreach f in array array['public.baghdad_today()',
                            'public.inventory_create_report(date, text, jsonb)', 'public.inventory_save_item(uuid, uuid, jsonb)',
                            'public.inventory_remove_item(uuid)', 'public.inventory_archive_report(uuid, text)',
-                           'public.handover_save_item(uuid, text, uuid, text, text, text)', 'public.handover_remove_item(uuid)',
                            'public.admin_update_user(uuid, user_status, user_role, date)'] loop
     execute format('revoke all on function %s from public, anon', f);
     execute format('grant execute on function %s to authenticated', f);

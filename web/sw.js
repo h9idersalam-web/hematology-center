@@ -1,6 +1,6 @@
 // يحفظ ملفات واجهة التطبيق فقط ليفتح بسرعة.
 // لا يحفظ أي بيانات مرضى: كل طلبات قاعدة البيانات تذهب إلى الخادم مباشرة.
-const VERSION = 'v24-2026-11-07-reports';
+const VERSION = 'v24-2026-11-07-internal-pharmacy';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'vendor/supabase-2.118.0.js',
@@ -11,7 +11,7 @@ const SHELL = [
   'js/screens/appointments.js', 'js/screens/postpone.js',
   'js/screens/protocols.js', 'js/screens/protocol.js', 'js/screens/protocol-form.js', 'js/screens/plan-form.js',
   'js/screens/cycle.js', 'js/screens/cycle-edit.js', 'js/screens/requests.js', 'js/screens/request.js',
-  'js/screens/files.js', 'js/screens/labs.js', 'js/screens/lab-alert.js', 'js/screens/mixing.js', 'js/screens/nursing.js', 'js/screens/reports.js',
+  'js/screens/files.js', 'js/screens/labs.js', 'js/screens/lab-alert.js', 'js/screens/mixing.js', 'js/screens/nursing.js', 'js/screens/pharmacy.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

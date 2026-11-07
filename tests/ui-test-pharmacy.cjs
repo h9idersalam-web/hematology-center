@@ -1,5 +1,5 @@
-// اختبار قسم التقارير (pgrest-lite على 8788)
-//   node tests/ui-test-reports.cjs ./shots <مجلد فيه week.xlsx و week.csv>
+// اختبار الصيدلية الداخلية (pgrest-lite على 8788)
+//   node tests/ui-test-pharmacy.cjs ./shots <مجلد فيه week.xlsx و week.csv>
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -35,11 +35,8 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
 
   // ===== مسؤول الصيدلية الداخلية: يرفع ملف الإكسل
   await login('inpharm@test.iq');
-  ok('home: reports tile', await page.locator('a.dept-t[href="#/reports"]').count() === 1);
-  await shot('home-tile', false);
-  await page.locator('a.dept-t[href="#/reports"]').click();
-  await page.waitForSelector('text=تقرير الصيدلية السريرية');
-  ok('hub: handover only', await page.locator('.report-tile').count() === 1);
+  ok('no reports section on home', await page.locator('a[href="#/reports"]').count() === 0);
+  await shot('home', false);
   ok('nav: 5 tabs with pharmacy', await page.locator('.bottom-nav a').count() === 5 && await page.locator('.bottom-nav a[href="#/report-pharmacy"]').count() === 1);
   ok('nav fits on phone', await page.evaluate(() => [...document.querySelectorAll('.bottom-nav a span')].every((s) => s.scrollWidth <= s.parentElement.clientWidth + 1)));
   await page.locator('.bottom-nav a[href="#/report-pharmacy"]').click();
@@ -115,58 +112,15 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.waitForSelector('text=الأحدث');
   ok('cp: no upload button', await page.locator('label[for="inv-file"]').count() === 0);
   ok('cp: rows read-only', await page.locator('button.inv-row').count() === 0);
-  await page.goto(B + '#/report-handover');
-  await page.waitForSelector('text=لا يوجد تسليم بعد');
-  await page.getByRole('button', { name: 'إضافة مريض إلى التسليم' }).click();
-  await page.locator('dialog .segmented button', { hasText: 'من الصباحي إلى الوسطي' }).click();
-  const fileNo = psql("select file_no from patients where full_name like 'علي حسين%'");
-  await page.getByLabel('اسم المريض').fill(`علي حسين كاظم · ${fileNo}`);
-  await page.getByLabel('الأدوية').fill('R-CHOP اليوم، Ondansetron 8mg قبل العلاج');
-  await page.getByLabel('الملاحظات').fill('متابعة الضغط بعد Rituximab');
-  await shot('handover-add', false);
-  await page.getByRole('button', { name: 'حفظ', exact: true }).click();
-  await page.waitForSelector('text=متابعة الضغط');
-  ok('handover linked to patient', psql("select (patient_id is not null)::text from shift_handover_items limit 1") === 'true');
-  await page.getByRole('button', { name: 'إضافة مريض إلى التسليم' }).click();
-  await page.locator('dialog .segmented button', { hasText: 'من الوسطي إلى الخفر' }).click();
-  await page.getByLabel('اسم المريض').fill('مريض من خارج السجل');
-  await page.getByLabel('الملاحظات').fill('نقل دم مساءً');
-  await page.getByRole('button', { name: 'حفظ', exact: true }).click();
-  await page.waitForSelector('text=نقل دم مساءً');
-  ok('two shifts shown', await page.locator('.ho-row').count() === 2);
-  ok('no overflow (handover)', await noOverflow());
-  await shot('handover');
-
-  // يوم جديد: تقرير الأمس يختفي عن الصيدلي ويبقى لمسؤول الصيادلة
-  psql("update shift_handovers set report_date = report_date - 1");
-  await page.goto(B + '#/report-handover?x=1');
-  await page.waitForSelector('text=عند إضافة أول مريض اليوم');
-  ok('yesterday still visible until new', await page.locator('.ho-row').count() === 2);
-  await page.getByRole('button', { name: 'إضافة مريض إلى التسليم' }).click();
-  await page.getByLabel('اسم المريض').fill('مريض اليوم');
-  await page.getByLabel('الأدوية').fill('Imatinib 400mg');
-  await page.getByRole('button', { name: 'حفظ', exact: true }).click();
-  await page.waitForSelector('text=مريض اليوم');
-  await page.waitForTimeout(800);
-  const nToday = await page.locator('.ho-row').count();
-  ok('after new day: only today (' + nToday + ')', nToday === 1);
-  ok('old kept in DB', psql("select count(*) from shift_handover_items") === '3');
-
   // ===== الممرض يقرأ فقط
   await login('nurse@test.iq');
-  await page.goto(B + '#/report-handover');
-  await page.waitForSelector('text=مريض اليوم');
-  ok('nurse: no add button', await page.getByRole('button', { name: 'إضافة مريض إلى التسليم' }).count() === 0);
+  await page.goto(B + '#/report-pharmacy');
+  await page.waitForSelector('text=الأحدث');
+  ok('nurse reads, cannot edit', await page.locator('label[for="inv-file"]').count() === 0 && await page.locator('.inv-row').count() === 2);
   ok('nurse got inventory notification', psql("select count(*) from notifications n join profiles p on p.id = n.user_id where p.email = 'nurse@test.iq' and n.link_type = 'inventory_report'") === '2');
 
-  // ===== المدير (يعمل بدور مسؤول الصيادلة): يرى التسليم السابق
+  // ===== المدير
   await login('admin@test.iq');
-  const y = psql("select to_char(min(report_date), 'YYYY-MM-DD') from shift_handovers");
-  await page.goto(B + '#/report-handover?d=' + y);
-  await page.waitForSelector('text=تقرير سابق محفوظ');
-  ok('admin sees old handover', await page.locator('.ho-row').count() === 2);
-  ok('old is read-only', await page.locator('button.ho-row').count() === 0);
-  await shot('handover-old', false);
   // المدير يعدّل الصيدلية الداخلية
   await page.goto(B + '#/report-pharmacy');
   await page.waitForSelector('text=الأحدث');

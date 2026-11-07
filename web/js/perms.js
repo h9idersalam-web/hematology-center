@@ -26,9 +26,8 @@ const RULES = {
   administer: ['nurse'],
   seeMixing: ['clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist', 'specialist', 'senior_resident'],
   seeNursing: ['nurse', 'specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist'],
-  // التقارير: الكل يقرأ
+  // الصيدلية الداخلية: الكل يقرأ
   editInventory: ['internal_pharmacist'],     // ومعهم المدير أياً كان دوره
-  writeHandover: ['clinical_pharmacist', 'chief_clinical_pharmacist'],
   seeRequests: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'],
 };
 

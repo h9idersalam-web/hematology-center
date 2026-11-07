@@ -172,7 +172,7 @@ function departments(p) {
   if (can('seeMixing')) tiles.push(['#/mixing', 'pill', 'قسم المزج', 'mix']);
   if (can('seeNursing')) tiles.push(['#/nursing', 'check', 'الإعطاء اليوم', 'nurse']);
   if (can('seeRequests')) tiles.push(['#/requests', 'edit', 'طلبات التعديل', 'req']);
-  tiles.push(['#/reports', 'report', 'التقارير', 'rep']);   // لكل المستخدمين
+  if (!tiles.length) return null;
   const box = h('div', { class: 'dept' }, tiles.map(([href, ic, label, key]) => h('a', { href, class: 'dept-t', 'data-k': key }, icon(ic, 24), h('span', { text: label }))));
   // عدد طلبات المزج المستحقة اليوم ولم تُرسل
   if (can('seeMixing')) {

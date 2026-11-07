@@ -1,14 +1,11 @@
-// الصيدلية الداخلية (تبويب في شريط التنقل): تقرير أسبوعي من ملف إكسل
-// قسم التقارير: تقرير الصيدلية السريرية (تسليم الشفتات)
+// الصيدلية الداخلية (تبويب «الصيدلية» في شريط التنقل): تقرير أسبوعي من ملف إكسل
 import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, field, fmtDate, fmtTime, todayISO, count, confirmDialog, arNorm, initials } from '../ui.js';
 import { can } from '../perms.js';
-import { state } from '../app.js';
 import { readSheet, writeXlsx, download } from '../xlsx.js';
 import { FIELDS, STATUS, guessColumns, rowsToItems, expiryState } from '../inventory.js';
 
 const STATUS_PILL = { available: 'ok', low: 'warn', out: 'err' };
-const SHIFTS = [['morning_middle', 'من الصباحي إلى الوسطي'], ['middle_night', 'من الوسطي إلى الخفر']];
 const fmtShort = (d) => fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' });
 const numTxt = (n) => (n === null || n === undefined ? '—' : String(+n));
 
@@ -22,28 +19,7 @@ function dialog(title, build) {
   return close;
 }
 
-// ================================================================ الصفحة الرئيسية للقسم
-export async function hub(root) {
-  const hoS = h('span', { class: 's', text: '…' });
-  mount(root, h('div', { class: 'screen' },
-    topbar({ title: 'التقارير', back: '#/home' }),
-    h('main', { class: 'main with-nav' },
-      h('div', { class: 'report-tiles' },
-        h('a', { class: 'report-tile', href: '#/report-handover' },
-          h('span', { class: 'report-ic' }, icon('swap', 30)),
-          h('span', { class: 't', text: 'تقرير الصيدلية السريرية' }), hoS))),
-    bottomNav('home')));
-
-  q(sb.from('shift_handovers').select('report_date, shift_handover_items(archived_at)').order('report_date', { ascending: false }).limit(2)).then((r) => {
-    if (!r.length) return hoS.textContent = 'تسليم واستلام بين الشفتات';
-    const d = r[0].report_date;
-    const n = r.filter((x) => x.report_date === d).flatMap((x) => x.shift_handover_items).filter((i) => !i.archived_at).length;
-    hoS.textContent = `تسليم ${fmtShort(d)} · ${count(n, 'patient')}`;
-  }).catch(() => { hoS.textContent = ''; });
-}
-
-// ================================================================ تقرير الصيدلية الداخلية
-export async function pharmacy(root, params) {
+export async function render(root, params) {
   const editor = can('editInventory');
   const reports = await q(sb.from('inventory_reports').select('id, report_date, source, created_at, updated_at, profiles!inventory_reports_created_by_fkey(full_name)')
     .is('archived_at', null).order('report_date', { ascending: false }).order('created_at', { ascending: false }).limit(60));
@@ -254,89 +230,5 @@ export async function pharmacy(root, params) {
       } }),
       h('button', { type: 'button', class: 'link-btn', text: 'إلغاء', onclick: close }),
     ]);
-  }
-}
-
-// ================================================================ تقرير الصيدلية السريرية: تسليم الشفتات
-export async function handover(root, params) {
-  const writer = can('writeHandover');
-  const seesOld = state.profile.is_admin || state.profile.role === 'chief_clinical_pharmacist';
-  const current = await rpc('handover_current_date', {});
-  const today = await rpc('baghdad_today', {});
-  const wanted = /^\d{4}-\d{2}-\d{2}$/.test(params.get('d') || '') && seesOld ? params.get('d') : current;
-  const isCurrent = wanted === current;
-
-  const reps = wanted ? await q(sb.from('shift_handovers').select('id, shift, report_date, shift_handover_items(id, patient_id, patient_name, medications, notes, created_at, updated_at, archived_at, author:profiles!shift_handover_items_created_by_fkey(full_name))')
-    .eq('report_date', wanted)) : [];
-  const patients = writer ? await q(sb.from('patients').select('id, full_name, file_no').is('archived_at', null).order('full_name').limit(1000)) : [];
-  const hourNow = +new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Baghdad' }).format(new Date());
-  const defaultShift = hourNow < 14 ? 'morning_middle' : 'middle_night';
-
-  const sections = SHIFTS.map(([k, label]) => {
-    const r = reps.find((x) => x.shift === k);
-    const rows = (r?.shift_handover_items || []).filter((i) => !i.archived_at).sort((a, b) => a.created_at.localeCompare(b.created_at));
-    return h('section', { class: 'section' },
-      h('div', { class: 'section-head' }, h('h2', { text: label }), h('span', { class: 'count', text: rows.length })),
-      h('div', { class: 'card flush' }, rows.length ? rows.map((i) => hoRow(i, k)) : [empty('لا يوجد مرضى في هذا التسليم', 'users')]));
-  });
-
-  mount(root, h('div', { class: 'screen' },
-    topbar({ title: 'تقرير الصيدلية السريرية', sub: wanted ? 'تسليم ' + fmtDate(wanted, { weekday: 'long', day: 'numeric', month: 'long' }) : 'تسليم واستلام بين الشفتات', back: '#/reports' }),
-    h('main', { class: 'main with-nav' },
-      h('p', { class: 'hint', text: 'تسليم واستلام بين الشفتات: من الصباحي إلى الوسطي، ومن الوسطي إلى الخفر. عند أول تسليم في اليوم التالي يختفي هذا التقرير ويبقى محفوظاً.' }),
-      seesOld ? field('عرض تسليم يوم سابق (للمدير ومسؤول الصيادلة)', h('input', { class: 'input', type: 'date', value: wanted || '', max: current || today,
-        onchange: (e) => { location.hash = '#/report-handover' + (e.target.value ? '?d=' + e.target.value : ''); } })) : null,
-      !isCurrent ? notice('info', 'archive', h('p', { text: 'تقرير سابق محفوظ، للعرض فقط.' })) : null,
-      writer && isCurrent ? h('button', { type: 'button', class: 'btn primary block', onclick: () => itemDialog(null) }, icon('plus', 20, '#fff'), h('span', { text: 'إضافة مريض إلى التسليم' })) : null,
-      writer && isCurrent && current && current < today ? notice('warn', 'info', h('p', { text: `هذا تسليم ${fmtShort(current)}. عند إضافة أول مريض اليوم يبدأ تسليم جديد ويختفي هذا.` })) : null,
-      !wanted ? h('div', { class: 'card' }, empty(writer ? 'لا يوجد تسليم بعد. أضف أول مريض.' : 'لم يُكتب تسليم بعد.', 'swap')) : sections),
-    bottomNav('home')));
-
-  function hoRow(i, shift) {
-    const editable = writer && isCurrent;
-    return h(editable ? 'button' : 'div', { class: 'row ho-row', type: editable ? 'button' : null, onclick: editable ? () => itemDialog(i, shift) : null },
-      h('span', { class: 'avatar', text: initials(i.patient_name) }),
-      h('span', { class: 'grow' },
-        h('span', { class: 't', text: i.patient_name }),
-        i.medications ? h('span', { class: 'ho-line' }, h('b', { text: 'الأدوية: ' }), h('span', { text: i.medications })) : null,
-        i.notes ? h('span', { class: 'ho-line' }, h('b', { text: 'الملاحظات: ' }), h('span', { text: i.notes })) : null,
-        h('span', { class: 's', text: `${i.author?.full_name || ''} · ${fmtTime(i.updated_at || i.created_at)}${i.updated_at ? ' (معدّل)' : ''}` })),
-      editable ? icon('edit', 18) : null);
-  }
-
-  function itemDialog(it, shiftOf) {
-    let shift = shiftOf || defaultShift;
-    let pid = it?.patient_id || null;
-    const listId = 'ho-patients';
-    const name = h('input', { class: 'input', value: it?.patient_name || '', list: listId, autocomplete: 'off', maxlength: 200,
-      oninput: () => { const m = patients.find((p) => `${p.full_name} · ${p.file_no}` === name.value || p.full_name === name.value); pid = m?.id || null; if (m) name.value = m.full_name; } });
-    const dl = h('datalist', { id: listId }, patients.map((p) => h('option', { value: `${p.full_name} · ${p.file_no}` })));
-    const meds = h('textarea', { class: 'input', rows: 3, maxlength: 2000, dir: 'auto', placeholder: 'الأدوية المعطاة أو المطلوبة' }); meds.value = it?.medications || '';
-    const notes = h('textarea', { class: 'input', rows: 3, maxlength: 2000, dir: 'auto', placeholder: 'ما يجب أن يعرفه الشفت التالي' }); notes.value = it?.notes || '';
-    const seg = h('div', { class: 'segmented', role: 'group', 'aria-label': 'الشفت' });
-    const drawSeg = () => seg.replaceChildren(...SHIFTS.map(([k, l]) => h('button', { type: 'button', disabled: !!it && k !== shift,
-      'aria-pressed': shift === k ? 'true' : 'false', onclick: () => { shift = k; drawSeg(); } }, l)));
-    drawSeg();
-    const err = h('div');
-    dialog(it ? 'تعديل التسليم' : 'إضافة مريض إلى التسليم', (close) => [
-      h('div', { class: 'field' }, h('span', { class: 'label', text: 'الشفت' }), seg),
-      field('اسم المريض', name, 'اختر من المرضى المسجلين أو اكتب الاسم'), dl,
-      field('الأدوية', meds), field('الملاحظات', notes), err,
-      h('button', { type: 'button', class: 'btn primary block', text: 'حفظ', onclick: (e) => busy(e.currentTarget, async () => {
-        try {
-          await rpc('handover_save_item', { p_item: it?.id || null, p_shift: shift, p_patient: pid, p_patient_name: name.value,
-            p_medications: meds.value, p_notes: notes.value });
-          close(); toast('حُفظ التسليم'); location.hash = '#/report-handover?r=' + Date.now();
-        } catch (x) { err.replaceChildren(notice('err', 'warn', h('p', { text: x.message }))); }
-      }) }),
-      it ? h('button', { type: 'button', class: 'btn secondary block', style: 'color: var(--brand-dark)', text: 'حذف من التسليم', onclick: async () => {
-        close();
-        if (!await confirmDialog({ title: 'حذف ' + it.patient_name + ' من التسليم', okText: 'حذف', danger: true })) return;
-        try { await rpc('handover_remove_item', { p_item: it.id }); toast('حُذف'); location.hash = '#/report-handover?r=' + Date.now(); }
-        catch (x) { toast(x.message, true); }
-      } }) : null,
-      h('button', { type: 'button', class: 'link-btn', text: 'إلغاء', onclick: close }),
-    ]);
-    name.focus();
   }
 }

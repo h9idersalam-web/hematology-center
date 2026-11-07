@@ -26,7 +26,7 @@ import * as labs from './screens/labs.js';
 import * as labAlert from './screens/lab-alert.js';
 import * as mixing from './screens/mixing.js';
 import * as nursing from './screens/nursing.js';
-import * as reports from './screens/reports.js';
+import * as pharmacy from './screens/pharmacy.js';
 
 const root = document.getElementById('app');
 
@@ -63,9 +63,7 @@ const ROUTES = {
   '/mixing-order': { screen: mixing.order },
   '/nursing': { screen: nursing.list },
   '/administer': { screen: nursing.administer },
-  '/reports': { screen: reports.hub },
-  '/report-pharmacy': { screen: reports.pharmacy },
-  '/report-handover': { screen: reports.handover },
+  '/report-pharmacy': { screen: pharmacy.render },
 };
 
 // رابط إشعار يشير إلى خطة علاج: افتح ملف مريضها

@@ -1,4 +1,4 @@
--- اختبار الملفين 25 و26: قسم التقارير (الصيدلية الداخلية وتسليم الشفتات)
+-- اختبار الملفين 25 و26: الصيدلية الداخلية
 \set ON_ERROR_STOP 1
 \pset format unaligned
 \pset tuples_only on
@@ -53,40 +53,6 @@ set request.jwt.claim.sub = :'IP';
 do $$ begin perform inventory_archive_report(current_setting('t.rep')::uuid, ''); raise exception 'X';
 exception when others then raise notice 'R14 archive needs reason: %', sqlerrm; end $$;
 
--- ===== تسليم الشفتات
-set request.jwt.claim.sub = :'CP';
-select 'H1 add: ' || (handover_save_item(null, 'morning_middle', null, 'مريض أ', 'Vincristine اليوم', 'متابعة الغثيان') is not null);
-select 'H2 add 2nd shift: ' || (handover_save_item(null, 'middle_night', null, 'مريض ب', null, 'نقل دم مساءً') is not null);
-select 'H3 one report per shift: ' || count(*) from shift_handovers;
-do $$ begin perform handover_save_item(null, 'morning_middle', null, 'مريض ج', '', ' '); raise exception 'X';
-exception when others then raise notice 'H4 empty meds+notes rejected: %', sqlerrm; end $$;
-do $$ begin perform handover_save_item(null, 'night_morning', null, 'مريض ج', 'x', null); raise exception 'X';
-exception when others then raise notice 'H5 bad shift rejected: %', sqlerrm; end $$;
-select 'H6 edit current: ' || (handover_save_item((select id from shift_handover_items where patient_name = 'مريض أ'),
-  null, null, 'مريض أ', 'Vincristine 2mg', 'متابعة') is not null);
-set request.jwt.claim.sub = :'NU';
-select 'H7 nurse reads handover: ' || count(*) from shift_handover_items;
-do $$ begin perform handover_save_item(null, 'morning_middle', null, 'x', 'x', null); raise exception 'X';
-exception when insufficient_privilege then raise notice 'H8 nurse cannot write handover OK'; end $$;
-set request.jwt.claim.sub = :'IP';
-do $$ begin perform handover_save_item(null, 'morning_middle', null, 'x', 'x', null); raise exception 'X';
-exception when insufficient_privilege then raise notice 'H9 internal pharmacist cannot write handover OK'; end $$;
-
--- يوم جديد: تقرير الأمس يختفي ويبقى محفوظاً
 reset role;
-update shift_handovers set report_date = report_date - 1;
-set role authenticated;
-set request.jwt.claim.sub = :'CP';
-select 'H10 before new day report, yesterday still visible: ' || count(*) from shift_handover_items;
-select handover_save_item(null, 'morning_middle', null, 'مريض جديد', 'x', null) is not null as ok \gset
-select 'H11 after new day report, CP sees only today: ' || count(*) from shift_handover_items;
-do $$ begin perform handover_save_item((select id from shift_handover_items where patient_name = 'مريض جديد'), null, null, 'مريض جديد', 'y', null);
-  raise notice 'H12 edit today OK'; end $$;
-set request.jwt.claim.sub = :'CH';
-select 'H13 chief sees old ones too: ' || count(*) from shift_handover_items;
-do $$ begin perform handover_save_item((select id from shift_handover_items where patient_name = 'مريض أ'), null, null, 'مريض أ', 'z', null); raise exception 'X';
-exception when others then raise notice 'H14 old report locked: %', sqlerrm; end $$;
-reset role;
-select 'H15 old rows kept in DB: ' || count(*) from shift_handover_items;
-select 'R15 audit logged: ' || (count(*) > 0) from audit_log where table_name in ('inventory_items', 'shift_handover_items');
-select 'REPORTS DONE';
+select 'R15 audit logged: ' || (count(*) > 0) from audit_log where table_name = 'inventory_items';
+select 'INTERNAL PHARMACY DONE';
