@@ -90,6 +90,11 @@ const B = 'http://localhost:8788/';
   ok('suspended user role changed', await zcard().locator('text=ممرض').first().waitFor({ timeout: 8000 }).then(() => true, () => false));
   await shot(adm, 'suspended-card');
 
+  // طبيب مختص لمرضى: يُبلَّغ قبل طلب السبب
+  await adm.locator('article', { hasText: 'د. سارة الربيعي' }).getByRole('button', { name: 'حذف' }).click();
+  ok('specialist with patients: told before asking reason', (await adm.locator('dialog', { hasText: 'انقلهم إلى طبيب اختصاص آخر' }).count()) === 1
+     && (await adm.locator('dialog textarea').count()) === 0);
+  await adm.locator('dialog').getByRole('button', { name: 'حسناً' }).click();
   // الحذف: بلا أثر يُحذف نهائياً
   await adm.locator('article', { hasText: 'د. حسين كامل' }).getByRole('button', { name: 'حذف' }).click();
   ok('delete dialog explains full delete', (await adm.locator('dialog', { hasText: 'فيُحذف حسابه نهائياً' }).count()) === 1);

@@ -53,7 +53,8 @@ alter table public.profiles add column if not exists suspended_at     timestampt
 alter table public.profiles add column if not exists suspended_reason text;
 
 -- الأكواد القديمة: نص صريح وغير مرتبطة بمستخدم. تُلغى غير المستخدمة، ويبقى الجدول سجلاً لا يُقرأ.
-update public.activation_codes set revoked = true where used_by is null and not revoked;
+-- «غير مستخدم» = used_at فارغ (لا used_by وحدها؛ الملف 22)
+update public.activation_codes set revoked = true where used_at is null and used_by is null and not revoked;
 drop policy if exists codes_admin on public.activation_codes;
 revoke all on public.activation_codes from public, anon, authenticated;
 drop function if exists public.admin_create_code(user_role, int);
