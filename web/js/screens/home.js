@@ -5,6 +5,7 @@ import { state, logout, loadProfile } from '../app.js';
 import { can } from '../perms.js';
 import { APP_NAME } from '../config.js';
 import { soundAsked, enableSound, disableSound } from '../notify.js';
+import { installButton } from '../install.js';
 
 function greeting() {
   const hr = new Date().getHours();
@@ -32,7 +33,7 @@ export async function render(root) {
   mount(root, h('div', { class: 'screen' },
     h('main', { class: 'main with-nav' },
       // اسم التطبيق في أعلى الواجهة
-      h('div', { class: 'app-brand' }, h('span', { class: 'app-brand-logo' }, icon('drop', 18, '#fff')), h('span', { text: APP_NAME })),
+      h('div', { class: 'app-brand' }, h('span', { class: 'app-brand-logo' }, icon('drop', 18, '#fff')), h('span', { class: 'app-brand-name', text: APP_NAME }), installButton('light')),
       h('header', { style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px' },
         h('div', { style: 'display: flex; flex-direction: column; gap: 2px; min-width: 0' },
           h('p', { style: 'font-size: 14px; color: var(--muted-2)', text: fmtDay(today) }),

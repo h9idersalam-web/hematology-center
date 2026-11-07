@@ -2,10 +2,12 @@
 import { sb, errMsg } from '../api.js';
 import { h, mount, icon, field, notice, busy, ROLE_GROUPS, ROLES } from '../ui.js';
 import { CENTER_NAME } from '../config.js';
+import { installButton } from '../install.js';
 import { state, go, loadProfile } from '../app.js';
 
 function hero() {
   return h('header', { class: 'hero' },
+    installButton('dark'),
     h('div', { class: 'logo' }, icon('drop', 34)),
     h('div', { style: 'display: flex; flex-direction: column; gap: 4px' },
       h('h1', { text: CENTER_NAME }),

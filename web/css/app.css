@@ -340,3 +340,15 @@ details[open] > summary::before { transform: rotate(-90deg); }
 /* اسم التطبيق أعلى الصفحة الرئيسية */
 .app-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--brand); }
 .app-brand-logo { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* زر «أضف إلى الشاشة الرئيسية» */
+.app-brand-name { flex: 1; min-width: 0; }
+.install-btn { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.install-btn.light { background: var(--brand); color: #fff; }
+.install-btn.dark { background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.45); position: absolute; top: calc(12px + env(safe-area-inset-top)); inset-inline-end: 16px; }
+.hero { position: relative; }
+.install-steps { display: flex; flex-direction: column; gap: 12px; padding: 0; margin: 8px 0 4px; list-style: none; }
+.install-steps li { display: flex; gap: 12px; align-items: flex-start; }
+.install-steps li > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.install-steps li > span:last-child span { font-size: 13px; color: var(--muted-2); }
+.install-step-ic { width: 36px; height: 36px; border-radius: 10px; background: var(--chip); color: var(--brand); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+@media (max-width: 359px) { .install-btn span { display: none; } .install-btn { padding: 7px; } }
