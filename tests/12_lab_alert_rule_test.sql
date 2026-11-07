@@ -1,4 +1,4 @@
--- اختبار الملف 19: إشعار التحليل الخارج فقط ليوم دورة لم تُعتمد (بعد 08..11)
+-- اختبار الملفين 19 و20: إشعار التحليل الخارج ليوم دورة لم تُعتمد أو قبله بيوم (بعد 08..11)
 \set ON_ERROR_STOP 1
 \pset format unaligned
 \pset tuples_only on
@@ -13,13 +13,18 @@ select create_treatment(:'pt', (select id from protocols where name = 'ABVD'), '
 select id as c1 from cycles where treatment_id = :'tid' and cycle_no = 1 \gset
 \set LOW '[{"test_name":"PLT","value":40,"unit":"x","ref_low":150,"ref_high":400}]'
 set request.jwt.claim.sub = :'NU2';
--- 1. ليس يوم دورة: لا إشعار
+-- 1. قبل الدورة بثلاثة أيام: لا إشعار
 select add_lab_results(:'pt', current_date, :'LOW'::jsonb) as x \gset
+-- 1ب. قبل الدورة بيومين: لا إشعار
+select add_lab_results(:'pt', current_date + 1, :'LOW'::jsonb) as x \gset
+-- 1ج. قبل الدورة بيوم: إشعار
+select add_lab_results(:'pt', current_date + 2, :'LOW'::jsonb) as x \gset
+select 'A00 helper: day-2=' || coalesce(lab_alert_cycle(:'pt', current_date + 1)::text, 'none') || ' day-1=' || coalesce(lab_alert_cycle(:'pt', current_date + 2)::text, 'none');
 -- 2. يوم الدورة وقبل اعتمادها: إشعار
 select add_lab_results(:'pt', current_date + 3, :'LOW'::jsonb) as x \gset
 select 'A0 ui helper says cycle: ' || coalesce(lab_alert_cycle(:'pt', current_date + 3)::text, 'none') || ', other day: ' || coalesce(lab_alert_cycle(:'pt', current_date)::text, 'none');
 reset role;
-select 'A1 alerts so far: ' || count(*) || ' · ' || string_agg(body, ' | ') from notifications where title = 'تحليل خارج المرجع' and body like 'مريض قاعدة الإشعار%';
+select 'A1 alerts so far (expect 2: day before, day of cycle 1): ' || count(*) || ' · ' || string_agg(body, ' | ') from notifications where title = 'تحليل خارج المرجع' and body like 'مريض قاعدة الإشعار%';
 -- 3. بعد اعتماد الدورة: لا إشعار
 set role authenticated;
 set request.jwt.claim.sub = :'SPA';
@@ -33,9 +38,9 @@ select id as c2 from cycles where treatment_id = :'tid' and cycle_no = 2 \gset
 select planned_date as d2 from cycles where id = :'c2' \gset
 select postpone_cycle(:'c2', :'d2'::date + 5, 'العدلات منخفضة');
 set request.jwt.claim.sub = :'NU2';
-select add_lab_results(:'pt', :'d2'::date, :'LOW'::jsonb) as x \gset
-select add_lab_results(:'pt', :'d2'::date + 5, :'LOW'::jsonb) as x \gset
+select add_lab_results(:'pt', :'d2'::date - 1, :'LOW'::jsonb) as x \gset
+select add_lab_results(:'pt', :'d2'::date + 4, :'LOW'::jsonb) as x \gset
 reset role;
-select 'A3 total alerts (expect 2: cycle 1 before approval, postponed cycle 2): ' || count(*) || ' · ' || string_agg(body, ' | ' order by created_at)
+select 'A3 total alerts (expect 3: cycle 1 ×2 before approval, day before postponed cycle 2): ' || count(*) || ' · ' || string_agg(body, ' | ' order by created_at)
   from notifications where title = 'تحليل خارج المرجع' and body like 'مريض قاعدة الإشعار%';
 select 'LAB ALERT RULE DONE';
