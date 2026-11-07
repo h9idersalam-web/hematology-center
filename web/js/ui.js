@@ -6,7 +6,16 @@ export function h(tag, props, ...children) {
     for (const [k, v] of Object.entries(props)) {
       if (v === null || v === undefined || v === false) continue;
       if (k === 'class') el.className = v;
-      else if (k === 'text') el.textContent = v;
+      else if (k === 'text') {
+        // الرموز (اسم بروتوكول مثل R-CHOP-21، رقم ملف) تلتف عند المسافات فقط، لا عند الشرطة
+        if (/(^|\s)tag(\s|$)/.test(props.class || '') && typeof v === 'string' && /\S-\S/.test(v)) {
+          for (const part of v.split(/(\s+)/)) {
+            if (!part) continue;
+            if (/\s/.test(part)) el.append(part);
+            else el.append(Object.assign(document.createElement('span'), { className: 'w', textContent: part }));
+          }
+        } else el.textContent = v;
+      }
       else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
       else if (k === 'value') el.value = v;
       else if (k === 'checked' || k === 'disabled' || k === 'selected') el[k] = !!v;
