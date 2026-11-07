@@ -1,0 +1,182 @@
+// اختبار قسم التقارير (pgrest-lite على 8788)
+//   node tests/ui-test-reports.cjs ./shots <مجلد فيه week.xlsx و week.csv>
+let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const OUT = process.argv[2], FIX = process.argv[3];
+const B = 'http://localhost:8788/';
+const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499', '-U', 'postgres', '-Atc', sql]).toString().trim();
+
+(async () => {
+  await fetch(B + '__reset');
+  const browser = await pw.chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+  const errors = [], checks = [];
+  const ok = (name, cond) => checks.push((cond ? 'PASS ' : 'FAIL ') + name);
+  let n = 0;
+  let ctx, page;
+  async function fresh() {
+    if (ctx) await ctx.close();
+    ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'ar-IQ', acceptDownloads: true });
+    page = await ctx.newPage();
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+    page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
+  }
+  const shot = async (name, full = true) => { await page.waitForTimeout(400); await page.screenshot({ path: `${OUT}/rep-${String(++n).padStart(2, '0')}-${name}.png`, fullPage: full }); };
+  const noOverflow = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+  async function login(email) {
+    await fresh();
+    await page.goto(B + '#/login');
+    await page.getByLabel('البريد الإلكتروني').fill(email);
+    await page.getByLabel('كلمة المرور').fill('Pass12345');
+    await page.getByRole('button', { name: 'دخول' }).click();
+    await page.waitForSelector('text=جلسات اليوم');
+  }
+
+  // ===== مسؤول الصيدلية الداخلية: يرفع ملف الإكسل
+  await login('inpharm@test.iq');
+  ok('home: reports tile', await page.locator('a.dept-t[href="#/reports"]').count() === 1);
+  await shot('home-tile', false);
+  await page.locator('a.dept-t[href="#/reports"]').click();
+  await page.waitForSelector('text=تقرير الصيدلية السريرية');
+  ok('hub: two icons', await page.locator('.report-tile').count() === 2);
+  await shot('hub', false);
+  await page.locator('.report-tile', { hasText: 'الصيدلية الداخلية' }).click();
+  await page.waitForSelector('text=لا يوجد تقرير بعد');
+  await page.locator('#inv-file').setInputFiles(`${FIX}/week.xlsx`);
+  await page.waitForSelector('text=مراجعة ملف week.xlsx');
+  const prev = page.locator('.inv-preview tbody tr');
+  ok('preview 5 drugs', await prev.count() === 5);
+  ok('xlsx date read', (await prev.nth(0).textContent()).includes('2027-03-31'));
+  ok('month/year => end of month', (await prev.nth(2).textContent()).includes('2027-03-31'));
+  ok('qty 0 => نافد', (await prev.nth(2).textContent()).includes('نافد'));
+  ok('Arabic digits qty', (await prev.nth(3).textContent()).includes('8 vial'));
+  ok('unclear values flagged', await page.locator('.inv-preview tr.warn').count() === 1);
+  await shot('import-review');
+  await page.getByRole('button', { name: 'حفظ التقرير' }).click();
+  await page.waitForSelector('text=الأحدث');
+  await page.waitForTimeout(500);
+  ok('saved 5 items', psql("select count(*) from inventory_items where archived_at is null") === '5');
+  ok('unclear kept in notes', psql("select notes from inventory_items where drug_name like 'Ondansetron%'").includes('عشرة'));
+  ok('summary: low 1, out 1', (await page.locator('.inv-summary .stat.warn .n').textContent()) === '1' && (await page.locator('.inv-summary .stat.brand .n').textContent()) === '1');
+  ok('expired flagged', await page.locator('.exp.expired').count() >= 1);
+  await shot('report');
+
+  // تعديل دواء، إضافة، حذف
+  await page.locator('.inv-row', { hasText: 'Vincristine' }).click();
+  await page.locator('dialog').getByLabel('العدد', { exact: true }).fill('9');
+  await page.locator('dialog .segmented button', { hasText: 'شحيح' }).click();
+  await shot('edit-dialog', false);
+  await page.getByRole('button', { name: 'حفظ', exact: true }).click();
+  await page.waitForTimeout(600);
+  ok('edit saved', psql("select quantity || ':' || status from inventory_items where drug_name like 'Vincristine%'") === '9:low');
+  await page.getByRole('button', { name: 'إضافة دواء' }).click();
+  await page.locator('dialog').getByLabel('اسم الدواء', { exact: true }).fill('Methotrexate 50mg');
+  await page.locator('dialog').getByLabel('العدد', { exact: true }).fill('20');
+  await page.getByRole('button', { name: 'حفظ', exact: true }).click();
+  await page.waitForSelector('text=Methotrexate 50mg');
+  await page.locator('.inv-row', { hasText: 'Ondansetron' }).click();
+  await page.getByRole('button', { name: 'حذف الدواء من التقرير' }).click();
+  await page.locator('dialog').getByRole('button', { name: 'حذف', exact: true }).click();
+  await page.waitForTimeout(600);
+  ok('delete = archived', psql("select (archived_at is not null)::text from inventory_items where drug_name like 'Ondansetron%'") === 'true');
+  ok('list now 5 rows', await page.locator('.inv-row').count() === 5);
+  // التصفية
+  await page.locator('.segmented button', { hasText: 'شحيح' }).click();
+  ok('filter low', await page.locator('.inv-row').count() === 2);
+  await page.locator('.segmented button', { hasText: 'الكل' }).click();
+
+  // التنزيل كإكسل ثم إعادة قراءته
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'تنزيل كملف إكسل' }).click()]);
+  const xf = `${OUT}/rep-export.xlsx`; await dl.saveAs(xf);
+  const back = execFileSync('python3', ['-c', `import openpyxl,sys;ws=openpyxl.load_workbook(sys.argv[1]).active;print(ws.max_row, ws['A1'].value, ws.sheet_view.rightToLeft)`, xf]).toString().trim();
+  ok('export opens in Excel lib: ' + back, back === '6 اسم الدواء True');
+
+  // أسبوع جديد من CSV
+  await page.locator('#inv-file').setInputFiles(`${FIX}/week.csv`);
+  await page.waitForSelector('text=مراجعة ملف week.csv');
+  ok('csv preview 2', await page.locator('.inv-preview tbody tr').count() === 2);
+  ok('csv dd/mm/yyyy', (await page.locator('.inv-preview tbody tr').nth(1).textContent()).includes('2027-02-15'));
+  await page.getByRole('button', { name: 'حفظ التقرير' }).click();
+  await page.waitForTimeout(800);
+  ok('2 reports, history select', await page.getByLabel('التقارير السابقة').locator('option').count() === 2);
+  ok('no overflow (pharmacy)', await noOverflow());
+
+  // ملف xls قديم مرفوض برسالة واضحة
+  const xls = `${OUT}/old.xls`; fs.writeFileSync(xls, Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0, 0, 0, 0]));
+  await page.locator('#inv-file').setInputFiles(xls);
+  ok('xls rejected with hint', await page.locator('#toast', { hasText: 'xlsx' }).waitFor({ timeout: 3000 }).then(() => true, () => false));
+
+  // ===== الصيدلي السريري: يقرأ ولا يعدّل الصيدلية، ويكتب التسليم
+  await login('cp@test.iq');
+  await page.goto(B + '#/report-pharmacy');
+  await page.waitForSelector('text=الأحدث');
+  ok('cp: no upload button', await page.locator('label[for="inv-file"]').count() === 0);
+  ok('cp: rows read-only', await page.locator('button.inv-row').count() === 0);
+  await page.goto(B + '#/report-handover');
+  await page.waitForSelector('text=لا يوجد تسليم بعد');
+  await page.getByRole('button', { name: 'إضافة مريض إلى التسليم' }).click();
+  await page.locator('dialog .segmented button', { hasText: 'من الصباحي إلى الوسطي' }).click();
+  const fileNo = psql("select file_no from patients where full_name like 'علي حسين%'");
+  await page.getByLabel('اسم المريض').fill(`علي حسين كاظم · ${fileNo}`);
+  await page.getByLabel('الأدوية').fill('R-CHOP اليوم، Ondansetron 8mg قبل العلاج');
+  await page.getByLabel('الملاحظات').fill('متابعة الضغط بعد Rituximab');
+  await shot('handover-add', false);
+  await page.getByRole('button', { name: 'حفظ', exact: true }).click();
+  await page.waitForSelector('text=متابعة الضغط');
+  ok('handover linked to patient', psql("select (patient_id is not null)::text from shift_handover_items limit 1") === 'true');
+  await page.getByRole('button', { name: 'إضافة مريض إلى التسليم' }).click();
+  await page.locator('dialog .segmented button', { hasText: 'من الوسطي إلى الخفر' }).click();
+  await page.getByLabel('اسم المريض').fill('مريض من خارج السجل');
+  await page.getByLabel('الملاحظات').fill('نقل دم مساءً');
+  await page.getByRole('button', { name: 'حفظ', exact: true }).click();
+  await page.waitForSelector('text=نقل دم مساءً');
+  ok('two shifts shown', await page.locator('.ho-row').count() === 2);
+  ok('no overflow (handover)', await noOverflow());
+  await shot('handover');
+
+  // يوم جديد: تقرير الأمس يختفي عن الصيدلي ويبقى لمسؤول الصيادلة
+  psql("update shift_handovers set report_date = report_date - 1");
+  await page.goto(B + '#/report-handover?x=1');
+  await page.waitForSelector('text=عند إضافة أول مريض اليوم');
+  ok('yesterday still visible until new', await page.locator('.ho-row').count() === 2);
+  await page.getByRole('button', { name: 'إضافة مريض إلى التسليم' }).click();
+  await page.getByLabel('اسم المريض').fill('مريض اليوم');
+  await page.getByLabel('الأدوية').fill('Imatinib 400mg');
+  await page.getByRole('button', { name: 'حفظ', exact: true }).click();
+  await page.waitForSelector('text=مريض اليوم');
+  await page.waitForTimeout(800);
+  const nToday = await page.locator('.ho-row').count();
+  ok('after new day: only today (' + nToday + ')', nToday === 1);
+  ok('old kept in DB', psql("select count(*) from shift_handover_items") === '3');
+
+  // ===== الممرض يقرأ فقط
+  await login('nurse@test.iq');
+  await page.goto(B + '#/report-handover');
+  await page.waitForSelector('text=مريض اليوم');
+  ok('nurse: no add button', await page.getByRole('button', { name: 'إضافة مريض إلى التسليم' }).count() === 0);
+  ok('nurse got inventory notification', psql("select count(*) from notifications n join profiles p on p.id = n.user_id where p.email = 'nurse@test.iq' and n.link_type = 'inventory_report'") === '2');
+
+  // ===== المدير (يعمل بدور مسؤول الصيادلة): يرى التسليم السابق
+  await login('admin@test.iq');
+  const y = psql("select to_char(min(report_date), 'YYYY-MM-DD') from shift_handovers");
+  await page.goto(B + '#/report-handover?d=' + y);
+  await page.waitForSelector('text=تقرير سابق محفوظ');
+  ok('admin sees old handover', await page.locator('.ho-row').count() === 2);
+  ok('old is read-only', await page.locator('button.ho-row').count() === 0);
+  await shot('handover-old', false);
+  // المدير يعدّل الصيدلية الداخلية
+  await page.goto(B + '#/report-pharmacy');
+  await page.waitForSelector('text=الأحدث');
+  ok('admin can edit inventory', await page.locator('label[for="inv-file"]').count() === 1);
+
+  // ===== التسجيل: النوع الجديد متاح
+  await fresh();
+  await page.goto(B + '#/register');
+  await page.getByRole('button', { name: /صيدلاني/ }).first().click().catch(() => {});
+  ok('register offers new role', await page.locator('text=مسؤول الصيدلية الداخلية').count() >= 1);
+
+  checks.forEach((c) => console.log(c));
+  console.log('ERRORS:', errors.length ? '\n' + errors.join('\n') : 'none');
+  await browser.close();
+})().catch((e) => { console.error('FAILED', e); process.exit(1); });

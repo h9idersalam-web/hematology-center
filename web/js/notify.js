@@ -20,6 +20,7 @@ const LINKS = {
   cycle: (id) => '#/cycle?id=' + id,
   mixing_order: (id) => '#/mixing-order?id=' + id,
   lab_result: (id) => '#/lab-alert?id=' + id,
+  inventory_report: (id) => '#/report-pharmacy?id=' + id,
 };
 // رابط الإشعار داخل التطبيق
 export function hrefOf(n) {

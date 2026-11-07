@@ -172,7 +172,7 @@ function departments(p) {
   if (can('seeMixing')) tiles.push(['#/mixing', 'pill', 'قسم المزج', 'mix']);
   if (can('seeNursing')) tiles.push(['#/nursing', 'check', 'الإعطاء اليوم', 'nurse']);
   if (can('seeRequests')) tiles.push(['#/requests', 'edit', 'طلبات التعديل', 'req']);
-  if (!tiles.length) return null;
+  tiles.push(['#/reports', 'report', 'التقارير', 'rep']);   // لكل المستخدمين
   const box = h('div', { class: 'dept' }, tiles.map(([href, ic, label, key]) => h('a', { href, class: 'dept-t', 'data-k': key }, icon(ic, 24), h('span', { text: label }))));
   // عدد طلبات المزج المستحقة اليوم ولم تُرسل
   if (can('seeMixing')) {
@@ -232,7 +232,7 @@ async function renderAdminPanel(box) {
       h('span', { class: 'pill', style: 'background: var(--dark-3); font-size: 12px', text: 'تظهر لك وحدك' })),
     h('div', { class: 'grid-2' },
       tile('#/admin?tab=users', 'إدارة المستخدمين', pending ? `${pending} بانتظار التفعيل` : `${total} مستخدماً مفعّلاً`, pending > 0),
-      tile('#/admin?tab=permissions', 'الصلاحيات', '7 أنواع مستخدمين'),
+      tile('#/admin?tab=permissions', 'الصلاحيات', '8 أنواع مستخدمين'),
       tile('#/admin?tab=subscriptions', 'الاشتراكات', expiring ? `${expiring} تنتهي خلال أسبوعين` : 'كلها سارية', expiring > 0),
       tile('#/admin?tab=users', 'كود تفعيل', 'يُصدر لكل مستخدم من إدارة المستخدمين', false, true))));
 }

@@ -36,7 +36,7 @@ const B = 'http://localhost:8788/';
   ok('admin label without role title', (await adm.locator('header .pill.dark').textContent()) === 'مدير النظام');
   ok('role switch icon shows current role', (await adm.locator('.role-switch').textContent()).includes('مسؤول الصيادلة السريريين'));
   await adm.locator('.role-switch').click(); await adm.waitForSelector('dialog .option');
-  ok('7 roles to choose from', (await adm.locator('dialog .option').count()) === 7);
+  ok('8 roles to choose from', (await adm.locator('dialog .option').count()) === 8);
   await shot(adm, 'role-picker');
   await adm.locator('dialog').getByRole('button', { name: 'إغلاق' }).click();
 

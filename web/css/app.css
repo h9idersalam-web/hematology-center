@@ -352,3 +352,31 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .install-steps li > span:last-child span { font-size: 13px; color: var(--muted-2); }
 .install-step-ic { width: 36px; height: 36px; border-radius: 10px; background: var(--chip); color: var(--brand); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
 @media (max-width: 359px) { .install-btn span { display: none; } .install-btn { padding: 7px; } }
+
+/* قسم التقارير */
+.report-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.report-tile { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 16px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--ink); }
+.report-tile .report-ic { width: 54px; height: 54px; border-radius: 14px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; margin-bottom: 4px; }
+.report-tile .t { font-size: 17px; font-weight: 700; }
+.report-tile .s { font-size: 14px; color: var(--muted-2); line-height: 1.6; }
+.report-tile:active { background: var(--line-2); }
+.inv-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.inv-actions > .btn { flex: 1 1 200px; }
+.inv-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 479px) { .inv-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.inv-row .t { unicode-bidi: plaintext; text-align: right; }
+.inv-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.inv-meta .exp.expired { color: var(--brand-dark); font-weight: 700; }
+.inv-meta .exp.soon { color: var(--warn); font-weight: 700; }
+.pill.err { background: var(--brand-soft); color: var(--brand-dark); }
+.inv-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.inv-preview { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+.inv-preview table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.inv-preview th, .inv-preview td { padding: 6px 8px; border-bottom: 1px solid var(--line-2); text-align: right; vertical-align: top; }
+.inv-preview th { position: sticky; top: 0; background: var(--chip); font-weight: 700; }
+.inv-preview tr.warn td { background: var(--warn-soft); }
+.inv-preview td.bad { color: var(--warn-ink); font-weight: 700; }
+.ho-row { align-items: flex-start; }
+.ho-line { display: block; font-size: 15px; line-height: 1.7; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ho-line b { color: var(--muted-2); font-weight: 600; }
+.dept-t { text-align: center; padding: 6px 4px; line-height: 1.4; }

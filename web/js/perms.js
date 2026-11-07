@@ -26,6 +26,9 @@ const RULES = {
   administer: ['nurse'],
   seeMixing: ['clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist', 'specialist', 'senior_resident'],
   seeNursing: ['nurse', 'specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist'],
+  // التقارير: الكل يقرأ
+  editInventory: ['internal_pharmacist'],     // ومعهم المدير أياً كان دوره
+  writeHandover: ['clinical_pharmacist', 'chief_clinical_pharmacist'],
   seeRequests: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'],
 };
 
@@ -34,7 +37,7 @@ export const role = () => state.profile?.role;
 export function can(action) {
   const p = state.profile;
   if (!p) return false;
-  if (action === 'manageProtocol' && p.is_admin) return true;
+  if ((action === 'manageProtocol' || action === 'editInventory') && p.is_admin) return true;
   // تفعيل صلاحيات الرديف: لمسؤول الصيادلة الأصلي فقط، لا للرديف نفسه
   if (action === 'toggleDeputy') return p.base_role === 'chief_clinical_pharmacist' || (p.is_admin && p.role === 'chief_clinical_pharmacist');
   return (RULES[action] || []).includes(p.role);

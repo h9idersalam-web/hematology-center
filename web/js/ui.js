@@ -77,6 +77,10 @@ const PATHS = {
   alert: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16v.3"/>',
   chevron: '<path d="M14.5 6l-6 6 6 6"/>',
   move: '<path d="M4 12h14M14 7l5 5-5 5"/>',
+  report: '<rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"/>',
+  swap: '<path d="M4 8.5h14l-3.5-3.5M20 15.5H6l3.5 3.5"/>',
+  upload: '<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>',
+  download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/>',
 };
 
 export function icon(name, size = 24, color = 'currentColor', width = 1.8) {
@@ -98,6 +102,7 @@ export const ROLES = {
   clinical_pharmacist: 'صيدلي سريري',
   chief_clinical_pharmacist: 'مسؤول الصيادلة السريريين',
   mixing_pharmacist: 'صيدلي المزج الكيميائي',
+  internal_pharmacist: 'مسؤول الصيدلية الداخلية',
   nurse: 'ممرض',
 };
 
@@ -121,6 +126,7 @@ export const ROLE_GROUPS = [
     { role: 'clinical_pharmacist', desc: 'يطلب تعديل الجرعة الدوائية والمحلول والأدوية الداعمة، ويرفق صورة الطبلة.' },
     { role: 'chief_clinical_pharmacist', desc: 'ينشئ الخطط ويطلب كل أنواع التعديل، ويقرّر طلبات الصيدلي السريري، ويغلق الجرعات ويؤجلها.' },
     { role: 'mixing_pharmacist', desc: 'يستلم الجرعات المعتمدة ويحضّرها ويرسلها، ويطلب تعديل الجرعات الدوائية فقط.' },
+    { role: 'internal_pharmacist', desc: 'يرفع تقرير الصيدلية الداخلية الأسبوعي (ملف إكسل) ويعدّله، ويرى بقية التطبيق عرضاً فقط.' },
   ] },
   { id: 'nurse', label: 'ممرض', legend: null, subs: [
     { role: 'nurse', desc: 'يسجّل إعطاء الجرعات الدوائية والعلامات الحيوية والتفاعلات، ويرى الأوامر المعتمدة فقط.' },
