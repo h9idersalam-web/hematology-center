@@ -1,6 +1,6 @@
 // يحفظ ملفات واجهة التطبيق فقط ليفتح بسرعة.
 // لا يحفظ أي بيانات مرضى: كل طلبات قاعدة البيانات تذهب إلى الخادم مباشرة.
-const VERSION = 'v21-2026-11-07-sound-alerts';
+const VERSION = 'v22-2026-11-07-activation-hardening';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'vendor/supabase-2.118.0.js',
