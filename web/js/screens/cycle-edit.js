@@ -17,7 +17,7 @@ export async function render(root, params) {
   const pharm = can('requestEdit');
   const mixing = state.profile.role === 'mixing_pharmacist';
   const clinical = state.profile.role === 'clinical_pharmacist' || mixing;   // كلاهما: لا تشخيص ولا بروتوكول ولا حذف
-  const shell = (...c) => mount(root, h('div', { class: 'screen' }, topbar({ title: doctor ? 'تعديل الدورة' : 'اقتراح تعديل', back }), h('main', { class: 'main' }, ...c)));
+  const shell = (...c) => mount(root, h('div', { class: 'screen' }, topbar({ title: doctor ? 'تعديل الجرعة' : 'اقتراح تعديل', back }), h('main', { class: 'main' }, ...c)));
   if (!doctor && !pharm) return shell(notice('info', 'lock', h('p', { text: 'التعديل للأطباء والصيادلة.' })));
 
   const [c, doses, protocols] = await Promise.all([
@@ -25,9 +25,9 @@ export async function render(root, params) {
     q(sb.from('cycle_doses').select('*').eq('cycle_id', id).is('archived_at', null).order('sort')),
     clinical ? Promise.resolve([]) : q(sb.from('protocols').select('id, name, disease').not('approved_at', 'is', null).is('archived_at', null).order('name')),
   ]);
-  if (!c) throw new Error('الدورة غير موجودة');
+  if (!c) throw new Error('الجرعة غير موجودة');
   const t = c.treatments;
-  if (!['planned', 'held'].includes(c.status) || t.patients.archived_at) return shell(notice('warn', 'lock', h('p', { text: 'لا يمكن تعديل دورة أُعطيت أو أُلغيت، أو ملف مؤرشف.' })));
+  if (!['planned', 'held'].includes(c.status) || t.patients.archived_at) return shell(notice('warn', 'lock', h('p', { text: 'لا يمكن تعديل جرعة أُعطيت أو أُلغيت، أو ملف مؤرشف.' })));
 
   // ----------------------------------------------------------- الجرعات
   const mixState = await loadMixState(sb, q, doses.map((d) => d.id)).catch(() => new Map());
@@ -47,7 +47,7 @@ export async function render(root, params) {
   const protoStart = h('input', { class: 'input', type: 'date', min: todayISO() });
   const protoNote = h('div');
   protoSel.addEventListener('change', () => {
-    protoNote.replaceChildren(protoSel.value ? notice('warn', 'warn', h('p', { text: `توقف الخطة الحالية (${t.protocol_name}) وتُلغى دوراتها غير المعطاة، وتبدأ خطة جديدة بالبروتوكول المختار وجرعات تُحسب من الطول والوزن الحاليين. لا تُجمع مع تعديلات أخرى في الطلب نفسه.` })) : null);
+    protoNote.replaceChildren(protoSel.value ? notice('warn', 'warn', h('p', { text: `توقف الخطة الحالية (${t.protocol_name}) وتُلغى جرعاتها غير المعطاة، وتبدأ خطة جديدة بالبروتوكول المختار وجرعات دوائية تُحسب من الطول والوزن الحاليين. لا تُجمع مع تعديلات أخرى في الطلب نفسه.` })) : null);
   });
 
   // ----------------------------------------------------------- التقرير
@@ -63,7 +63,7 @@ export async function render(root, params) {
 
   function collect() {
     if (protoSel.value) {
-      if (!protoStart.value) return { error: 'اختر تاريخ أول دورة في البروتوكول الجديد' };
+      if (!protoStart.value) return { error: 'اختر تاريخ أول جرعة في البروتوكول الجديد' };
       return { items: [{ kind: 'protocol', payload: { protocol_id: protoSel.value, start_date: protoStart.value } }],
         labels: ['تغيير البروتوكول إلى ' + protoSel.selectedOptions[0].text] };
     }
@@ -94,7 +94,7 @@ export async function render(root, params) {
     }
     const ok = await confirmDialog({
       title: doctor ? `تطبيق ${count(r.items.length, 'item')}` : `إرسال ${count(r.items.length, 'item')} للطبيب`,
-      body: r.labels.join(' ؛ ') + (doctor ? '. يُطبَّق فوراً ويبقى اعتماد الدورة، ويُبلَّغ قسم المزج إن وصلته.' : '. لا يُطبَّق شيء قبل القرار.'),
+      body: r.labels.join(' ؛ ') + (doctor ? '. يُطبَّق فوراً ويبقى اعتماد الجرعة، ويُبلَّغ قسم المزج إن وصلته.' : '. لا يُطبَّق شيء قبل القرار.'),
       okText: doctor ? 'تطبيق' : 'إرسال',
     });
     if (!ok) return;
@@ -112,21 +112,21 @@ export async function render(root, params) {
   }));
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: doctor ? 'تعديل الدورة' : 'اقتراح تعديل', sub: `${t.patients.full_name} · ${t.protocol_name} · الدورة ${c.cycle_no}`, back }),
+    topbar({ title: doctor ? 'تعديل الجرعة' : 'اقتراح تعديل', sub: `${t.patients.full_name} · ${t.protocol_name} · الجرعة ${c.cycle_no}`, back }),
     h('main', { class: 'main' },
       notice(doctor ? 'info' : 'warn', 'info', h('p', { text: doctor
         ? 'تُطبَّق تعديلاتك فوراً وتُسجَّل باسمك.' + (state.profile.role === 'senior_resident' ? ' ويُبلَّغ الطبيب المختص بها.' : '')
         : (state.profile.role === 'clinical_pharmacist'
           ? 'يُرسل اقتراحك مع تقريرك إلى الطبيب المختص بالمريض والمقيم الأقدم ومسؤول الصيادلة، ويقرّره أحدهم. لا يتغير شيء قبل القرار.'
-          : 'يُرسل اقتراحك مع تقريرك إلى الطبيب المختص بالمريض والمقيم الأقدم، ويقرّره أحدهما. لا يتغير شيء قبل القرار، وبعد الموافقة يعيد الطبيب اعتماد الدورة.')
-          + (mixing ? ' صيدلي المزج يقترح تعديل الجرعات فقط.' : '') })),
-      h('div', { class: 'section-head' }, h('h2', { text: 'الجرعات' })),
+          : 'يُرسل اقتراحك مع تقريرك إلى الطبيب المختص بالمريض والمقيم الأقدم، ويقرّره أحدهما. لا يتغير شيء قبل القرار، وبعد الموافقة يعيد الطبيب اعتماد الجرعة.')
+          + (mixing ? ' صيدلي المزج يقترح تعديل الجرعات الدوائية فقط.' : '') })),
+      h('div', { class: 'section-head' }, h('h2', { text: 'الجرعات الدوائية' })),
       ...doseEds.map((e) => e.el),
       mixing ? null : h('div', { class: 'section-head' }, h('h2', { text: clinical ? 'إضافة دواء داعم' : 'إضافة دواء' })),
       mixing ? null : add.el,
       !clinical ? h('div', { class: 'card' }, h('h2', { text: 'التشخيص والمرحلة' }), field('التشخيص', dx),
         h('div', { class: 'grid-2' }, field('ICD-10', icd), field('المرحلة', stage))) : null,
-      !clinical ? h('div', { class: 'card' }, h('h2', { text: 'تغيير البروتوكول' }), field('البروتوكول الجديد', protoSel), field('تاريخ أول دورة', protoStart), protoNote) : null,
+      !clinical ? h('div', { class: 'card' }, h('h2', { text: 'تغيير البروتوكول' }), field('البروتوكول الجديد', protoSel), field('تاريخ أول جرعة', protoStart), protoNote) : null,
       h('div', { class: 'card' },
         h('h2', { text: doctor ? 'ملاحظة' : 'تقرير الأسباب للطبيب' }),
         !doctor ? h('div', { class: 'field' }, h('span', { class: 'label', text: 'سبب التعديل' }), reasonBox) : null,
@@ -146,7 +146,7 @@ function doseEditor(d, canRemove, doseOnly = false, ms = null) {
   const pctOut = h('p', { class: 'hint' });
   const drawPct = () => {
     const v = Number(latinDigits(val.value));
-    pctOut.textContent = v > 0 && v !== cur ? `${v > cur ? 'زيادة' : 'تخفيض'} ${Math.abs(Math.round((v / cur - 1) * 100))}% عن الجرعة الحالية` : '';
+    pctOut.textContent = v > 0 && v !== cur ? `${v > cur ? 'زيادة' : 'تخفيض'} ${Math.abs(Math.round((v / cur - 1) * 100))}% عن الجرعة الدوائية الحالية` : '';
     pctOut.style.color = v > cur * 1.25 ? 'var(--brand)' : '';
   };
   val.addEventListener('input', drawPct);
@@ -160,8 +160,8 @@ function doseEditor(d, canRemove, doseOnly = false, ms = null) {
         h('b', { class: 'ltr', style: 'text-align: right; font-size: 17px', text: d.drug_name }),
         h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: `${d.route} · ${daysText(d.days)}` })),
       h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(cur) }), h('span', { text: OUT_UNITS[d.final_unit] || d.final_unit }))),
-    field(`الجرعة الجديدة (${OUT_UNITS[d.final_unit] || d.final_unit})`, val), quick, pctOut,
-    h('label', { class: 'check' }, onward, h('span', { text: 'تطبيق على هذه الدورة والدورات التالية' })),
+    field(`الجرعة الدوائية الجديدة (${OUT_UNITS[d.final_unit] || d.final_unit})`, val), quick, pctOut,
+    h('label', { class: 'check' }, onward, h('span', { text: 'تطبيق على هذه الجرعة والجرعات التالية' })),
     doseOnly ? null : h('details', null, h('summary', { style: 'cursor: pointer; font-weight: 600; min-height: 36px', text: 'المحلول ومعدل التسريب' }),
       h('div', { class: 'grid-2', style: 'margin-top: 8px' }, field('المحلول', dil), field('معدل التسريب', rate))),
     canRemove ? h('div', { class: 'grid-2', style: 'align-items: center' }, h('label', { class: 'check' }, remove, h('span', { text: 'حذف الدواء' })), removeReason) : null);
@@ -187,7 +187,7 @@ function doseEditor(d, canRemove, doseOnly = false, ms = null) {
       }
       if (val.value !== '') {
         const v = Number(latinDigits(val.value));
-        if (!(v > 0)) return { error: `جرعة ${d.drug_name} يجب أن تكون أكبر من صفر` };
+        if (!(v > 0)) return { error: `الجرعة الدوائية لـ ${d.drug_name} يجب أن تكون أكبر من صفر` };
         if (v !== cur) {
           items.push({ kind: 'dose', target_dose_id: d.id, new_value: String(v), apply_onward: onward.checked });
           labels.push(`${d.drug_name}: من ${num(cur)} إلى ${num(v)} ${OUT_UNITS[d.final_unit] || ''}${onward.checked ? ' (وما بعدها)' : ''}`);
@@ -215,21 +215,21 @@ function addEditor(supportiveOnly) {
   const onward = h('input', { type: 'checkbox', checked: true });
   const body = h('div', { class: 'section', hidden: true },
     field('اسم الدواء (بالإنجليزية)', name),
-    h('div', { class: 'grid-2' }, field('الجرعة النهائية', dose), field('الوحدة', unit)),
+    h('div', { class: 'grid-2' }, field('الجرعة الدوائية النهائية', dose), field('الوحدة', unit)),
     h('div', { class: 'grid-2' }, field('الطريق', route), field('الأيام', days)),
     h('div', { class: 'grid-2' }, field('المحلول', dil), field('التسريب', rate)),
     h('label', { class: 'check' }, mixed, h('span', { text: 'يُحضَّر في قسم المزج' })),
-    h('label', { class: 'check' }, onward, h('span', { text: 'في هذه الدورة والدورات التالية' })),
+    h('label', { class: 'check' }, onward, h('span', { text: 'في هذه الجرعة والجرعات التالية' })),
     supportiveOnly ? h('p', { class: 'hint', text: 'الصيدلي السريري يقترح الأدوية الداعمة فقط (مضادات القيء، الوقاية، السوائل...).' }) : null);
   on.addEventListener('change', () => { body.hidden = !on.checked; });
   route.addEventListener('change', () => { mixed.checked = route.value !== 'PO'; });
   return {
-    el: h('div', { class: 'card' }, h('label', { class: 'check' }, on, h('span', { style: 'font-weight: 700', text: supportiveOnly ? 'أضف دواءً داعماً' : 'أضف دواءً إلى الدورة' })), body),
+    el: h('div', { class: 'card' }, h('label', { class: 'check' }, on, h('span', { style: 'font-weight: 700', text: supportiveOnly ? 'أضف دواءً داعماً' : 'أضف دواءً إلى الجرعة' })), body),
     item() {
       if (!on.checked) return {};
       const nm = name.value.trim(), v = Number(latinDigits(dose.value));
       if (!/^[A-Za-z]/.test(nm)) return { error: 'اكتب اسم الدواء المضاف بالإنجليزية' };
-      if (!(v > 0)) return { error: 'جرعة الدواء المضاف يجب أن تكون أكبر من صفر' };
+      if (!(v > 0)) return { error: 'الجرعة الدوائية للدواء المضاف يجب أن تكون أكبر من صفر' };
       if (!validDays(days.value)) return { error: 'أيام الدواء المضاف غير صحيحة' };
       return {
         item: { kind: 'add_drug', apply_onward: onward.checked, payload: { drug_name: nm, route: route.value, days: days.value.replace(/\s/g, ''),

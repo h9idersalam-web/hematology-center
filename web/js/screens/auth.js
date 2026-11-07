@@ -8,8 +8,8 @@ function hero() {
   return h('header', { class: 'hero' },
     h('div', { class: 'logo' }, icon('drop', 34)),
     h('div', { style: 'display: flex; flex-direction: column; gap: 4px' },
-      h('p', { class: 'center', text: CENTER_NAME }),
-      h('h1', { text: 'نظام متابعة مرضى الدم' })));
+      h('h1', { text: CENTER_NAME }),
+      h('p', { class: 'center ltr', style: 'font-size: 18px; font-weight: 600; letter-spacing: .5px', text: 'Hematology' })));
 }
 
 function switcher(active) {

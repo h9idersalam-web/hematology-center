@@ -23,9 +23,9 @@ export async function render(root, params) {
   ]);
   if (!p) throw new Error('المريض غير موجود');
   if (p.archived_at) return shell(notice('err', 'archive', h('p', { text: 'ملف المريض مؤرشف.' })));
-  if (current.length) return shell(notice('warn', 'warn', h('p', { text: 'للمريض خطة علاج قائمة. لتغيير البروتوكول استخدم «تعديل» من شاشة الدورة، أو أوقف الخطة الحالية أولاً.' })));
+  if (current.length) return shell(notice('warn', 'warn', h('p', { text: 'للمريض خطة علاج قائمة. لتغيير البروتوكول استخدم «تعديل» من شاشة الجرعة، أو أوقف الخطة الحالية أولاً.' })));
   if (!p.height_cm || !p.weight_kg) {
-    return shell(notice('warn', 'warn', h('p', { text: 'الطول والوزن مطلوبان لحساب مساحة سطح الجسم والجرعات.' })),
+    return shell(notice('warn', 'warn', h('p', { text: 'الطول والوزن مطلوبان لحساب مساحة سطح الجسم والجرعات الدوائية.' })),
       h('a', { class: 'btn primary block', href: '#/patient-edit?id=' + pid }, icon('edit', 22, '#fff'), 'إدخال الطول والوزن'));
   }
   if (!protocols.length) {
@@ -64,7 +64,7 @@ export async function render(root, params) {
     const allergy = p.allergies && p.allergies !== NKDA ? p.allergies.toLowerCase() : '';
     const clash = drugs.filter((d) => allergy && allergy.includes(d.drug_name.toLowerCase()));
     preview.replaceChildren(
-      h('div', { class: 'section-head' }, h('h2', { text: 'معاينة الجرعات' }), h('span', { class: 'meta ltr', text: `BSA ${B} m²` })),
+      h('div', { class: 'section-head' }, h('h2', { text: 'معاينة الجرعات الدوائية' }), h('span', { class: 'meta ltr', text: `BSA ${B} m²` })),
       clash.length ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'تحذير حساسية: ' + clash.map((d) => d.drug_name).join('، ') }), h('p', { text: 'المريض مسجّل بحساسية لدواء في هذا البروتوكول. راجع الطبيب المختص قبل المتابعة.' })) : null,
       h('div', { class: 'card flush' }, drugs.map((d) => {
         const c = calcDose(Number(d.dose_value), d.dose_unit, B, W, d.max_dose);
@@ -77,7 +77,7 @@ export async function render(root, params) {
             c.capped ? h('span', { class: 'pill warn', style: 'align-self: flex-start; margin-top: 4px', text: `قُصّت إلى السقف ${num(d.max_dose)} ${OUT_UNITS[c.finalUnit]} (المحسوب ${num(c.calculated)})` }) : null),
           h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(c.final) }), h('span', { text: OUT_UNITS[c.finalUnit] })));
       })),
-      h('p', { class: 'hint', text: `حُسبت من طول ${num(p.height_cm)} سم ووزن ${num(p.weight_kg)} كغ بمعادلة موستيلر. هذه معاينة، والجرعات المعتمدة تحسبها قاعدة البيانات عند الحفظ بالطريقة نفسها.` }),
+      h('p', { class: 'hint', text: `حُسبت من طول ${num(p.height_cm)} سم ووزن ${num(p.weight_kg)} كغ بمعادلة موستيلر. هذه معاينة، والجرعات الدوائية المعتمدة تحسبها قاعدة البيانات عند الحفظ بالطريقة نفسها.` }),
       chosen.notes ? notice('info', 'info', h('p', { text: chosen.notes })) : null,
       protocolFileLink(chosen.file_path, 'مطابقة مع ملف البروتوكول ' + chosen.name));
   }
@@ -90,7 +90,7 @@ export async function render(root, params) {
     const last = addDaysISO(start.value, (chosen.total_cycles - 1) * chosen.cycle_length_days);
     const past = start.value < todayISO() ? Math.ceil((new Date(todayISO()) - new Date(start.value)) / 86400000 / chosen.cycle_length_days) : 0;
     schedule.textContent = `${count(chosen.total_cycles, 'cycle')} من ${fmtDate(start.value)} إلى ${fmtDate(last)}.` +
-      (past ? ` البدء في تاريخ ماضٍ: ستظهر الدورات التي مضى موعدها متأخرة حتى تُسجَّل أو تُؤجَّل.` : '');
+      (past ? ` البدء في تاريخ ماضٍ: ستظهر الجرعات التي مضى موعدها متأخرة حتى تُسجَّل أو تُؤجَّل.` : '');
   }
   start.addEventListener('input', drawSchedule);
 
@@ -107,7 +107,7 @@ export async function render(root, params) {
       h('h2', { text: 'التشخيص والبدء' }),
       field('التشخيص', diagnosis),
       h('div', { class: 'grid-2' }, field('رمز ICD-10', icd), field('المرحلة', stage)),
-      field('تاريخ الدورة الأولى', start), schedule),
+      field('تاريخ الجرعة الأولى', start), schedule),
     pending ? notice('info', 'info', h('p', { text: 'تُرسل الخطة للطبيب المختص بالمريض، ولا تُفعَّل قبل موافقته.' })) : null,
     err, submit);
 
@@ -120,7 +120,7 @@ export async function render(root, params) {
       if (!diagnosis.value.trim()) return fail('اكتب التشخيص');
       const code = icd.value.trim().toUpperCase();
       if (code && !/^[A-Z]\d{2}(\.\d{1,2})?$/.test(code)) return fail('رمز ICD-10 بصيغة حرف ثم رقمين، مثل C83.3');
-      if (!start.value) return fail('اختر تاريخ الدورة الأولى');
+      if (!start.value) return fail('اختر تاريخ الجرعة الأولى');
       try {
         await rpc('create_treatment', { p_patient: pid, p_protocol: chosen.id, p_diagnosis: diagnosis.value.trim(),
           p_icd10: code || null, p_stage: stage.value.trim() || null, p_start: start.value });

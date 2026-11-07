@@ -17,7 +17,7 @@ export function postponeDialog(cycle) {
     const err = h('div');
     const drawShift = () => {
       const days = date.value ? Math.round((new Date(date.value) - new Date(cycle.planned_date)) / 86400000) : 0;
-      shift.textContent = days > 0 ? `تأجيل ${count(days, 'day')}. تُزاح مواعيد الدورات التالية بالمدة نفسها.` : '';
+      shift.textContent = days > 0 ? `تأجيل ${count(days, 'day')}. تُزاح مواعيد الجرعات التالية بالمدة نفسها.` : '';
     };
     date.addEventListener('input', drawShift); drawShift();
 
@@ -31,13 +31,13 @@ export function postponeDialog(cycle) {
       ok.disabled = true;
       try {
         await rpc('postpone_cycle', { p_cycle: cycle.id, p_new_date: date.value, p_reason: reason.value.trim() });
-        toast(`أُجّلت الدورة ${cycle.cycle_no} إلى ${fmtDate(date.value)}`);
+        toast(`أُجّلت الجرعة ${cycle.cycle_no} إلى ${fmtDate(date.value)}`);
         done(true);
       } catch (e) { ok.disabled = false; err.replaceChildren(notice('err', 'warn', h('p', { text: e.message }))); }
     });
 
     dlg.append(h('div', { class: 'dlg' },
-      h('h2', { text: `تأجيل الدورة ${cycle.cycle_no}` }),
+      h('h2', { text: `تأجيل الجرعة ${cycle.cycle_no}` }),
       h('p', { style: 'color: var(--muted)', text: `${cycle.patient_name ? cycle.patient_name + ' · ' : ''}الموعد الحالي ${fmtDate(cycle.planned_date)}` }),
       field('الموعد الجديد', date), shift,
       field('سبب التأجيل', reason), chips, err,

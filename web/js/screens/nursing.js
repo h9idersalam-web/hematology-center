@@ -36,8 +36,8 @@ export async function list(root) {
   due.sort((a, b) => (a.done === a.doses.length) - (b.done === b.doses.length));
 
   box.replaceChildren(
-    h('p', { style: 'font-size: 14px; color: var(--muted-2)', text: due.length ? `${count(due.length, 'patient')} لهم جرعات اليوم` : '' }),
-    h('div', { class: 'card flush' }, due.length ? due.map(dueRow) : empty('لا توجد جرعات مستحقة اليوم', 'check')));
+    h('p', { style: 'font-size: 14px; color: var(--muted-2)', text: due.length ? `${count(due.length, 'patient')} لهم جرعات دوائية اليوم` : '' }),
+    h('div', { class: 'card flush' }, due.length ? due.map(dueRow) : empty('لا توجد جرعات دوائية مستحقة اليوم', 'check')));
 }
 
 function dueRow({ c, day, doses, done, ready, mixing }) {
@@ -53,7 +53,7 @@ function dueRow({ c, day, doses, done, ready, mixing }) {
       h('span', { class: 't', style: 'display: flex; gap: 6px; align-items: center' }, h('span', { text: p.full_name }),
         p.allergies && p.allergies !== NKDA ? h('span', { style: 'color: var(--brand); display: flex', title: 'حساسية' }, icon('alert', 16, 'currentColor', 2.2)) : null),
       h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
-        h('span', { class: 'tag', text: c.treatments.protocol_name }), h('span', { text: `الدورة ${c.cycle_no} · اليوم ${day}` })),
+        h('span', { class: 'tag', text: c.treatments.protocol_name }), h('span', { text: `الجرعة ${c.cycle_no} · اليوم ${day}` })),
       h('span', { class: 's', text: `أُعطي ${done} من ${count(doses.length, 'drug')}` })),
     pill);
 }
@@ -64,7 +64,7 @@ export async function administer(root, params) {
   const c = await q(sb.from('cycles')
     .select('id, cycle_no, planned_date, status, doctor_approved_at, treatments(status, protocol_name, patients(id, full_name, file_no, allergies)), cycle_doses(id, drug_name, final_dose, final_unit, route, days, diluent, infusion_rate, instructions, is_mixed, archived_at, sort)')
     .eq('id', cid).maybeSingle());
-  if (!c) throw new Error('الدورة غير موجودة');
+  if (!c) throw new Error('الجرعة غير موجودة');
   const p = c.treatments.patients;
   const doses = c.cycle_doses.filter((d) => !d.archived_at && daysList(d.days).includes(day)).sort((a, b) => a.sort - b.sort);
   const ids = doses.map((d) => d.id);
@@ -102,29 +102,29 @@ export async function administer(root, params) {
   });
 
   const closeBtn = live && allGiven && day === lastDay && can('completeCycle')
-    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), `إغلاق الدورة ${c.cycle_no}`) : null;
+    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), `إغلاق الجرعة ${c.cycle_no}`) : null;
   closeBtn?.addEventListener('click', () => busy(closeBtn, async () => {
-    const ok = await confirmDialog({ title: `إغلاق الدورة ${c.cycle_no}`, body: 'أُعطيت كل جرعات الدورة. تُسجَّل الدورة مُعطاة وتصبح الدورة التالية هي القادمة.', okText: 'إغلاق' });
+    const ok = await confirmDialog({ title: `إغلاق الجرعة ${c.cycle_no}`, body: 'أُعطيت كل الجرعات الدوائية في هذه الجرعة. تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.', okText: 'إغلاق' });
     if (!ok) return;
-    try { await rpc('complete_cycle', { p_cycle: cid }); toast('أُغلقت الدورة'); reload(); } catch (e) { toast(e.message, true); }
+    try { await rpc('complete_cycle', { p_cycle: cid }); toast('أُغلقت الجرعة'); reload(); } catch (e) { toast(e.message, true); }
   }));
 
   const daysNav = allDays.length > 1 ? h('div', { class: 'segmented', style: 'grid-auto-columns: minmax(44px, 1fr); overflow-x: auto' },
     allDays.sort((a, b) => a - b).map((n) => h('a', { href: `#/administer?cycle=${cid}&day=${n}`, 'aria-current': n === day ? 'page' : null, 'aria-label': 'اليوم ' + n, text: String(n) }))) : null;
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: p.full_name, sub: `${c.treatments.protocol_name} · الدورة ${c.cycle_no} · اليوم ${day}`, back: '#/nursing' }),
+    topbar({ title: p.full_name, sub: `${c.treatments.protocol_name} · الجرعة ${c.cycle_no} · اليوم ${day}`, back: '#/nursing' }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column' }, h('span', { class: 'tag', style: 'align-self: flex-start', text: p.file_no }),
           h('b', { style: 'margin-top: 4px', text: fmtDay(addDaysISO(c.planned_date, day - 1)) })),
-        h('a', { href: '#/cycle?id=' + cid, class: 'link-btn', text: 'الدورة' })),
+        h('a', { href: '#/cycle?id=' + cid, class: 'link-btn', text: 'الجرعة' })),
       p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null,
       !approved ? notice('warn', 'lock', h('p', { text: 'لا يُعطى أي دواء قبل اعتماد الطبيب.' })) : null,
-      daysNav ? h('p', { style: 'font-size: 14px; font-weight: 600', text: 'أيام الإعطاء في الدورة' }) : null,
+      daysNav ? h('p', { style: 'font-size: 14px; font-weight: 600', text: 'أيام الإعطاء في الجرعة' }) : null,
       daysNav,
       h('div', { class: 'card flush' }, rows.length ? rows : empty(`لا توجد أدوية في اليوم ${day}`, 'pill')),
-      can('administer') ? notice('info', 'info', h('p', { text: 'قبل كل جرعة: طابق اسم المريض ورقم ملفه مع ملصق الكيس، والجرعة مع هذه الشاشة.' })) : null,
+      can('administer') ? notice('info', 'info', h('p', { text: 'قبل كل جرعة دوائية: طابق اسم المريض ورقم ملفه مع ملصق الكيس، والجرعة الدوائية مع هذه الشاشة.' })) : null,
       closeBtn),
     bottomNav('home')));
 }

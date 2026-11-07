@@ -3,6 +3,7 @@ import { sb, q, countOf, rpc } from '../api.js';
 import { h, mount, icon, roleLabel, ROLES, ROLE_GROUPS, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil, toast, busy } from '../ui.js';
 import { state, logout, loadProfile } from '../app.js';
 import { can } from '../perms.js';
+import { APP_NAME } from '../config.js';
 
 function greeting() {
   const hr = new Date().getHours();
@@ -29,6 +30,8 @@ export async function render(root) {
 
   mount(root, h('div', { class: 'screen' },
     h('main', { class: 'main with-nav' },
+      // اسم التطبيق في أعلى الواجهة
+      h('div', { class: 'app-brand' }, h('span', { class: 'app-brand-logo' }, icon('drop', 18, '#fff')), h('span', { text: APP_NAME })),
       h('header', { style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px' },
         h('div', { style: 'display: flex; flex-direction: column; gap: 2px; min-width: 0' },
           h('p', { style: 'font-size: 14px; color: var(--muted-2)', text: fmtDay(today) }),
@@ -111,7 +114,7 @@ async function renderChartTasks(box) {
         h('span', { class: 'grow' }, h('span', { class: 't', text: c.treatments.patients.full_name }),
           h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
             h('span', { class: 'tag', text: c.treatments.protocol_name }),
-            h('span', { text: `الدورة ${c.cycle_no} · ${fmtDate(c.planned_date, { day: 'numeric', month: 'short' })}` }))),
+            h('span', { text: `الجرعة ${c.cycle_no} · ${fmtDate(c.planned_date, { day: 'numeric', month: 'short' })}` }))),
         h('span', { class: 'pill warn', text: 'أرفق الصورة' }))))));
   } catch (e) { box.replaceChildren(); }
 }
@@ -158,7 +161,7 @@ function departments(p) {
     q(sb.from('mixing_orders').select('day, cycles!inner(planned_date, status)').in('status', ['incoming', 'in_progress', 'partially_sent'])
       .in('cycles.status', ['planned', 'held']).lte('cycles.planned_date', today)).then((rows) => {
       const n = rows.filter((r) => { const d = new Date(r.cycles.planned_date + 'T00:00:00'); d.setDate(d.getDate() + r.day - 1); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10) === today; }).length;
-      if (n) box.querySelector('[data-k="mix"]').append(h('span', { class: 'count', text: n, title: 'جرعات اليوم' }));
+      if (n) box.querySelector('[data-k="mix"]').append(h('span', { class: 'count', text: n, title: 'جرعات دوائية اليوم' }));
     }).catch(() => {});
   }
   return box;
@@ -185,7 +188,7 @@ function cycleRow(c) {
     h('span', { class: 'grow' },
       h('span', { class: 't', text: pt.full_name }),
       h('span', { class: 's', style: 'display: flex; gap: 8px; align-items: center' },
-        h('span', { class: 'tag', text: t.protocol_name }), h('span', { text: `الدورة ${c.cycle_no} من ${t.total_cycles}` }))),
+        h('span', { class: 'tag', text: t.protocol_name }), h('span', { text: `الجرعة ${c.cycle_no} من ${t.total_cycles}` }))),
     pill);
 }
 

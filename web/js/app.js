@@ -1,4 +1,5 @@
 // نقطة البداية: الجلسة، الملف الشخصي، والتنقل بين الشاشات
+import { APP_NAME } from './config.js';
 import { sb, configured, q } from './api.js';
 import { h, mount, icon, notice } from './ui.js';
 import * as auth from './screens/auth.js';
@@ -140,7 +141,7 @@ function fatal(msg) {
 function notConfigured() {
   mount(root, h('div', { class: 'main' },
     h('div', { class: 'hero', style: 'border-radius: 20px' },
-      h('div', { class: 'logo' }, icon('drop', 34)), h('h1', { text: 'نظام متابعة مرضى الدم' })),
+      h('div', { class: 'logo' }, icon('drop', 34)), h('h1', { text: APP_NAME })),
     notice('warn', 'warn',
       h('p', { text: 'التطبيق غير مربوط بقاعدة البيانات بعد.' }),
       h('p', { text: 'افتح الملف js/config.js وضع فيه رابط مشروع Supabase ومفتاحه العام.' }))));

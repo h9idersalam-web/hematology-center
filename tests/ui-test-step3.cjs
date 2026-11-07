@@ -98,11 +98,11 @@ const B = 'http://localhost:8787/';
   ok('edit saved', true);
 
   // ملفات المرضى الموجودين
-  await a.goto(B + '#/patient?id=p2'); await a.waitForSelector('text=جدول الدورات');
+  await a.goto(B + '#/patient?id=p2'); await a.waitForSelector('text=جدول الجرعات');
   ok('allergy banner shown', (await a.locator('text=Penicillin').count()) > 0);
   ok('no postpone for pharmacist', (await a.locator('button[aria-label^="تأجيل"]').count()) === 0);
   await shot(a, 's3-08-file-allergy');
-  await a.goto(B + '#/patient?id=p4'); await a.waitForSelector('text=جدول الدورات');
+  await a.goto(B + '#/patient?id=p4'); await a.waitForSelector('text=جدول الجرعات');
   ok('weight-change warning', (await a.locator('text=أقل من وزن الخطة').count()) === 1);
   ok('overdue tile', (await a.locator('text=متأخرة 5 أيام').count()) === 1);
   await shot(a, 's3-09-file-overdue-weight');
@@ -137,7 +137,7 @@ const B = 'http://localhost:8787/';
   await s.locator('dialog').getByRole('button', { name: 'تأجيل', exact: true }).click();
   await s.waitForSelector('text=لا توجد جلسات متأخرة');
   ok('postpone clears late list', true);
-  await s.goto(B + '#/patient?id=p4'); await s.waitForSelector('text=جدول الدورات');
+  await s.goto(B + '#/patient?id=p4'); await s.waitForSelector('text=جدول الجرعات');
   ok('postpone reason on cycle', (await s.locator('text=أُجّلت: نقص العدلات').count()) === 1);
   await shot(s, 's3-15-after-postpone');
 

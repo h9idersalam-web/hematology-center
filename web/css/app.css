@@ -337,3 +337,6 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .role-switch { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; }
 /* شاشة إشعار التحليل خارج المرجع */
 .card.lab-alert { gap: 10px; border-inline-start: 4px solid var(--brand); }
+/* اسم التطبيق أعلى الصفحة الرئيسية */
+.app-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--brand); }
+.app-brand-logo { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }

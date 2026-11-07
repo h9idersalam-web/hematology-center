@@ -48,7 +48,7 @@ export async function entry(root, params) {
     }));
     return h('details', { class: 'card', open: i === 0 },
       h('summary', { style: 'font-weight: 700; font-size: 17px; cursor: pointer', text: panel.label }),
-      h('div', { class: 'lab-head' }, h('span', { text: 'التحليل' }), h('span', { text: 'النتيجة' }), h('span', { text: 'المرجع' })),
+      h('div', { class: 'lab-head' }, h('span', { text: 'التحليل' }), h('span', { text: 'النتيجة' }), h('span', { text: 'الحد الطبيعي' })),
       body);
   });
 
@@ -82,8 +82,8 @@ export async function entry(root, params) {
       // الإشعار للطبيب المختص لتحاليل يوم دورة لم تُعتمد بعد فقط (الملف 19)
       const cyc = out ? await rpc('lab_alert_cycle', { p_patient: pid, p_test_date: date.value }).catch(() => null) : null;
       toast(!out ? 'حُفظت النتائج'
-        : cyc ? `حُفظت النتائج، و${out} خارج المرجع أُبلغ بها الطبيب المختص قبل الدورة ${cyc}`
-        : `حُفظت النتائج، و${out} خارج المرجع`);
+        : cyc ? `حُفظت النتائج، و${out} خارج الحد الطبيعي أُبلغ بها الطبيب المختص قبل الجرعة ${cyc}`
+        : `حُفظت النتائج، و${out} خارج الحد الطبيعي`);
       go('/labs?patient=' + pid);
     } catch (e) { err.replaceChildren(notice('err', 'warn', h('p', { text: e.message }))); }
   }));
@@ -93,7 +93,7 @@ export async function entry(root, params) {
       icon('file', 20), h('span', { text: 'مرتبط بملف التحليل المرفوع. اضغط لفتحه أثناء الإدخال.' })) : null),
     !att && can('upload') ? h('a', { class: 'btn secondary block', href: `#/upload?patient=${pid}&kind=lab` }, icon('share', 20), 'التقط صورة التحليل لتُقرأ قيمها آلياً') : null,
     h('div', { class: 'card' }, field('تاريخ سحب العينة', date)),
-    notice('info', 'info', h('p', { text: 'المراجع جاهزة لبالغ ' + (sex === 'female' ? 'أنثى' : 'ذكر') + '. عدّلها لتطابق ورقة مختبركم. اترك أي تحليل فارغاً إن لم يُجرَ.' })),
+    notice('info', 'info', h('p', { text: 'الحدود الطبيعية جاهزة لبالغ ' + (sex === 'female' ? 'أنثى' : 'ذكر') + '. عدّلها لتطابق ورقة مختبركم. اترك أي تحليل فارغاً إن لم يُجرَ.' })),
     ...panels, reviewBox, err, submit);
 }
 
@@ -221,7 +221,7 @@ function testCard(name, rows) {
     h('div', { style: 'display: flex; justify-content: space-between; align-items: flex-start; gap: 8px' },
       h('span', { style: 'display: flex; flex-direction: column' },
         h('b', { class: 'ltr', style: 'text-align: right; font-size: 17px', text: name }),
-        h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: `المرجع ${last.ref_low ?? '—'} – ${last.ref_high ?? '—'} ${last.unit || ''}` })),
+        h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: `الحد الطبيعي ${last.ref_low ?? '—'} – ${last.ref_high ?? '—'} ${last.unit || ''}` })),
       h('span', { style: 'display: flex; flex-direction: column; align-items: flex-end' },
         h('b', { class: 'ltr lab-last ' + (f || ''), text: String(last.value) }),
         h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: fmtDate(last.test_date, { day: 'numeric', month: 'short' }) + (f === 'low' ? ' · منخفض' : f === 'high' ? ' · مرتفع' : '') }))),

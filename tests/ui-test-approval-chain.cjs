@@ -67,20 +67,20 @@ const B = 'http://localhost:8788/';
 
   // ===== 3. اعتماد دورة اليوم لعلي: تصل إلى المزج، ثم طلب المزج للجرعة فقط
   await openPatient(sara, 'علي حسين');
-  await sara.locator('a[aria-label^="الدورة 3،"]').click(); await sara.waitForSelector('text=الجرعات');
+  await sara.locator('a[aria-label^="الجرعة 3،"]').click(); await sara.waitForSelector('text=الجرعات الدوائية');
   const cycleUrl = sara.url();
-  await sara.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(sara, 'اعتماد');
+  await sara.getByRole('button', { name: 'اعتماد الجرعة' }).click(); await confirm(sara, 'اعتماد');
   await sara.locator('.pill', { hasText: 'وصل قسم المزج' }).waitFor();
   ok('approved cycle reached mixing', true);
 
-  await nav(mix, cycleUrl); await mix.waitForSelector('text=الجرعات');
+  await nav(mix, cycleUrl); await mix.waitForSelector('text=الجرعات الدوائية');
   await mix.getByRole('link', { name: 'اقتراح تعديل على الطبيب' }).click(); await mix.waitForSelector('text=تقرير الأسباب للطبيب');
   ok('mixing: dose only (no infusion, add, diagnosis, protocol, remove)',
     (await mix.locator('text=المحلول ومعدل التسريب').count()) === 0 && (await mix.locator('text=إضافة دواء').count()) === 0
     && (await mix.locator('text=التشخيص والمرحلة').count()) === 0 && (await mix.locator('text=حذف الدواء').count()) === 0);
   await mix.locator('.dose-edit', { hasText: 'Doxorubicin' }).getByRole('button', { name: '75%' }).click();
   await mix.getByRole('button', { name: 'أخرى' }).click();
-  await mix.getByLabel('التقرير').fill('الفيال المتوفر 50 ملغ؛ نقترح تقريب الجرعة.');
+  await mix.getByLabel('التقرير').fill('الفيال المتوفر 50 ملغ؛ نقترح تقريب الجرعة الدوائية.');
   await shot(mix, 'mixing-request-form');
   await mix.getByRole('button', { name: 'إرسال الطلب' }).click(); await confirm(mix, 'إرسال');
   await mix.waitForSelector('text=بانتظار القرار');
@@ -91,20 +91,20 @@ const B = 'http://localhost:8788/';
   ok('chief cannot decide mixing request', (await chief.locator('text=قرارك').count()) === 0 && (await chief.locator('text=القرار لـالطبيب المختص بهذا المريض أو المقيم الأقدم').count()) === 1);
   await nav(sr, reqUrl); await sr.waitForSelector('text=قرارك');
   await sr.getByRole('button', { name: 'موافقة على البنود المحددة' }).click();
-  ok('confirm warns approval drops', (await sr.locator('dialog', { hasText: 'يُسقط اعتماد الدورة' }).count()) === 1);
+  ok('confirm warns approval drops', (await sr.locator('dialog', { hasText: 'يُسقط اعتماد الجرعة' }).count()) === 1);
   await confirm(sr, 'موافقة');
   await sr.waitForSelector('text=وُوفق عليه');
 
   // ===== 4. الدورة معلّقة في المزج حتى يُعاد الاعتماد
-  await nav(sara, cycleUrl); await sara.waitForSelector('text=الجرعات');
+  await nav(sara, cycleUrl); await sara.waitForSelector('text=الجرعات الدوائية');
   ok('cycle shows hold notice', (await sara.locator('text=فعُلّق المزج حتى يعيد الطبيب اعتمادها').count()) === 1);
-  ok('re-approve button back', (await sara.getByRole('button', { name: 'اعتماد الدورة' }).count()) === 1);
+  ok('re-approve button back', (await sara.getByRole('button', { name: 'اعتماد الجرعة' }).count()) === 1);
   await shot(sara, 'cycle-held');
   const orderHref = await sara.locator('.pill', { hasText: 'معلّق' }).first().getAttribute('href');
   await nav(mix, B + orderHref); await mix.waitForSelector('text=الطلب معلّق');
   ok('mixing order held, no prepare boxes', (await mix.locator('main input[type=checkbox]').count()) === 0);
   await shot(mix, 'order-held');
-  await sara.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(sara, 'اعتماد');
+  await sara.getByRole('button', { name: 'اعتماد الجرعة' }).click(); await confirm(sara, 'اعتماد');
   await sara.locator('.pill', { hasText: 'وصل قسم المزج' }).waitFor();
   await nav(mix, B + orderHref); await mix.waitForSelector('text=ضع علامة على ما حضّرته');
   ok('order resumes after re-approval', (await mix.locator('main input[type=checkbox]').count()) >= 1);
@@ -115,11 +115,11 @@ const B = 'http://localhost:8788/';
   await mix.getByRole('button', { name: /إرسال المحضَّر/ }).click(); await confirm(mix, 'إرسال');
   await mix.waitForSelector('.pill >> text=أُرسل جزء');
   await tickDrug('Cyclophosphamide');
-  await nav(sr, cycleUrl); await sr.waitForSelector('text=الجرعات');
+  await nav(sr, cycleUrl); await sr.waitForSelector('text=الجرعات الدوائية');
   ok('everyone sees sent note', (await sr.locator('.row', { hasText: 'Rituximab' }).locator('text=أُرسلت من المزج (اليوم 1) ولم تُعطَ بعد').count()) === 1);
   ok('everyone sees prepared note', (await sr.locator('.row', { hasText: 'Cyclophosphamide' }).locator('text=حضّرها صيدلي المزج (اليوم 1) ولم تُرسل بعد').count()) === 1);
   await shot(sr, 'cycle-mix-notes');
-  await sr.getByRole('link', { name: 'تعديل الجرعات أو الخطة' }).click(); await sr.waitForSelector('text=التشخيص والمرحلة');
+  await sr.getByRole('link', { name: 'تعديل الجرعات الدوائية أو الخطة' }).click(); await sr.waitForSelector('text=التشخيص والمرحلة');
   ok('sent dose locked in editor', await sr.locator('.dose-edit.locked', { hasText: 'Rituximab' }).locator('input[type=number]').isDisabled());
   ok('prepared dose locked too (file 21)', await sr.locator('.dose-edit.locked', { hasText: 'Cyclophosphamide' }).locator('input[type=number]').isDisabled()
      && (await sr.locator('.dose-edit', { hasText: 'Cyclophosphamide' }).locator('text=يزيل صيدلي المزج علامة التحضير').count()) === 1);

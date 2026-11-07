@@ -24,13 +24,13 @@ export async function render(root, params) {
   else status = notice('warn', 'warn',
     h('p', { style: 'font-weight: 700', text: 'غير معتمد: لا يُستخدم لأي مريض قبل اعتماده' }),
     h('p', { text: can('approveProtocol')
-      ? 'طابق الأدوية والجرعات والأيام والسقوف مع بروتوكول المركز أو مرجع موثوق (eviQ أو BC Cancer) قبل الاعتماد.'
+      ? 'طابق الأدوية والجرعات الدوائية والأيام والسقوف مع بروتوكول المركز أو مرجع موثوق (eviQ أو BC Cancer) قبل الاعتماد.'
       : 'أُرسل إشعار لأطباء الاختصاص لمراجعته واعتماده.' }));
 
   const approveBtn = can('approveProtocol') && !p.approved_at && !p.archived_at
     ? h('button', { class: 'btn ok block', type: 'button' }, icon('check', 22, '#fff', 2.2), 'اعتماد البروتوكول') : null;
   approveBtn?.addEventListener('click', async () => {
-    const ok = await confirmDialog({ title: 'اعتماد ' + p.name, body: 'باعتماده تؤكد أنك راجعت كل دواء وجرعته وأيامه وسقفه، ويصبح متاحاً لإنشاء خطط العلاج.', okText: 'اعتماد' });
+    const ok = await confirmDialog({ title: 'اعتماد ' + p.name, body: 'باعتماده تؤكد أنك راجعت كل دواء وجرعته الدوائية وأيامه وسقفه، ويصبح متاحاً لإنشاء خطط العلاج.', okText: 'اعتماد' });
     if (!ok) return;
     busy(approveBtn, async () => {
       try { await rpc('approve_protocol', { p_id: p.id }); toast('اعتُمد البروتوكول'); go('/protocol?id=' + p.id); }
@@ -52,8 +52,8 @@ export async function render(root, params) {
       h('section', { class: 'card' },
         h('div', { class: 'facts' },
           h('div', { class: 'fact' }, h('span', { class: 'l', text: 'نوع العلاج' }), h('span', { class: 'v', text: KIND[p.kind] })),
-          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'طول الدورة' }), h('span', { class: 'v', text: count(p.cycle_length_days, 'day') })),
-          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'عدد الدورات' }), h('span', { class: 'v', text: String(p.total_cycles) })),
+          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'المدة بين الجرعات' }), h('span', { class: 'v', text: count(p.cycle_length_days, 'day') })),
+          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'عدد الجرعات' }), h('span', { class: 'v', text: String(p.total_cycles) })),
           h('div', { class: 'fact' }, h('span', { class: 'l', text: 'أضافه' }), h('span', { class: 'v', text: p.author?.full_name || 'المكتبة الأولية' }))),
         p.notes ? h('div', { class: 'notice info' }, icon('info', 20), h('p', { text: p.notes })) : null),
       fileSection(p, () => render(root, params)),
@@ -90,7 +90,7 @@ function fileSection(p, reload) {
   return h('section', { class: 'section' },
     h('div', { class: 'section-head' }, h('h2', { text: 'الملف المرجعي' })),
     p.file_path ? protocolFileLink(p.file_path, 'فتح ملف البروتوكول')
-      : notice('warn', 'file', h('p', { text: 'لم يُرفق ملف البروتوكول المعتمد في المركز بعد. إرفاقه يتيح لكل من يعتمد أو يتحقق أو يحضّر الجرعات أن يطابق مع المصدر نفسه.' })),
+      : notice('warn', 'file', h('p', { text: 'لم يُرفق ملف البروتوكول المعتمد في المركز بعد. إرفاقه يتيح لكل من يعتمد أو يتحقق أو يحضّر الجرعات الدوائية أن يطابق مع المصدر نفسه.' })),
     input, picker, status,
     p.file_path && p.approved_at && !manager && can('createProtocol')
       ? h('p', { class: 'hint', text: 'استبدال ملف بروتوكول معتمد لطبيب الاختصاص ومسؤول الصيادلة ومدير البرنامج.' }) : null);

@@ -7,7 +7,7 @@ import { OUT_UNITS, daysText, num, loadMixState, mixNote } from '../dose.js';
 import { CR_STATUS } from './cycle.js';
 import { NKDA } from './patient-form.js';
 
-const KIND_AR = { dose: 'تعديل جرعة', infusion: 'المحلول والتسريب', add_drug: 'إضافة دواء', remove_drug: 'حذف دواء', diagnosis: 'التشخيص', protocol: 'تغيير البروتوكول' };
+const KIND_AR = { dose: 'تعديل جرعة دوائية', infusion: 'المحلول والتسريب', add_drug: 'إضافة دواء', remove_drug: 'حذف دواء', diagnosis: 'التشخيص', protocol: 'تغيير البروتوكول' };
 
 export async function render(root, params) {
   const id = params.get('id');
@@ -57,8 +57,8 @@ export async function render(root, params) {
       title: all ? 'رفض الطلب' : `الموافقة على ${count(ids.length, 'item')} من ${items.length}`,
       body: all ? 'لن يُطبَّق أي بند، ويُبلَّغ مرسل الطلب بقرارك.'
         : 'تُطبَّق البنود المحددة فوراً، وتُرفض غير المحددة. ' + (dropsApproval
-          ? 'ويُسقط اعتماد الدورة ويُعلَّق مزجها حتى يعيد الطبيب المختص أو المقيم الأقدم اعتمادها.'
-          : 'ويبقى اعتماد الدورة، ويُبلَّغ قسم المزج بالتغيير.'),
+          ? 'ويُسقط اعتماد الجرعة ويُعلَّق مزجها حتى يعيد الطبيب المختص أو المقيم الأقدم اعتمادها.'
+          : 'ويبقى اعتماد الجرعة، ويُبلَّغ قسم المزج بالتغيير.'),
       okText: all ? 'رفض' : 'موافقة', danger: all,
     });
     if (!ok) return;
@@ -72,11 +72,11 @@ export async function render(root, params) {
   rejectBtn.addEventListener('click', () => decide(rejectBtn, true));
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: 'طلب تعديل', sub: `${p.full_name} · الدورة ${r.cycles?.cycle_no ?? '—'}`, back: '#/requests' }),
+    topbar({ title: 'طلب تعديل', sub: `${p.full_name} · الجرعة ${r.cycles?.cycle_no ?? '—'}`, back: '#/requests' }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
-          h('b', { text: `${r.treatments?.protocol_name} · الدورة ${r.cycles?.cycle_no}` }),
+          h('b', { text: `${r.treatments?.protocol_name} · الجرعة ${r.cycles?.cycle_no}` }),
           h('span', { style: 'font-size: 14px; color: var(--muted-2)', text: r.cycles ? fmtDay(r.cycles.planned_date) : '' })),
         h('span', { class: 'pill ' + stK, text: stL })),
       p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { text: 'حساسية دوائية: ' + p.allergies })) : null,
@@ -96,14 +96,14 @@ export async function render(root, params) {
       r.status === 'pending' && !isMine ? notice('info', 'lock', h('p', { text: `القرار لـ${whoDecides}.` })) : null,
       deciding && isMine ? h('section', { class: 'card' }, h('h2', { text: 'قرارك' }),
         h('p', { class: 'hint', text: 'ألغِ تحديد أي بند لا توافق عليه.' }), field('ملاحظة', note), approveBtn, rejectBtn) : null,
-      r.cycles ? h('a', { class: 'btn secondary block', href: '#/cycle?id=' + r.cycles.id }, 'فتح الدورة') : null),
+      r.cycles ? h('a', { class: 'btn secondary block', href: '#/cycle?id=' + r.cycles.id }, 'فتح الجرعة') : null),
     bottomNav('home')));
 }
 
 export function describe(it, protos = []) {
   const d = it.cycle_doses, pl = it.payload || {};
   const unit = d ? OUT_UNITS[d.final_unit] || d.final_unit : '';
-  const onward = it.apply_onward ? 'هذه الدورة وما بعدها' : 'هذه الدورة فقط';
+  const onward = it.apply_onward ? 'هذه الجرعة وما بعدها' : 'هذه الجرعة فقط';
   switch (it.kind) {
     case 'dose': {
       const o = Number(it.old_value), n = Number(it.new_value);
@@ -115,7 +115,7 @@ export function describe(it, protos = []) {
       `${pl.route} · ${daysText(pl.days)} · ${onward}${pl.supportive ? ' · دواء داعم' : ''}${pl.diluent ? ' · ' + pl.diluent : ''}`];
     case 'remove_drug': return [`حذف ${d?.drug_name}`, `${pl.reason || ''} · ${onward}`];
     case 'diagnosis': return [pl.diagnosis, [pl.icd10, pl.stage].filter(Boolean).join(' · ')];
-    case 'protocol': return [`إلى ${(protos.find((x) => x.id === pl.protocol_id) || {}).name || 'بروتوكول آخر'}`, `أول دورة ${fmtDate(pl.start_date)}`];
+    case 'protocol': return [`إلى ${(protos.find((x) => x.id === pl.protocol_id) || {}).name || 'بروتوكول آخر'}`, `أول جرعة ${fmtDate(pl.start_date)}`];
     default: return [it.kind, ''];
   }
 }

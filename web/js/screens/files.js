@@ -24,7 +24,7 @@ export async function upload(root, params) {
   const input = h('input', { type: 'file', accept: 'image/*,application/pdf', class: 'sr-only', id: 'up-file' });
   const pick = h('label', { for: 'up-file', class: 'drop' }, icon('share', 30), h('b', { text: 'التقط صورة أو اختر ملفاً' }), h('span', { text: 'صورة أو PDF حتى 10 ميغابايت' }));
   const previewBox = h('div');
-  const title = h('input', { class: 'input', placeholder: 'مثال: تعداد دم كامل، وصفة الدورة 3', maxlength: 120 });
+  const title = h('input', { class: 'input', placeholder: 'مثال: تعداد دم كامل، وصفة الجرعة 3', maxlength: 120 });
   const date = h('input', { class: 'input', type: 'date', value: todayISO(), max: todayISO() });
   const err = h('div');
   const submit = h('button', { class: 'btn primary block', type: 'button', text: 'رفع وحفظ في ملف المريض' });

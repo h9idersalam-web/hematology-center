@@ -1,6 +1,6 @@
 {
-  "name": "نظام متابعة مرضى الدم",
-  "short_name": "مرضى الدم",
+  "name": "مركز أمراض الدم - Hematology",
+  "short_name": "Hematology",
   "description": "ملف المريض وبروتوكوله ومواعيد جرعاته في مكان واحد",
   "lang": "ar",
   "dir": "rtl",

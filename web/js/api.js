@@ -1,4 +1,5 @@
 // الاتصال بـ Supabase وترجمة الأخطاء
+import { terms } from './terms.js';
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
 export const configured = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_KEY.startsWith('YOUR-');
@@ -28,7 +29,7 @@ const AUTH_ERRORS = [
 export function errMsg(err) {
   const m = (err && (err.message || err.error_description || err.msg)) || String(err || '');
   for (const [re, ar] of AUTH_ERRORS) if (re.test(m)) return ar;
-  if (/[؀-ۿ]/.test(m)) return m;          // رسائل قاعدة البيانات عربية أصلاً
+  if (/[؀-ۿ]/.test(m)) return terms(m);   // رسائل قاعدة البيانات عربية أصلاً، بالمصطلحات المعتمدة
   if (err && err.code === '42501') return 'ليست لديك صلاحية لهذا الإجراء';
   return 'حدث خطأ غير متوقع: ' + m;
 }

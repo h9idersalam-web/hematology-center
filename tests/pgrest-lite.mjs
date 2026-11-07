@@ -330,7 +330,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/__reset') { await setup(); await loadMeta(); return send(res, 200, { ok: true }); }
     if (url.pathname === '/js/config.js') {
       res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
-      return res.end(`export const SUPABASE_URL = 'http://localhost:${PORT}';\nexport const SUPABASE_KEY = 'test-anon-key';\nexport const CENTER_NAME = 'مركز أمراض الدم';\n`);
+      return res.end(`export const SUPABASE_URL = 'http://localhost:${PORT}';\nexport const SUPABASE_KEY = 'test-anon-key';\nexport const CENTER_NAME = 'مركز أمراض الدم';\nexport const APP_NAME = 'مركز أمراض الدم - Hematology';\n`);
     }
     const file = path.join(WEB, decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));
     if (!file.startsWith(WEB) || !fs.existsSync(file)) { res.writeHead(404); return res.end('not found'); }

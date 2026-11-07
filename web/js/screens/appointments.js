@@ -99,7 +99,7 @@ function row(c, reload) {
           hasAllergy ? h('span', { title: 'حساسية: ' + pt.allergies, style: 'color: var(--brand); display: flex' }, icon('alert', 16, 'currentColor', 2.2)) : null),
         h('span', { class: 's', style: 'display: flex; gap: 8px; align-items: center; flex-wrap: wrap' },
           h('span', { class: 'tag', text: t.protocol_name }),
-          h('span', { text: `الدورة ${c.cycle_no} من ${t.total_cycles}` })),
+          h('span', { text: `الجرعة ${c.cycle_no} من ${t.total_cycles}` })),
         c.postpone_reason ? h('span', { class: 's', text: 'أُجّلت: ' + c.postpone_reason }) : null),
       pill),
     can('postpone') && t.status === 'active'

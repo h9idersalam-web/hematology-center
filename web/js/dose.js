@@ -45,9 +45,9 @@ export function daysText(s) {
 export function cyclesText(s) {
   if (!s) return '';
   const d = daysList(s);
-  if (d.length === 1) return `الدورة ${d[0]} فقط`;
-  if (/^\d+-\d+$/.test(String(s).replace(/\s/g, ''))) return `الدورات ${d[0]} إلى ${d[d.length - 1]}`;
-  return 'الدورات ' + d.join('، ');
+  if (d.length === 1) return `الجرعة ${d[0]} فقط`;
+  if (/^\d+-\d+$/.test(String(s).replace(/\s/g, ''))) return `الجرعات ${d[0]} إلى ${d[d.length - 1]}`;
+  return 'الجرعات ' + d.join('، ');
 }
 export const withCycles = (d) => (d.cycles ? ' · ' + cyclesText(d.cycles) : '');
 
@@ -60,8 +60,8 @@ export const num = (n) => (n === null || n === undefined || n === '' ? '—' : S
 
 // سطر طريقة الحساب: 375 ملغ/م² × 1.82 م² = 683 ملغ
 export function calcLine(d, bsa, weight) {
-  if (!d.dose_unit || d.dose_value == null) return 'جرعة ثابتة';
-  if (d.dose_unit === 'mg' || d.dose_unit === 'units') return `جرعة ثابتة ${num(d.dose_value)} ${UNITS[d.dose_unit]}`;
+  if (!d.dose_unit || d.dose_value == null) return 'جرعة دوائية ثابتة';
+  if (d.dose_unit === 'mg' || d.dose_unit === 'units') return `جرعة دوائية ثابتة ${num(d.dose_value)} ${UNITS[d.dose_unit]}`;
   const base = d.dose_unit.endsWith('/m2') ? `${num(bsa)} م²` : `${num(weight)} كغ`;
   return `${num(d.dose_value)} ${UNITS[d.dose_unit]} × ${base} = ${num(d.calculated)} ${OUT_UNITS[d.final_unit] || ''}`;
 }

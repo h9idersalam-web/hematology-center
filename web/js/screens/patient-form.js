@@ -55,7 +55,7 @@ export async function render(root, params) {
   const bsaOut = h('p', { class: 'hint', 'aria-live': 'polite' });
   const drawBsa = () => {
     const b = bsa(Number(height.value), Number(weight.value));
-    bsaOut.textContent = b ? `مساحة سطح الجسم: ${b} م² (معادلة موستيلر)` : 'الطول والوزن مطلوبان قبل إنشاء خطة العلاج وحساب الجرعات.';
+    bsaOut.textContent = b ? `مساحة سطح الجسم: ${b} م² (معادلة موستيلر)` : 'الطول والوزن مطلوبان قبل إنشاء خطة العلاج وحساب الجرعات الدوائية.';
   };
   height.addEventListener('input', drawBsa); weight.addEventListener('input', drawBsa); drawBsa();
 
@@ -77,7 +77,7 @@ export async function render(root, params) {
       h('h2', { text: 'القياسات' }),
       h('div', { class: 'grid-2' }, field('الطول (سم)', height), field('الوزن (كغ)', weight)),
       bsaOut,
-      id ? notice('info', 'info', h('p', { text: 'تغيير الوزن أو الطول لا يغيّر جرعات خطة العلاج الحالية تلقائياً. إعادة حساب الجرعات تتم بطلب تعديل يوافق عليه الطبيب المختص.' })) : null),
+      id ? notice('info', 'info', h('p', { text: 'تغيير الوزن أو الطول لا يغيّر الجرعات الدوائية لخطة العلاج الحالية تلقائياً. إعادة حساب الجرعات الدوائية تتم بطلب تعديل يوافق عليه الطبيب المختص.' })) : null),
     h('div', { class: 'card' },
       h('h2', { text: 'الحساسية الدوائية' }),
       h('label', { class: 'check' }, nkda, h('span', { text: NKDA })),

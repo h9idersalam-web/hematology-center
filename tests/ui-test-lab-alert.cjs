@@ -1,4 +1,4 @@
-// إشعار «تحليل خارج المرجع» يفتح التحليل نفسه (pgrest-lite على 8788)
+// إشعار «تحليل خارج الحد الطبيعي» يفتح التحليل نفسه (pgrest-lite على 8788)
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const { execFileSync } = require('node:child_process');
 const OUT = process.argv[2];
@@ -38,17 +38,17 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
     await nurse.waitForTimeout(600);
   }
   const d = (k) => { const x = new Date(); x.setDate(x.getDate() + k); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
-  // تحليل سابق خارج المرجع في غير يوم دورة: لا إشعار
+  // تحليل سابق خارج الحد الطبيعي في غير يوم دورة: لا إشعار
   await enter(d(-14), { 'WBC (×10⁹/L)': '6.1', 'ANC (×10⁹/L)': '3.9', 'Hb (g/dL)': '12.0', 'PLT (×10⁹/L)': '210' });
   ok('non-cycle-day toast: no doctor notified', !(await nurse.locator('#toast').textContent()).includes('أُبلغ'));
   // يوم الدورة 3 (اليوم) وهي لم تُعتمد: إشعار
   await enter(d(0), { 'WBC (×10⁹/L)': '1.6', 'ANC (×10⁹/L)': '0.4', 'Hb (g/dL)': '13.6', 'PLT (×10⁹/L)': '38' });
-  ok('cycle-day toast: doctor notified', (await nurse.locator('#toast').textContent()).includes('قبل الدورة 3'));
+  ok('cycle-day toast: doctor notified', (await nurse.locator('#toast').textContent()).includes('قبل الجرعة 3'));
 
   const sara = await login('sara@test.iq');
   await sara.goto(B + '#/notifications'); await sara.waitForSelector('main .row');
   await sara.locator('main .row', { hasText: 'ANC 0.4' }).click();
-  await sara.waitForSelector('text=التحاليل خارج المرجع');
+  await sara.waitForSelector('text=التحاليل خارج الحد الطبيعي');
   ok('opens lab alert screen (not the full file)', sara.url().includes('#/lab-alert?id='));
   ok('header: name, diagnosis, protocol', (await sara.locator('main a.card').first().textContent()).includes('علي حسين كاظم')
      && (await sara.locator('main a.card').first().textContent()).includes('لمفوما') && (await sara.locator('main a.card .tag', { hasText: 'R-CHOP-21' }).count()) === 1);
@@ -60,17 +60,17 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   ok('important-notes section removed', (await sara.locator('text=ملاحظات مهمة').count()) === 0);
   ok('only one alert: earlier non-cycle-day test did not notify', psql("select count(*) from notifications where title = 'تحليل خارج المرجع'") === '1');
   ok('alert names the cycle', psql("select body from notifications where title = 'تحليل خارج المرجع'").includes('قبل الدورة 3'));
-  ok('in-range results collapsed', (await sara.locator('summary', { hasText: 'ضمن المرجع (1)' }).count()) === 1);
+  ok('in-range results collapsed', (await sara.locator('summary', { hasText: 'ضمن الحد الطبيعي (1)' }).count()) === 1);
   await shot(sara, 'alert');
   await sara.locator('main a.card').first().click();
   ok('tapping name opens full file', await sara.locator('text=خطة العلاج الحالية').waitFor({ timeout: 8000 }).then(() => true, () => false));
 
   // إشعار قديم يشير إلى المريض: يفتح الشاشة نفسها
   psql(`insert into notifications(user_id, kind, title, body, link_type, link_id, created_at)
-        select specialist_id, 'alert', 'تحليل خارج المرجع', 'إشعار قديم', 'patient', id, now() + interval '1 minute' from patients where id = '${pid}'`);
+        select specialist_id, 'alert', 'تحليل خارج الحد الطبيعي', 'إشعار قديم', 'patient', id, now() + interval '1 minute' from patients where id = '${pid}'`);
   await sara.goto(B + '#/notifications'); await sara.waitForSelector('main .row');
   await sara.locator('main .row', { hasText: 'إشعار قديم' }).click();
-  ok('old notification opens lab alert too', await sara.locator('text=التحاليل خارج المرجع').waitFor({ timeout: 8000 }).then(async () => (await sara.locator('.card.lab-alert').count()) === 3, () => false));
+  ok('old notification opens lab alert too', await sara.locator('text=التحاليل خارج الحد الطبيعي').waitFor({ timeout: 8000 }).then(async () => (await sara.locator('.card.lab-alert').count()) === 3, () => false));
 
   ok('no horizontal overflow', await sara.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   checks.forEach((c) => console.log(c));

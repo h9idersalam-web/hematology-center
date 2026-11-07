@@ -1,4 +1,4 @@
-// شاشة إشعار «تحليل خارج المرجع»: المريض باختصار، ثم التحاليل الخارجة وقيمها وشدتها وما يتعلق بها
+// شاشة إشعار «تحليل خارج الحد الطبيعي»: المريض باختصار، ثم التحاليل الخارجة وقيمها وشدتها وما يتعلق بها
 import { sb, q } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, toast, empty } from '../ui.js';
 import { flag, ctcae, testKey } from '../labs.js';
@@ -8,7 +8,7 @@ import { NKDA } from './patient-form.js';
 // ?id=<نتيجة تحليل> (الإشعارات الجديدة)، أو ?patient=&at=<وقت الإشعار> (الإشعارات القديمة)
 export async function render(root, params) {
   const shell = (...c) => mount(root, h('div', { class: 'screen' },
-    topbar({ title: 'تحليل خارج المرجع', back: '#/notifications' }), h('main', { class: 'main with-nav' }, ...c), bottomNav('home')));
+    topbar({ title: 'تحليل خارج الحد الطبيعي', back: '#/notifications' }), h('main', { class: 'main with-nav' }, ...c), bottomNav('home')));
   const id = params.get('id');
   let anchor = null;
   if (id) anchor = await q(sb.from('lab_results').select('patient_id, created_at, test_date').eq('id', id).maybeSingle());
@@ -72,13 +72,13 @@ export async function render(root, params) {
       h('div', { style: 'display: flex; justify-content: space-between; align-items: flex-start; gap: 10px' },
         h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
           h('b', { class: 'ltr', style: 'text-align: right; font-size: 18px', text: r.test_name }),
-          h('span', { style: 'font-size: 14px; color: var(--muted-2)' }, 'المرجع ',
+          h('span', { style: 'font-size: 14px; color: var(--muted-2)' }, 'الحد الطبيعي ',
             h('span', { class: 'ltr', style: 'unicode-bidi: isolate', text: `${r.ref_low ?? '—'} – ${r.ref_high ?? '—'} ${r.unit || ''}` }))),
         h('span', { style: 'display: flex; flex-direction: column; align-items: flex-end' },
           h('b', { class: 'ltr', style: 'font-size: 30px; line-height: 1.1; color: var(--brand)', text: String(r.value) }),
           h('span', { class: 'ltr', style: 'font-size: 13px; color: var(--muted-2)', text: r.unit || '' }))),
       h('div', { style: 'display: flex; gap: 6px; flex-wrap: wrap' },
-        h('span', { class: 'pill warn', text: (f === 'low' ? '↓ أقل من المرجع' : '↑ أعلى من المرجع') + (gap ? ` بنحو ${gap}%` : '') }),
+        h('span', { class: 'pill warn', text: (f === 'low' ? '↓ أقل من الحد الطبيعي' : '↑ أعلى من الحد الطبيعي') + (gap ? ` بنحو ${gap}%` : '') }),
         g ? h('span', { class: 'pill ' + (g.grade >= 3 ? 'brand' : 'info'), text: `${g.what}: ${g.label}` }) : null),
       trend ? h('span', { style: 'font-size: 14px; color: var(--ink-2)', text: trend }) : null);
   };
@@ -90,14 +90,14 @@ export async function render(root, params) {
 
   shell(
     head, allergy,
-    h('div', { class: 'section-head' }, h('h2', { text: 'التحاليل خارج المرجع' }),
+    h('div', { class: 'section-head' }, h('h2', { text: 'التحاليل خارج الحد الطبيعي' }),
       h('span', { class: 'meta', text: first ? `سحب العينة ${fmtDate(first.test_date, { day: 'numeric', month: 'short', year: 'numeric' })}` : '' })),
-    out.length ? out.map(resultCard) : h('div', { class: 'card flush' }, empty('كل نتائج هذا الإدخال ضمن المرجع', 'check')),
+    out.length ? out.map(resultCard) : h('div', { class: 'card flush' }, empty('كل نتائج هذا الإدخال ضمن الحد الطبيعي', 'check')),
     inRange.length ? h('details', { class: 'card' },
-      h('summary', { style: 'font-weight: 700; cursor: pointer', text: `بقية نتائج الإدخال نفسه ضمن المرجع (${inRange.length})` }),
+      h('summary', { style: 'font-weight: 700; cursor: pointer', text: `بقية نتائج الإدخال نفسه ضمن الحد الطبيعي (${inRange.length})` }),
       ...inRange.map((r) => h('p', { class: 'ltr', style: 'text-align: right', text: `${r.test_name} ${r.value} ${r.unit || ''}` }))) : null,
     first ? h('p', { class: 'hint', text: `أدخله ${first.author?.full_name || '—'}${first.entry_method === 'ocr' ? ' (مقروء آلياً من الصورة ومُراجَع)' : ''}` }) : null,
     imgPath ? h('button', { type: 'button', class: 'btn secondary block', onclick: () => openFile(imgPath).catch((e) => toast(e.message, true)) }, icon('file', 20), 'فتح صورة التحليل') : null,
     h('a', { class: 'btn secondary block', href: '#/labs?patient=' + pid }, icon('file', 20), 'كل تحاليل المريض ومنحنياتها'),
-    next ? h('a', { class: 'btn secondary block', href: '#/cycle?id=' + next.id }, 'فتح الدورة القادمة') : null);
+    next ? h('a', { class: 'btn secondary block', href: '#/cycle?id=' + next.id }, 'فتح الجرعة القادمة') : null);
 }

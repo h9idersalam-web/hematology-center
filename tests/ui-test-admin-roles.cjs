@@ -50,8 +50,8 @@ const B = 'http://localhost:8788/';
   await switchTo(adm, 'طبيب اختصاص');
   await adm.goto(B + '#/patients?f=all'); await adm.waitForSelector('main .row');
   await adm.locator('main .row', { hasText: 'علي حسين' }).click(); await adm.waitForSelector('text=خطة العلاج الحالية');
-  await adm.locator('a[aria-label^="الدورة 3،"]').click(); await adm.waitForSelector('text=الجرعات');
-  await adm.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(adm, 'اعتماد');
+  await adm.locator('a[aria-label^="الجرعة 3،"]').click(); await adm.waitForSelector('text=الجرعات الدوائية');
+  await adm.getByRole('button', { name: 'اعتماد الجرعة' }).click(); await confirm(adm, 'اعتماد');
   ok('as specialist: approved cycle', await adm.locator('.step.done', { hasText: 'حيدر سلام' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
 
   // يعمل بدور صيدلي المزج: يحضّر

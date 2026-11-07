@@ -1,5 +1,6 @@
 // الإشعارات: طلبات الموافقة والتنبيهات الذكية وردود الأطباء
 import { sb, q, rpc } from '../api.js';
+import { terms } from '../terms.js';
 import { h, mount, icon, topbar, empty, relTime, toast } from '../ui.js';
 
 const KIND = {
@@ -64,15 +65,15 @@ export async function render(root, params) {
 
   function row(n) {
     const k = KIND[n.kind] || KIND.info;
-    // إشعارات «تحليل خارج المرجع» القديمة كانت تشير إلى المريض: تفتح الآن شاشة التحليل نفسها
-    const href = n.link_type === 'patient' && n.title === 'تحليل خارج المرجع'
+    // إشعارات «تحليل خارج الحد الطبيعي» القديمة كانت تشير إلى المريض: تفتح الآن شاشة التحليل نفسها
+    const href = n.link_type === 'patient' && /^تحليل خارج (المرجع|الحد الطبيعي)$/.test(n.title)
       ? `#/lab-alert?patient=${n.link_id}&at=${encodeURIComponent(n.created_at)}`
       : LINKS[n.link_type] ? LINKS[n.link_type](n.link_id) : null;
     const el = h(href ? 'a' : 'div', { class: 'row', href, style: n.read_at ? null : 'background: #FFFBFB' },
       h('span', { class: 'avatar', style: `border-radius: 10px; width: 38px; height: 38px; background: var(--${k.tone === 'muted' ? 'chip' : k.tone + '-soft'}); color: var(--${k.tone === 'muted' ? 'muted' : k.tone === 'brand' ? 'brand' : k.tone})` }, icon(k.icon, 20)),
       h('span', { class: 'grow' },
-        h('span', { class: 't', style: 'font-size: 15px; line-height: 1.6', text: n.title }),
-        n.body ? h('span', { class: 's', style: 'line-height: 1.6', text: n.body }) : null,
+        h('span', { class: 't', style: 'font-size: 15px; line-height: 1.6', text: terms(n.title) }),
+        n.body ? h('span', { class: 's', style: 'line-height: 1.6', text: terms(n.body) }) : null,
         h('span', { class: 's', style: 'font-size: 13px', text: `${k.label} · ${relTime(n.created_at)}` })),
       n.read_at ? null : h('span', { class: 'sr-only', text: 'غير مقروء' }),
       n.read_at ? null : h('span', { 'aria-hidden': 'true', style: 'width: 10px; height: 10px; border-radius: 5px; background: var(--brand); flex-shrink: 0' }));

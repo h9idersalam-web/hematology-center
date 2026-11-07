@@ -27,7 +27,7 @@ const B = 'http://localhost:8788/';
   const shot = async (page, name, full = true) => { await page.waitForTimeout(600); await page.screenshot({ path: `${OUT}/s5-${String(++n).padStart(2, '0')}-${name}.png`, fullPage: full }); };
   const confirm = (page, label) => page.locator('dialog').getByRole('button', { name: label, exact: true }).click();
   const openPatient = async (page, name) => { await nav(page, B + '#/patients?f=all'); await page.waitForSelector('main .row'); await page.locator('main .row', { hasText: name }).click(); await page.waitForSelector('text=خطة العلاج الحالية'); };
-  const cycleUrlOf = async (page, name, no) => { await openPatient(page, name); await page.locator(`a[aria-label^="الدورة ${no}،"]`).click(); await page.waitForSelector('text=الجرعات'); return page.url(); };
+  const cycleUrlOf = async (page, name, no) => { await openPatient(page, name); await page.locator(`a[aria-label^="الجرعة ${no}،"]`).click(); await page.waitForSelector('text=الجرعات الدوائية'); return page.url(); };
 
   const sara = await login('sara@test.iq');
   const cp = await login('cp@test.iq');
@@ -36,7 +36,7 @@ const B = 'http://localhost:8788/';
 
   // ===== 1. التحاليل: صورة ثم قيم، مرتان لرسم المنحنى
   const ali = await cycleUrlOf(sara, 'علي حسين', 3);
-  ok('cycle shows no CBC yet', (await sara.locator('text=أدخل نتائج تعداد الدم قبل اعتماد الدورة').count()) === 1);
+  ok('cycle shows no CBC yet', (await sara.locator('text=أدخل نتائج تعداد الدم قبل اعتماد الجرعة').count()) === 1);
   await openPatient(nurse, 'علي حسين');
   await nurse.getByRole('link', { name: 'رفع تحليل أو وصفة أو مرفق' }).click();
   await nurse.waitForSelector('text=نوع المرفق');
@@ -57,7 +57,7 @@ const B = 'http://localhost:8788/';
   await nurse.getByRole('button', { name: 'حفظ النتائج' }).click();
   await nurse.waitForSelector('text=كل القيم');
   await nurse.waitForTimeout(300);
-  ok('toast reports 4 out of range', (await nurse.locator('#toast').textContent()).includes('4 خارج المرجع'));
+  ok('toast reports 4 out of range', (await nurse.locator('#toast').textContent()).includes('4 خارج الحد الطبيعي'));
   // قيم سابقة قبل 21 يوماً
   await nav(nurse, nurse.url().replace('#/labs?', '#/labs-new?'));
   await nurse.waitForSelector('text=تاريخ سحب العينة');
@@ -77,10 +77,10 @@ const B = 'http://localhost:8788/';
   // ===== 2. الاعتماد مع آخر تعداد: تصل الدورة إلى المزج فوراً (الملف 14: لا تحقق ولا تحويل يدوي)
   await nav(sara, ali); await sara.waitForSelector('.cbc');
   ok('cycle shows latest CBC with flags', (await sara.locator('.cbc-i.low').count()) === 4);
-  await sara.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(sara, 'اعتماد');
+  await sara.getByRole('button', { name: 'اعتماد الجرعة' }).click(); await confirm(sara, 'اعتماد');
   await sara.waitForSelector('.step.done');
   ok('approval sends cycle to mixing', await sara.locator('.pill', { hasText: 'وصل قسم المزج' }).waitFor({ timeout: 5000 }).then(() => true, () => false));
-  await nav(cp, ali); await cp.waitForSelector('text=صورة الدورة من طبلة المريض');
+  await nav(cp, ali); await cp.waitForSelector('text=صورة الجرعة من طبلة المريض');
   ok('no verify or transfer for pharmacist', (await cp.getByRole('button', { name: 'تحقق الصيدلاني' }).count()) === 0 && (await cp.getByRole('link', { name: 'تحويل للمزج' }).count()) === 0);
   await shot(cp, 'cycle-chart-due');
 
@@ -139,7 +139,7 @@ const B = 'http://localhost:8788/';
   await nurse.locator('.dept-t', { hasText: 'الإعطاء اليوم' }).click(); await nurse.waitForSelector('main .row');
   ok('nursing list shows ready patient', await nurse.locator('main .row', { hasText: 'علي حسين' }).locator('.pill', { hasText: 'جاهزة للإعطاء' }).waitFor({ timeout: 5000 }).then(() => true, () => false));
   await shot(nurse, 'nursing-list', false);
-  await nurse.locator('main .row', { hasText: 'علي حسين' }).click(); await nurse.waitForSelector('text=قبل كل جرعة');
+  await nurse.locator('main .row', { hasText: 'علي حسين' }).click(); await nurse.waitForSelector('text=قبل كل جرعة دوائية');
   const adminUrl = nurse.url();
   await giveAll(nurse, adminUrl, 1, 'Rituximab');
   ok('all 5 day-1 doses given', await nurse.waitForFunction(() => document.querySelectorAll('main .pill.ok').length === 5, null, { timeout: 5000 }).then(() => true, () => false));
@@ -156,7 +156,7 @@ const B = 'http://localhost:8788/';
 
   // ===== 6. دورة كاملة لرقية: تبدأ قبل 4 أيام، والمزج يبدأ دون انتظار صورة الطبلة، ويغلقها مسؤول الصيادلة
   const ruq = await cycleUrlOf(sara, 'رقية', 1);
-  await sara.getByRole('button', { name: 'اعتماد الدورة' }).click(); await confirm(sara, 'اعتماد');
+  await sara.getByRole('button', { name: 'اعتماد الجرعة' }).click(); await confirm(sara, 'اعتماد');
   await sara.waitForSelector('.step.done');
   const orderHref = await sara.locator('.pill', { hasText: 'وصل قسم المزج' }).first().getAttribute('href');
   await nav(mix, B + orderHref); await mix.waitForSelector('text=ضع علامة على ما حضّرته');
@@ -166,13 +166,13 @@ const B = 'http://localhost:8788/';
   await mix.waitForSelector('.pill >> text=أُرسل كاملاً');
   const cid = ruq.split('id=')[1];
   for (let day = 1; day <= 5; day++) await giveAll(nurse, `${B}#/administer?cycle=${cid}&day=${day}`, day);
-  ok('nurse cannot close cycle', (await nurse.getByRole('button', { name: 'إغلاق الدورة 1' }).count()) === 0);
+  ok('nurse cannot close cycle', (await nurse.getByRole('button', { name: 'إغلاق الجرعة 1' }).count()) === 0);
   const chief = await login('admin@test.iq');
   await nav(chief, `${B}#/administer?cycle=${cid}&day=5`); await chief.waitForSelector('main .row');
-  ok('chief sees close button on last day', await chief.getByRole('button', { name: 'إغلاق الدورة 1' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
-  await chief.getByRole('button', { name: 'إغلاق الدورة 1' }).click(); await confirm(chief, 'إغلاق');
+  ok('chief sees close button on last day', await chief.getByRole('button', { name: 'إغلاق الجرعة 1' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
+  await chief.getByRole('button', { name: 'إغلاق الجرعة 1' }).click(); await confirm(chief, 'إغلاق');
   await chief.waitForTimeout(800);
-  await nav(sara, ruq); await sara.waitForSelector('text=الجرعات');
+  await nav(sara, ruq); await sara.waitForSelector('text=الجرعات الدوائية');
   ok('cycle closed as given', (await sara.locator('.pill', { hasText: 'أُعطيت' }).count()) >= 1);
 
   // ===== 7. الطبيب الدوري لا يرفع

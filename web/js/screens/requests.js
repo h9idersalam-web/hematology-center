@@ -63,7 +63,7 @@ function row(r) {
     h('span', { class: 'grow' },
       h('span', { class: 't', text: r.patients?.full_name }),
       h('span', { class: 's', style: 'display: flex; gap: 6px; align-items: center; flex-wrap: wrap' },
-        h('span', { class: 'tag', text: r.treatments?.protocol_name }), h('span', { text: `الدورة ${r.cycles?.cycle_no ?? '—'} · ${count(r.change_request_items.length, 'item')}` })),
+        h('span', { class: 'tag', text: r.treatments?.protocol_name }), h('span', { text: `الجرعة ${r.cycles?.cycle_no ?? '—'} · ${count(r.change_request_items.length, 'item')}` })),
       h('span', { class: 's', text: `${r.requester?.full_name || ''} (${ROLES[r.requester_role]}) · ${r.reason_category || ''} · ${relTime(r.created_at)}` })),
     h('span', { class: 'pill ' + k, text: l }));
 }

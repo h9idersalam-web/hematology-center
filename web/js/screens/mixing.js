@@ -1,5 +1,6 @@
 // قسم المزج الكيميائي: التحويل من الصيدلي السريري، والطلبات الواردة، والتحضير والإرسال
 import { sb, q, rpc } from '../api.js';
+import { terms } from '../terms.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDate, fmtTime, initials, count, confirmDialog, todayISO } from '../ui.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
@@ -16,8 +17,8 @@ const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d
 export async function transfer(root, params) {
   const cid = params.get('cycle');
   mount(root, h('div', { class: 'screen' }, topbar({ title: 'التحويل إلى المزج', back: cid ? '#/cycle?id=' + cid : '#/home' }),
-    h('main', { class: 'main' }, notice('info', 'info', h('p', { text: 'أُلغي التحويل اليدوي: تصل الدورة إلى قسم المزج تلقائياً فور اعتماد الطبيب.' })),
-      cid ? h('a', { class: 'btn secondary block', href: '#/cycle?id=' + cid, text: 'فتح الدورة' }) : null)));
+    h('main', { class: 'main' }, notice('info', 'info', h('p', { text: 'أُلغي التحويل اليدوي: تصل الجرعة إلى قسم المزج تلقائياً فور اعتماد الطبيب.' })),
+      cid ? h('a', { class: 'btn secondary block', href: '#/cycle?id=' + cid, text: 'فتح الجرعة' }) : null)));
 }
 
 function itemLine(d) {
@@ -62,7 +63,7 @@ export async function list(root, params) {
     dayBar.replaceChildren(h('div', { class: 'card', style: 'gap: 10px' },
       h('div', { class: 'segmented', role: 'group', 'aria-label': 'اليوم' }, quick(today, 'اليوم'), quick(addDays(today, 1), 'غداً')),
       h('label', { class: 'field', style: 'margin: 0' }, h('span', { class: 'label', text: 'أو اختر تاريخاً' }), picked),
-      h('p', { style: 'font-weight: 700', text: tab === 'late' ? 'طلبات أيام سابقة لم تُرسل' : 'جرعات ' + fmtDate(day, { weekday: 'long', day: 'numeric', month: 'long' }) })));
+      h('p', { style: 'font-weight: 700', text: tab === 'late' ? 'طلبات أيام سابقة لم تُرسل' : 'جرعات دوائية ' + fmtDate(day, { weekday: 'long', day: 'numeric', month: 'long' }) })));
 
     lateBox.replaceChildren(late.length && tab !== 'late'
       ? h('button', { type: 'button', class: 'notice warn', style: 'border: 0; width: 100%; text-align: right; align-items: center', onclick: () => { tab = 'late'; sync(); draw(); } },
@@ -82,7 +83,7 @@ export async function list(root, params) {
     }, label, groups[id].length ? h('span', { class: 'count', style: 'margin-right: 6px', text: groups[id].length }) : null)));
     const list = groups[tab] || [];
     box.replaceChildren(...(list.length ? list.map(orderRow)
-      : [empty(tab === 'sent' ? 'لم يُرسل شيء لهذا اليوم' : 'لا توجد جرعات للتحضير في هذا اليوم', 'check')]));
+      : [empty(tab === 'sent' ? 'لم يُرسل شيء لهذا اليوم' : 'لا توجد جرعات دوائية للتحضير في هذا اليوم', 'check')]));
   }
   sync(); draw();
 }
@@ -98,8 +99,8 @@ function orderRow(o) {
         h('span', { class: 't', style: 'display: flex; gap: 6px; align-items: center' }, h('span', { text: o.patients.full_name }),
           hasAllergy ? h('span', { style: 'color: var(--brand); display: flex', title: 'حساسية' }, icon('alert', 16, 'currentColor', 2.2)) : null),
         h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
-          h('span', { class: 'tag', text: o.cycles.treatments.protocol_name }), h('span', { text: `الدورة ${o.cycles.cycle_no} · اليوم ${o.day}` })),
-        h('span', { class: 's', text: o.status === 'held' ? (o.hold_reason || 'معلّق')
+          h('span', { class: 'tag', text: o.cycles.treatments.protocol_name }), h('span', { text: `الجرعة ${o.cycles.cycle_no} · اليوم ${o.day}` })),
+        h('span', { class: 's', text: o.status === 'held' ? (terms(o.hold_reason) || 'معلّق')
           : `${fmtDate(dueDate(o), { weekday: 'short', day: 'numeric', month: 'short' })} · ${prep} من ${count(o.mixing_items.length, 'drug')} محضَّرة${o.cycles.chart_attachment_id ? ' · وصلت صورة الطبلة' : ''}` })),
       h('span', { class: 'pill ' + k, text: l })),
     h('a', { class: 'link-btn', style: 'flex-basis: 100%; text-align: start; padding-inline-start: 56px; font-size: 14px',
@@ -163,7 +164,7 @@ export async function order(root, params) {
   }));
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: p.full_name, sub: `${t.protocol_name} · الدورة ${o.cycles.cycle_no} · اليوم ${o.day}`, back: '#/mixing?d=' + dueDate(o) }),
+    topbar({ title: p.full_name, sub: `${t.protocol_name} · الجرعة ${o.cycles.cycle_no} · اليوم ${o.day}`, back: '#/mixing?d=' + dueDate(o) }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
@@ -172,16 +173,16 @@ export async function order(root, params) {
           h('span', { class: 'ltr', style: 'font-size: 14px; color: var(--muted-2); text-align: right', text: `BSA ${num(t.bsa)} m² · ${num(t.weight_kg)} kg` })),
         h('span', { class: 'pill ' + k, text: l })),
       p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null,
-      held ? notice('warn', 'lock', h('p', { style: 'font-weight: 700', text: 'الطلب معلّق: ' + (o.hold_reason || 'بانتظار الطبيب') }),
-        h('p', { text: 'لا يُحضَّر ولا يُرسل شيء حتى يعيد الطبيب اعتماد الدورة.' })) : null,
+      held ? notice('warn', 'lock', h('p', { style: 'font-weight: 700', text: 'الطلب معلّق: ' + (terms(o.hold_reason) || 'بانتظار الطبيب') }),
+        h('p', { text: 'لا يُحضَّر ولا يُرسل شيء حتى يعيد الطبيب اعتماد الجرعة.' })) : null,
       h('section', { class: 'section' }, h('div', { class: 'section-head' }, h('h2', { text: 'التحقق' })), docs,
-        h('p', { class: 'hint', text: chart ? 'طابق الدورة في صورة الطبلة مع الأدوية والجرعات أدناه.' : 'تصلك صورة الطبلة من الصيدلي السريري للتحقق. لا تنتظرها لتبدأ التحضير.' })),
+        h('p', { class: 'hint', text: chart ? 'طابق الجرعة في صورة الطبلة مع الأدوية والجرعات الدوائية أدناه.' : 'تصلك صورة الطبلة من الصيدلي السريري للتحقق. لا تنتظرها لتبدأ التحضير.' })),
       h('section', { class: 'section' },
         h('div', { class: 'section-head' }, h('h2', { text: 'الأدوية' }), h('span', { class: 'meta', text: mine ? 'ضع علامة على ما حضّرته' : '' })),
         h('div', { class: 'card flush' }, items)),
       sendBtn,
       protocolFileLink(t.protocols?.file_path, 'ملف البروتوكول ' + t.protocol_name),
       can('requestEdit') && o.status !== 'sent' ? h('a', { class: 'btn secondary block', href: '#/cycle-edit?id=' + o.cycles.id }, icon('edit', 22), 'اقتراح تعديل على الطبيب') : null,
-      h('a', { class: 'btn secondary block', href: '#/cycle?id=' + o.cycles.id }, icon('file', 20), 'البروتوكول كاملاً للمريض (كل أيام الدورة)')),
+      h('a', { class: 'btn secondary block', href: '#/cycle?id=' + o.cycles.id }, icon('file', 20), 'البروتوكول كاملاً للمريض (كل أيام الجرعة)')),
     bottomNav('home')));
 }
