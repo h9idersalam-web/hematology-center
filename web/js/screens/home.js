@@ -1,7 +1,7 @@
 // الرئيسية: ملخص اليوم حسب الدور، وقسم الإدارة للمدير وحده
 import { sb, q, countOf, rpc } from '../api.js';
-import { h, mount, icon, roleLabel, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil, toast, busy } from '../ui.js';
-import { state, logout } from '../app.js';
+import { h, mount, icon, roleLabel, ROLES, ROLE_GROUPS, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil, toast, busy } from '../ui.js';
+import { state, logout, loadProfile } from '../app.js';
 import { can } from '../perms.js';
 
 function greeting() {
@@ -33,8 +33,10 @@ export async function render(root) {
         h('div', { style: 'display: flex; flex-direction: column; gap: 2px; min-width: 0' },
           h('p', { style: 'font-size: 14px; color: var(--muted-2)', text: fmtDay(today) }),
           h('h1', { style: 'font-size: 26px; font-weight: 700', text: greeting() }),
-          h('span', { class: 'pill ' + (p.is_admin ? 'dark' : 'brand'), style: 'align-self: flex-start; margin-top: 4px',
-            text: (p.is_admin ? 'مدير النظام · ' : '') + roleLabel(p) })),
+          h('span', { style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 4px' },
+            h('span', { class: 'pill ' + (p.is_admin ? 'dark' : 'brand'), text: roleLabel(p) }),
+            p.is_admin ? h('button', { type: 'button', class: 'pill brand role-switch', 'aria-label': 'تغيير دور العمل',
+              onclick: () => roleSwitcher(root) }, icon('refresh', 14, 'currentColor', 2.4), h('span', { text: 'أعمل بدور: ' + ROLES[p.role] })) : null)),
         h('div', { style: 'display: flex; gap: 8px' }, bell, profileBtn)),
       p.role === 'intern' ? h('div', { class: 'notice info' }, icon('info', 20), h('p', { text: 'حسابك للعرض فقط، دون إضافة أو تعديل.' })) : null,
       deptBox,
@@ -208,12 +210,37 @@ async function renderAdminPanel(box) {
       tile('#/admin?tab=users', 'كود تفعيل', 'يُصدر لكل مستخدم من إدارة المستخدمين', false, true))));
 }
 
+// المدير يختار الدور الذي يعمل به: يرى أقسامه ويعمل بصلاحياته الحقيقية، ويبقى مديراً
+function roleSwitcher(root) {
+  const p = state.profile;
+  const dlg = h('dialog', null);
+  const close = () => { dlg.close(); dlg.remove(); };
+  const desc = Object.fromEntries(ROLE_GROUPS.flatMap((g) => g.subs.map((x) => [x.role, x.desc])));
+  dlg.append(h('div', { class: 'dlg' },
+    h('h2', { text: 'الدور الذي تعمل به' }),
+    h('p', { style: 'color: var(--muted); font-size: 14px', text: 'تدخل أقسام الدور المختار وتعمل بصلاحياته، ويُسجَّل كل إجراء باسمك وبهذا الدور. تبقى مديراً في كل الأحوال.' }),
+    h('div', { style: 'display: flex; flex-direction: column; gap: 6px' }, Object.entries(ROLES).map(([k, label]) =>
+      h('button', { type: 'button', class: 'option', 'aria-pressed': p.role === k ? 'true' : 'false', onclick: async (e) => {
+        await busy(e.currentTarget, async () => {
+          try {
+            await rpc('admin_set_acting_role', { p_role: k });
+            await loadProfile();
+            close(); toast('تعمل الآن بدور ' + label); render(root);
+          } catch (err) { toast(err.message, true); }
+        });
+      } }, h('span', null, h('span', { class: 'ot', text: label + (p.base_role === k ? ' (دورك المسجّل)' : '') }), h('span', { class: 'od', text: desc[k] || '' }))))),
+    h('button', { class: 'link-btn', text: 'إغلاق', onclick: close })));
+  document.body.append(dlg);
+  dlg.addEventListener('cancel', close);
+  dlg.showModal();
+}
+
 async function profileDialog() {
   const p = state.profile;
   const left = daysUntil(p.subscription_ends);
   const ok = await confirmDialog({
     title: p.full_name,
-    body: `${roleLabel(p)}${p.is_admin ? ' · مدير النظام' : ''}. ` +
+    body: `${roleLabel(p)}${p.is_admin ? ' · يعمل الآن بدور ' + ROLES[p.role] : ''}. ` +
       (p.subscription_ends ? `الاشتراك حتى ${fmtDate(p.subscription_ends)}${left !== null && left <= 14 ? ` (باقٍ ${left} يوماً)` : ''}.` : 'اشتراك دائم.'),
     okText: 'تسجيل الخروج', danger: true,
   });

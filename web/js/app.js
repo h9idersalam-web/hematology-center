@@ -77,6 +77,8 @@ export async function loadProfile() {
     p.base_role = p.role;
     p.acting = p.role === 'clinical_pharmacist' && p.is_deputy && p.deputy_active;
     if (p.acting) p.role = 'chief_clinical_pharmacist';
+    // المدير يعمل بدور يختاره (acting_role)، كما في my_role بالقاعدة
+    if (p.is_admin && p.acting_role) p.role = p.acting_role;
   }
   state.profile = p;
   state.profileAt = Date.now();

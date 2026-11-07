@@ -36,6 +36,6 @@ export function can(action) {
   if (!p) return false;
   if (action === 'manageProtocol' && p.is_admin) return true;
   // تفعيل صلاحيات الرديف: لمسؤول الصيادلة الأصلي فقط، لا للرديف نفسه
-  if (action === 'toggleDeputy') return p.base_role === 'chief_clinical_pharmacist';
+  if (action === 'toggleDeputy') return p.base_role === 'chief_clinical_pharmacist' || (p.is_admin && p.role === 'chief_clinical_pharmacist');
   return (RULES[action] || []).includes(p.role);
 }

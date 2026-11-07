@@ -1,6 +1,6 @@
 // الإدارة: المستخدمون، أكواد التفعيل، الاشتراكات، الصلاحيات (للمدير وحده)
 import { rpc } from '../api.js';
-import { h, mount, icon, topbar, empty, ROLES, fmtDate, daysUntil, toast, busy, field, notice, initials, confirmDialog } from '../ui.js';
+import { h, mount, icon, topbar, empty, ROLES, fmtDate, daysUntil, toast, busy, field, notice, initials, confirmDialog, ROLE_GROUPS } from '../ui.js';
 import { state, go } from '../app.js';
 
 const STATUS = { pending: ['بانتظار التفعيل', 'warn'], active: ['مفعّل', 'ok'], suspended: ['موقوف', 'muted'] };
@@ -105,7 +105,7 @@ export async function render(root, params) {
       actions.push(btn('secondary', 'إيقاف', () => suspend(u)));
     } else if (u.status === 'active') {
       actions.push(btn('secondary', 'كود تجديد', () => issueDialog(u)));
-      actions.push(btn('secondary', 'التخصص والاشتراك', () => userDialog(u)));
+      actions.push(btn('secondary', 'الصلاحية والاشتراك', () => userDialog(u)));
       if (u.role === 'clinical_pharmacist') {
         actions.push(btn('secondary', u.is_deputy ? 'إلغاء تعيينه رديفاً' : 'تعيينه رديفاً لمسؤول الصيادلة', () => deputy(u)));
       }
@@ -171,14 +171,28 @@ export async function render(root, params) {
     const dlg = h('dialog', null);
     const close = () => { dlg.close(); dlg.remove(); };
     const roleSel = h('select', { class: 'input' }, Object.entries(ROLES).map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
+    const desc = Object.fromEntries(ROLE_GROUPS.flatMap((g) => g.subs.map((x) => [x.role, x.desc])));
+    const what = h('p', { class: 'hint' });
+    const warn = h('div');
+    const drawRole = () => {
+      what.textContent = 'صلاحياته: ' + (desc[roleSel.value] || '');
+      warn.replaceChildren(u.role === 'specialist' && roleSel.value !== 'specialist' && u.patients > 0
+        ? notice('warn', 'warn', h('p', { text: `هو الطبيب المختص لـ ${u.patients} من المرضى. انقلهم إلى طبيب اختصاص آخر من ملف كل مريض قبل تغيير صلاحيته.` }))
+        : u.is_deputy && roleSel.value !== 'clinical_pharmacist' ? notice('info', 'info', h('p', { text: 'تسقط عنه صفة رديف مسؤول الصيادلة.' })) : null);
+    };
+    roleSel.addEventListener('change', drawRole); drawRole();
     dlg.append(h('div', { class: 'dlg' },
       h('h2', { text: u.full_name }),
       h('p', { style: 'color: var(--muted)', text: [u.email, u.phone].filter(Boolean).join(' · ') || '—' }),
       h('p', { style: 'font-size: 15px', text: u.is_admin || !u.subscription_ends ? 'اشتراك دائم' : `الاشتراك حتى ${fmtDate(u.subscription_ends)}` }),
-      field('التخصص', roleSel),
-      h('button', { class: 'btn secondary', text: 'حفظ التخصص', onclick: async (e) => {
-        await busy(e.currentTarget, async () => {
-          try { await rpc('admin_update_user', { p_user: u.id, p_role: roleSel.value }); toast('حُدّث التخصص'); draw(); close(); }
+      field('الصلاحية (الدور)', roleSel), what, warn,
+      h('button', { class: 'btn primary', text: 'حفظ الصلاحية', onclick: async (e) => {
+        const btn = e.currentTarget;   // يُفقد بعد أول await
+        if (roleSel.value === u.role) return close();
+        const ok = await confirmDialog({ title: 'تغيير صلاحية ' + u.full_name, body: `من «${ROLES[u.role]}» إلى «${ROLES[roleSel.value]}». تتغير صلاحياته فوراً ويُبلَّغ بذلك.`, okText: 'تغيير' });
+        if (!ok) return;
+        await busy(btn, async () => {
+          try { await rpc('admin_update_user', { p_user: u.id, p_role: roleSel.value }); toast('غُيّرت الصلاحية'); draw(); close(); }
           catch (err) { toast(err.message, true); }
         });
       } }),
@@ -265,6 +279,7 @@ export async function render(root, params) {
     const groupTitle = (t) => h('h2', { style: 'font-size: 15px; font-weight: 700; color: var(--muted-2); margin-top: 6px', text: t });
     body.replaceChildren(
       notice('info', 'info', h('p', { text: 'الحذف في كل الأنواع أرشفة مع السبب، ويبقى في سجل التعديلات. هذه الصلاحيات مفروضة من قاعدة البيانات نفسها.' })),
+      notice('info', 'edit', h('p', { text: 'لتغيير صلاحية مستخدم: «إدارة المستخدمين» ← «الصلاحية والاشتراك» عند اسمه. ولتعمل أنت بأي دور: زر «أعمل بدور» في صفحتك الرئيسية.' })),
       groupTitle('الأطباء'),
       card('طبيب اختصاص', [Y('عرض'), Y('إضافة'), Y('تعديل'), Y('أرشفة')], [
         ['خطة العلاج', 'الطبيب المختص بالمريض وحده يوافق عليها أو يرفضها، ولكل مريض طبيب مختص إلزاماً'],

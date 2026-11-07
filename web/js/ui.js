@@ -104,6 +104,7 @@ export const ROLES = {
 // اسم الدور كما يظهر للمستخدم نفسه (الرديف يُميَّز عن مسؤول الصيادلة الأصلي)
 export function roleLabel(p) {
   if (!p) return '';
+  if (p.is_admin) return 'مدير النظام';
   if (p.is_deputy && (p.base_role || p.role) === 'clinical_pharmacist') {
     return p.deputy_active ? 'رديف مسؤول الصيادلة (الصلاحيات مفعّلة)' : 'صيدلي سريري · رديف (الصلاحيات موقوفة)';
   }
@@ -112,17 +113,17 @@ export function roleLabel(p) {
 
 export const ROLE_GROUPS = [
   { id: 'doc', label: 'طبيب', legend: 'نوع الطبيب', subs: [
-    { role: 'specialist', desc: 'يعتمد العلاج، ويوافق على تعديلات الصيادلة أو يرفضها.' },
-    { role: 'senior_resident', desc: 'يعدّل الأدوية والجرع والتشخيص ونوع البروتوكول.' },
+    { role: 'specialist', desc: 'يعتمد البروتوكولات والدورات، ويوافق على خطط مرضاه أو يرفضها، ويقرّر طلبات التعديل.' },
+    { role: 'senior_resident', desc: 'يعتمد الدورات ويعدّل الأدوية والجرع والتشخيص مباشرة، ويقرّر طلبات الصيادلة.' },
     { role: 'intern', desc: 'عرض فقط، دون إضافة أو تعديل أو حذف.' },
   ] },
   { id: 'pharm', label: 'صيدلاني', legend: 'نوع الصيدلاني', subs: [
-    { role: 'clinical_pharmacist', desc: 'تعديلات محددة تُرسل للطبيب المختص مع تقرير للموافقة.' },
-    { role: 'chief_clinical_pharmacist', desc: 'صلاحيات الطبيب المقيم الأقدم، وتُرسل تعديلاته للموافقة.' },
-    { role: 'mixing_pharmacist', desc: 'يحضّر الجرع ويعدّلها، وتُرسل تعديلاته للموافقة.' },
+    { role: 'clinical_pharmacist', desc: 'يطلب تعديل الجرعة والمحلول والأدوية الداعمة، ويرفق صورة الطبلة.' },
+    { role: 'chief_clinical_pharmacist', desc: 'ينشئ الخطط ويطلب كل أنواع التعديل، ويقرّر طلبات الصيدلي السريري، ويغلق الدورات ويؤجلها.' },
+    { role: 'mixing_pharmacist', desc: 'يستلم الدورات المعتمدة ويحضّرها ويرسلها، ويطلب تعديل الجرعات فقط.' },
   ] },
   { id: 'nurse', label: 'ممرض', legend: null, subs: [
-    { role: 'nurse', desc: 'يسجّل إعطاء الجرع والعلامات الحيوية، ويرى الأوامر المعتمدة فقط.' },
+    { role: 'nurse', desc: 'يسجّل إعطاء الجرع والعلامات الحيوية والتفاعلات، ويرى الأوامر المعتمدة فقط.' },
   ] },
 ];
 

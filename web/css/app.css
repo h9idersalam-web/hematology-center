@@ -333,3 +333,5 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .lab-src .check { min-height: 36px; font-weight: 700; color: var(--ink); }
 .ocr-progress { height: 6px; background: var(--chip); border-radius: 4px; overflow: hidden; }
 .ocr-progress span { display: block; height: 100%; width: 0; background: var(--brand); transition: width .3s; }
+/* زر دور العمل للمدير */
+.role-switch { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-family: inherit; }
