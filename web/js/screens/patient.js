@@ -153,7 +153,8 @@ function treatmentCard(p, t, cycles, reload) {
           h('span', { style: 'font-weight: 600', text: `أُعطيت ${given} من ${count(t.total_cycles, 'cycle')}` }),
           h('span', { style: 'color: var(--muted-2)', text: pct + '%' })),
         h('div', { class: 'progress', role: 'progressbar', 'aria-valuenow': given, 'aria-valuemin': 0, 'aria-valuemax': t.total_cycles },
-          h('span', { style: `width: ${pct}%` }))),
+          h('span', { style: `width: ${pct}%` })),
+        cycleDrops(cycles, t.total_cycles)),
       h('div', { class: 'grid-2' }, lastTile, nextTile),
       weightWarn,
       planActions(p, t, reload)),
@@ -258,4 +259,23 @@ async function archive(p) {
     toast('أُرشف الملف');
     go('/patient?id=' + p.id);
   } catch (e) { toast(e.message, true); }
+}
+
+// تقدّم الجرعات قطراتِ دم (تظهر في التصميم 2 فقط؛ في المظهر الحالي يبقى الشريط)
+function cycleDrops(cycles, total) {
+  const box = h('div', { class: 'cyc-drops', 'aria-hidden': 'true' });
+  const byNo = new Map(cycles.map((c) => [c.cycle_no, c]));
+  let nowMarked = false;
+  for (let n = 1; n <= total; n++) {
+    const c = byNo.get(n);
+    let k = 'todo';
+    if (c && c.status === 'given') k = 'done';
+    else if (c && c.status === 'cancelled') k = 'off';
+    else if (!nowMarked && c && ['planned', 'held'].includes(c.status)) { k = 'now'; nowMarked = true; }
+    const d = h('span', { class: 'cd ' + k, title: 'الجرعة ' + n });
+    d.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5c4.2 5 7.6 9.2 7.6 13.3a7.6 7.6 0 0 1-15.2 0c0-4.1 3.4-8.3 7.6-13.3z"/></svg>';
+    d.append(h('b', { text: n }));
+    box.append(d);
+  }
+  return box;
 }

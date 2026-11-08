@@ -114,3 +114,47 @@ body { font-size: 15px; }
 .hb-row .grow > span { font-size: 12.5px; color: var(--muted); }
 .hb-extra { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
 .hb .bottom-nav { box-shadow: 0 -6px 20px rgba(0, 0, 0, .05); }
+
+/* ---------- كل الشاشات بتخطيط الشكل 7 ---------- */
+/* الرأس: قرمزي كبير منحني، والبطاقة الأولى تطفو فوقه */
+.screen > .topbar { position: relative; top: auto; z-index: 1; padding: calc(14px + env(safe-area-inset-top)) 16px 58px; border-radius: 0 0 50% 50% / 0 0 40px 40px; position: relative; overflow: hidden; align-items: flex-start; }
+.screen > .topbar::after { content: ''; position: absolute; left: -46px; top: 6px; width: 170px; height: 200px; opacity: .08; pointer-events: none;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.2'%3E%3Cpath d='M12 2.8c3.6 4.3 6.5 7.9 6.5 11.4a6.5 6.5 0 0 1-13 0c0-3.5 2.9-7.1 6.5-11.4z'/%3E%3Cpath d='M12 11.5v5.5M9.25 14.25h5.5'/%3E%3C/svg%3E"); }
+.screen > .topbar > * { position: relative; z-index: 1; }
+.screen > .topbar .titles { padding-top: 4px; }
+.screen > .topbar h1 { font-size: 25px; font-weight: 700; line-height: 1.3; }
+.screen > .topbar .sub { font-size: 13px; }
+.screen > .topbar .icon-btn.boxed { background: rgba(255, 255, 255, .16); border: 0; color: #fff !important; border-radius: 50%; }
+.screen > .topbar + .main { margin-top: -44px; position: relative; z-index: 2; }
+.screen > .topbar + .main > :first-child { box-shadow: 0 16px 36px rgba(122, 13, 35, .16); border-radius: 24px; }
+.screen > .topbar + .main > :first-child:not(.card):not(.segmented):not(.notice):not(.btn) { background: #fff; border-radius: 24px; padding: 6px; }
+.screen > .topbar + .main > :first-child .input { border-color: transparent; }
+.section-head h2 { font-weight: 600; font-size: 18px; }
+.card.flush { border-radius: 24px; overflow: hidden; }
+
+/* ملف المريض: تقدّم الجرعات قطراتِ دم بدل الشريط */
+.progress { display: none; }
+.cyc-drops { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-start; padding: 4px 0; }
+.cyc-drops .cd { width: 30px; height: 36px; position: relative; display: grid; place-items: center; }
+.cyc-drops .cd svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cyc-drops .cd b { position: relative; font-size: 11px; font-weight: 600; margin-top: 8px; }
+.cyc-drops .cd.done { color: #0F7A4A; } .cyc-drops .cd.done b { color: #fff; }
+.cyc-drops .cd.now { color: var(--brand); } .cyc-drops .cd.now b { color: #fff; }
+.cyc-drops .cd.todo { color: #EADDE0; } .cyc-drops .cd.todo b { color: #A4959A; }
+.cyc-drops .cd.off { color: #F3ECEE; } .cyc-drops .cd.off b { color: #C9B9BD; text-decoration: line-through; }
+
+/* شاشة الجرعة: مراحل الاعتماد قطراتٍ */
+.step .dot { width: 30px; height: 30px; border-radius: 50% 0 50% 50%; transform: rotate(-45deg); border: 0; background: #EADDE0; }
+.step .dot > * { transform: rotate(45deg); }
+.step.done .dot { background: #0F7A4A; }
+.step.now .dot { background: var(--brand); box-shadow: 0 0 0 5px var(--brand-soft); }
+.step + .step::before { right: 14px; background: #EADDE0; }
+
+/* الدخول: رأس كبير، والنموذج بطاقة تطفو فوقه */
+.screen > .hero { padding: calc(40px + env(safe-area-inset-top)) 24px 80px; border-radius: 0 0 50% 50% / 0 0 44px 44px; flex-direction: column; align-items: flex-start; gap: 18px; position: relative; overflow: hidden; }
+.screen > .hero::after { content: ''; position: absolute; left: -60px; top: 30px; width: 250px; height: 290px; opacity: .08; pointer-events: none;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.2'%3E%3Cpath d='M12 2.8c3.6 4.3 6.5 7.9 6.5 11.4a6.5 6.5 0 0 1-13 0c0-3.5 2.9-7.1 6.5-11.4z'/%3E%3Cpath d='M12 11.5v5.5M9.25 14.25h5.5'/%3E%3C/svg%3E"); }
+.screen > .hero h1 { font-size: 30px; }
+.screen > .hero + div { margin-top: -58px; position: relative; z-index: 2; }
+.screen > .hero ~ .main { padding-top: 14px; }
+.screen > .hero ~ .main > form { background: #fff; border-radius: 28px; padding: 22px 20px; box-shadow: 0 16px 36px rgba(122, 13, 35, .14); }
