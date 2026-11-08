@@ -261,7 +261,7 @@ async function archive(p) {
   } catch (e) { toast(e.message, true); }
 }
 
-// تقدّم الجرعات قطراتِ دم (تظهر في التصميم 2 فقط؛ في المظهر الحالي يبقى الشريط)
+// تقدّم الجرعات مراحلَ مرقّمة متصلة، والمعطاة خضراء بعلامة صح (في التصميم 2 فقط؛ في المظهر الحالي يبقى الشريط)
 function cycleDrops(cycles, total) {
   const box = h('div', { class: 'cyc-drops', 'aria-hidden': 'true' });
   const byNo = new Map(cycles.map((c) => [c.cycle_no, c]));
@@ -272,8 +272,9 @@ function cycleDrops(cycles, total) {
     if (c && c.status === 'given') k = 'done';
     else if (c && c.status === 'cancelled') k = 'off';
     else if (!nowMarked && c && ['planned', 'held'].includes(c.status)) { k = 'now'; nowMarked = true; }
+    if (n > 1) box.append(h('span', { class: 'ln' + (k === 'done' ? ' done' : '') }));
     const d = h('span', { class: 'cd ' + k, title: 'الجرعة ' + n });
-    d.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5c4.2 5 7.6 9.2 7.6 13.3a7.6 7.6 0 0 1-15.2 0c0-4.1 3.4-8.3 7.6-13.3z"/></svg>';
+    d.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
     d.append(h('b', { text: n }));
     box.append(d);
   }

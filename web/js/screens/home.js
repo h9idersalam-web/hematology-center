@@ -281,7 +281,8 @@ async function profileDialog() {
 // التصميم 2 (تجريبي): الشكل 7 «منحنيات وهوية» كما اختاره صاحب المشروع
 // رأس قرمزي كبير بقطرة دم، بطاقة «بانتظار اعتمادك» تطفو فوقه، شريط أرقام واحد، وجلسات اليوم
 // =====================================================================
-const DROP_FILL = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5c4.2 5 7.6 9.2 7.6 13.3a7.6 7.6 0 0 1-15.2 0c0-4.1 3.4-8.3 7.6-13.3z"/></svg>';
+// كيس مغذٍّ (IV) يحمل عدد الجرعات بانتظار الاعتماد
+const IV_BAG = '<svg viewBox="0 0 48 64" aria-hidden="true"><path d="M20 2h8v4h-8z" fill="currentColor" opacity=".55"/><rect x="6" y="6" width="36" height="40" rx="10" fill="currentColor"/><path d="M20 46h8l-1.5 6h-5z" fill="currentColor"/><path d="M24 52v10" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>';
 function shortName(full) {
   const w = String(full || '').trim().split(/\s+/);
   return (w[0] === 'د.' || w[0] === 'د' ? w.slice(0, 2) : w.slice(0, 1)).join(' ');
@@ -323,7 +324,7 @@ async function renderB(root) {
       .lte('planned_date', today).eq('status', 'planned').is('doctor_approved_at', null).eq('treatments.status', 'active').order('planned_date').limit(50));
     const names = [...new Set(rows.map((r) => shortName(r.treatments.patients.full_name.replace(/^د\.\s*/, ''))))];
     const title = doctor ? 'جرعات بانتظار اعتمادك' : 'جرعات بانتظار اعتماد الطبيب';
-    const drop = h('span', { class: 'hb-drop' }); drop.innerHTML = DROP_FILL; drop.append(h('b', { text: rows.length }));
+    const drop = h('span', { class: 'hb-drop' }); drop.innerHTML = IV_BAG; drop.append(h('b', { text: rows.length }));
     pendBox.replaceChildren(drop,
       h('span', { class: 'hb-pend-t' }, h('b', { text: rows.length ? title : 'لا جرعات بانتظار الاعتماد' }),
         h('span', { text: rows.length ? names.slice(0, 3).join(' · ') + (names.length > 3 ? ` · +${names.length - 3}` : '') : 'كل جرعات اليوم معتمدة' })),
