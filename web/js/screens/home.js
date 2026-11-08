@@ -16,6 +16,7 @@ const CAN_APPROVE = ['specialist', 'senior_resident', 'chief_clinical_pharmacist
 const SEES_REQUESTS = ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'];
 
 export async function render(root) {
+  if (document.documentElement.dataset.theme === 'b') return renderB(root);
   const p = state.profile;
   const today = todayISO();
   const bell = h('a', { class: 'icon-btn boxed', href: '#/notifications', 'aria-label': 'الإشعارات' }, icon('bell', 24));
@@ -273,4 +274,97 @@ async function profileDialog() {
     okText: 'تسجيل الخروج', danger: true,
   });
   if (ok) logout();
+}
+
+
+// =====================================================================
+// التصميم 2 (تجريبي): الشكل 7 «منحنيات وهوية» كما اختاره صاحب المشروع
+// رأس قرمزي كبير بقطرة دم، بطاقة «بانتظار اعتمادك» تطفو فوقه، شريط أرقام واحد، وجلسات اليوم
+// =====================================================================
+const DROP_FILL = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5c4.2 5 7.6 9.2 7.6 13.3a7.6 7.6 0 0 1-15.2 0c0-4.1 3.4-8.3 7.6-13.3z"/></svg>';
+function shortName(full) {
+  const w = String(full || '').trim().split(/\s+/);
+  return (w[0] === 'د.' || w[0] === 'د' ? w.slice(0, 2) : w.slice(0, 1)).join(' ');
+}
+
+async function renderB(root) {
+  const p = state.profile;
+  const today = todayISO();
+  const doctor = can('approveCycle');
+  const bell = h('a', { class: 'hb-ic', href: '#/notifications', 'aria-label': 'الإشعارات' }, icon('bell', 22));
+  const profileBtn = h('button', { type: 'button', class: 'hb-ic', 'aria-label': 'حسابي', onclick: () => profileDialog() },
+    h('span', { class: 'hb-ini', text: initials(p.full_name) || '؟' }));
+  const pendBox = h('div', { class: 'hb-pend' }, h('span', { class: 'spinner' }));
+  const statsBox = h('div', { class: 'hb-stats' });
+  const listBox = h('div', { class: 'hb-list' }, h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
+  const extra = h('div', { class: 'hb-extra' });
+
+  mount(root, h('div', { class: 'screen hb' },
+    h('main', { class: 'main with-nav hb-main' },
+      h('section', { class: 'hb-hero' },
+        h('div', { class: 'hb-top' },
+          h('span', { class: 'hb-brand' }, icon('drop', 18, 'currentColor', 2), h('span', { text: 'مركز أمراض الدم' })),
+          h('span', { class: 'hb-actions' }, profileBtn, bell)),
+        h('h1', null, greeting(), h('br'), shortName(p.full_name)),
+        h('p', { class: 'hb-date', text: `${fmtDay(today)} · ${roleLabel(p)}` }),
+        p.is_admin ? h('button', { type: 'button', class: 'hb-role', onclick: () => roleSwitcher(root) }, icon('refresh', 14, 'currentColor', 2.4), h('span', { text: 'أعمل بدور: ' + ROLES[p.role] })) : null),
+      pendBox, statsBox,
+      h('div', { class: 'section-head hb-head' }, h('h2', { text: 'جلسات اليوم' }), h('a', { href: '#/appointments', text: 'عرض الكل' })),
+      listBox, extra),
+    bottomNav('home')));
+
+  countOf('notifications', (x) => x.is('read_at', null)).then((n) => {
+    if (n > 0) { bell.append(h('span', { class: 'badge-dot', text: n > 99 ? '99+' : n })); bell.setAttribute('aria-label', `الإشعارات، ${n} غير مقروءة`); }
+  }).catch(() => {});
+
+  // البطاقة الطافية: الجرعات بانتظار اعتماد الطبيب (أو جلسات اليوم لبقية الأدوار)
+  try {
+    const rows = await q(sb.from('cycles').select('id, planned_date, treatments!inner(status, patients!inner(full_name))')
+      .lte('planned_date', today).eq('status', 'planned').is('doctor_approved_at', null).eq('treatments.status', 'active').order('planned_date').limit(50));
+    const names = [...new Set(rows.map((r) => shortName(r.treatments.patients.full_name.replace(/^د\.\s*/, ''))))];
+    const title = doctor ? 'جرعات بانتظار اعتمادك' : 'جرعات بانتظار اعتماد الطبيب';
+    const drop = h('span', { class: 'hb-drop' }); drop.innerHTML = DROP_FILL; drop.append(h('b', { text: rows.length }));
+    pendBox.replaceChildren(drop,
+      h('span', { class: 'hb-pend-t' }, h('b', { text: rows.length ? title : 'لا جرعات بانتظار الاعتماد' }),
+        h('span', { text: rows.length ? names.slice(0, 3).join(' · ') + (names.length > 3 ? ` · +${names.length - 3}` : '') : 'كل جرعات اليوم معتمدة' })),
+      h('a', { class: 'hb-go', href: rows.length ? '#/cycle?id=' + rows[0].id : '#/appointments', 'aria-label': 'فتح' }, icon('chevron', 22, 'currentColor', 2.2)));
+  } catch (e) { pendBox.replaceChildren(h('p', { text: e.message })); }
+
+  // شريط الأرقام
+  try {
+    const [todayN, overdueN, reqN, patientsN] = await Promise.all([
+      countOf('cycles', (x) => x.eq('planned_date', today).in('status', ['planned', 'held'])),
+      countOf('cycles', (x) => x.lt('planned_date', today).eq('status', 'planned')),
+      SEES_REQUESTS.includes(p.role) ? countOf('change_requests', (x) => x.eq('status', 'pending')) : Promise.resolve(null),
+      countOf('patients', (x) => x.is('archived_at', null)),
+    ]);
+    const cell = (n, l, href) => h(href ? 'a' : 'div', { class: 'hb-stat', href }, h('b', { text: n ?? '—' }), h('span', { text: l }));
+    statsBox.replaceChildren(cell(todayN, 'جلسات اليوم', '#/appointments'), cell(overdueN, overdueN === 1 ? 'جلسة متأخرة' : 'جلسات متأخرة', '#/appointments'),
+      cell(reqN, 'طلبات تعديل', reqN === null ? null : '#/requests'), cell(patientsN, 'مريضاً', '#/patients'));
+  } catch (e) { statsBox.replaceChildren(); }
+
+  // جلسات اليوم
+  try {
+    const rows = await q(sb.from('cycles')
+      .select('id, cycle_no, status, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name))')
+      .eq('planned_date', today).in('status', ['planned', 'held']).eq('treatments.status', 'active').order('cycle_no').limit(30));
+    listBox.replaceChildren(...(rows.length ? rows.map((c) => {
+      const t = c.treatments, pt = t.patients;
+      const pill = c.status === 'held' ? h('span', { class: 'pill warn', text: 'موقوفة' })
+        : c.doctor_approved_at ? h('span', { class: 'pill info', text: 'في المزج' }) : h('span', { class: 'pill muted', text: 'بانتظار الطبيب' });
+      return h('a', { class: 'hb-row', href: '#/cycle?id=' + c.id },
+        h('span', { class: 'hb-av', text: initials(pt.full_name) }),
+        h('span', { class: 'grow' }, h('b', { text: pt.full_name }), h('span', null, h('span', { class: 'ltr', text: t.protocol_name }), ` · الجرعة ${c.cycle_no} من ${t.total_cycles}`)),
+        pill);
+    }) : [empty('لا توجد جلسات مجدولة اليوم', 'calendar')]));
+  } catch (e) { listBox.replaceChildren(h('p', { text: e.message })); }
+
+  // ما يخص الدور (الأقسام، التنبيه بالصوت، الإدارة...) يبقى في الأسفل
+  const dept = departments(p);
+  const parts = [soundCard(), dept ? h('div', { class: 'section-head hb-head' }, h('h2', { text: 'الأقسام' })) : null, dept];
+  const chartBox = can('chart') ? h('div') : null, deputyBox = can('toggleDeputy') ? h('div') : null, adminBox = p.is_admin ? h('div') : null;
+  extra.replaceChildren(...parts.filter(Boolean), chartBox, deputyBox, adminBox);
+  if (chartBox) renderChartTasks(chartBox);
+  if (deputyBox) renderDeputies(deputyBox);
+  if (adminBox) renderAdminPanel(adminBox);
 }

@@ -36,7 +36,12 @@ function apply(t) {
   document.body.append(chip);
 }
 
-export function set(t) { save(THEMES[t] ? t : null); apply(THEMES[t] ? t : null); }
+export function set(t) {
+  const before = document.documentElement.dataset.theme || null;
+  save(THEMES[t] ? t : null); apply(THEMES[t] ? t : null);
+  // الشاشة الرئيسية في التصميم 2 لها تخطيط خاص: يُعاد رسم الشاشة الحالية عند التبديل
+  if (before !== (document.documentElement.dataset.theme || null)) window.dispatchEvent(new HashChangeEvent('hashchange'));
+}
 
 function sync() {
   const u = fromUrl();
