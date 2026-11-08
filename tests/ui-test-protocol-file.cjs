@@ -80,6 +80,7 @@ const B = 'http://localhost:8788/';
   await sara.getByRole('button', { name: /ABVD/ }).click(); await sara.waitForSelector('text=معاينة الجرعات الدوائية');
   ok('plan form links protocol file', (await sara.getByRole('button', { name: 'مطابقة مع ملف البروتوكول ABVD' }).count()) === 1);
   await shot(sara, 'plan-file-link', false);
+  await sara.locator('#dx-sel').selectOption('HL'); await sara.getByRole('radio', { name: /Initial treatment/ }).click();
   await sara.getByRole('button', { name: 'إنشاء الخطة' }).click(); await sara.waitForSelector('text=خطة العلاج الحالية');
   await sara.locator('a[aria-label^="الجرعة 1،"]').click(); await sara.waitForSelector('text=الجرعات الدوائية');
   ok('cycle screen links protocol file', await opensPdf(sara, 'ملف البروتوكول ABVD'));

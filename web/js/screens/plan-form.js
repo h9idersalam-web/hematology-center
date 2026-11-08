@@ -6,6 +6,7 @@ import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, UNITS, calcDose, daysText, num, instrLine, withCycles } from '../dose.js';
 import { NKDA } from './patient-form.js';
 import { protocolFileLink } from '../files.js';
+import { diagnosesFor, OTHER, STATUS, GRADES, guessStatus } from '../diagnoses.js';
 
 export async function render(root, params) {
   const pid = params.get('patient');
@@ -39,9 +40,30 @@ export async function render(root, params) {
 
   const picker = h('div', { class: 'section', role: 'radiogroup', 'aria-label': 'البروتوكول' });
   const preview = h('div', { class: 'section' });
-  const diagnosis = h('input', { class: 'input', maxlength: 200 });
-  const icd = h('input', { class: 'input ltr', style: 'text-align: right; text-transform: uppercase', placeholder: 'C83.3', maxlength: 8 });
-  const stage = h('input', { class: 'input', placeholder: 'مثال: II أو IIIB أو ISS II', maxlength: 40 });
+  // التشخيص: قائمة حسب البروتوكول المختار (من معلومات ملفه)، أو «أخرى» للكتابة
+  const dxSel = h('select', { class: 'input', id: 'dx-sel', disabled: true }, h('option', { value: '', text: 'اختر البروتوكول أولاً' }));
+  const diagnosis = h('input', { class: 'input ltr', style: 'text-align: right', maxlength: 200, placeholder: 'Diagnosis', hidden: true, 'aria-label': 'التشخيص (كتابة)' });
+  // درجة المرض: قائمة منسدلة
+  const stage = h('select', { class: 'input' }, h('option', { value: '', text: 'غير محددة' }), GRADES.map((g) => h('option', { value: g, text: g })));
+  // حالة المرض
+  let dStatus = null;
+  const statusBox = h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': 'حالة المرض' });
+  const drawStatus = () => statusBox.replaceChildren(...STATUS.map(([k, en]) => h('button', { type: 'button', role: 'radio', 'aria-pressed': dStatus === k ? 'true' : 'false', 'aria-checked': dStatus === k ? 'true' : 'false',
+    onclick: () => { dStatus = k; statusBox.dataset.touched = '1'; drawStatus(); } }, h('span', { class: 'ltr', text: en }))));
+  drawStatus();
+  let dxList = [];
+  function drawDx() {
+    dxList = diagnosesFor(chosen);
+    const keep = dxSel.value;
+    dxSel.disabled = false;
+    dxSel.replaceChildren(h('option', { value: '', text: 'اختر التشخيص' }),
+      dxList.map((d) => h('option', { value: d.key, text: d.label, title: d.en })),
+      h('option', { value: OTHER, text: 'Other' }));
+    dxSel.value = dxList.some((d) => d.key === keep) || keep === OTHER ? keep : (dxList.length === 1 ? dxList[0].key : '');
+    onDx();
+  }
+  function onDx() { diagnosis.hidden = dxSel.value !== OTHER; }
+  dxSel.addEventListener('change', onDx);
   const start = h('input', { class: 'input', type: 'date', value: todayISO(), min: addDaysISO(todayISO(), -365), max: addDaysISO(todayISO(), 180) });
   const schedule = h('p', { class: 'hint' });
   const err = h('div');
@@ -51,12 +73,11 @@ export async function render(root, params) {
   function drawPicker() {
     picker.replaceChildren(...protocols.map((pr) => h('button', {
       type: 'button', class: 'option', 'aria-pressed': chosen === pr ? 'true' : 'false',
-      onclick: () => { chosen = pr; if (!diagnosis.dataset.touched) diagnosis.value = pr.disease; drawPicker(); drawPreview(); drawSchedule(); submit.disabled = false; },
+      onclick: () => { chosen = pr; drawDx(); if (!statusBox.dataset.touched) { dStatus = guessStatus(pr); drawStatus(); } drawPicker(); drawPreview(); drawSchedule(); submit.disabled = false; },
     }, h('span', { class: 'radio' }),
       h('span', null, h('span', { class: 'ot ltr', style: 'text-align: right', text: pr.name }),
         h('span', { class: 'od', text: `${pr.disease} · كل ${count(pr.cycle_length_days, 'day')} · ${count(pr.total_cycles, 'cycle')}` })))));
   }
-  diagnosis.addEventListener('input', () => { diagnosis.dataset.touched = '1'; });
 
   function drawPreview() {
     if (!chosen) return preview.replaceChildren();
@@ -105,8 +126,9 @@ export async function render(root, params) {
     picker, preview,
     h('div', { class: 'card' },
       h('h2', { text: 'التشخيص والبدء' }),
-      field('التشخيص', diagnosis),
-      h('div', { class: 'grid-2' }, field('رمز ICD-10', icd), field('المرحلة', stage)),
+      field('التشخيص', dxSel, 'القائمة حسب البروتوكول المختار'), diagnosis,
+      h('div', { class: 'field' }, h('span', { class: 'label', text: 'حالة المرض' }), statusBox),
+      field('درجة المرض', stage),
       field('تاريخ الجرعة الأولى', start), schedule),
     pending ? notice('info', 'info', h('p', { text: 'تُرسل الخطة للطبيب المختص بالمريض، ولا تُفعَّل قبل موافقته.' })) : null,
     err, submit);
@@ -117,13 +139,15 @@ export async function render(root, params) {
       const fail = (m) => { err.replaceChildren(notice('err', 'warn', h('p', { text: m }))); err.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
       err.replaceChildren();
       if (!chosen) return fail('اختر البروتوكول');
-      if (!diagnosis.value.trim()) return fail('اكتب التشخيص');
-      const code = icd.value.trim().toUpperCase();
-      if (code && !/^[A-Z]\d{2}(\.\d{1,2})?$/.test(code)) return fail('رمز ICD-10 بصيغة حرف ثم رقمين، مثل C83.3');
+      const dxItem = dxList.find((d) => d.key === dxSel.value);
+      const dxText = dxSel.value === OTHER ? diagnosis.value.trim() : (dxItem ? dxItem.abbr : '');
+      if (!dxText) return fail(dxSel.value === OTHER ? 'اكتب التشخيص' : 'اختر التشخيص');
+      if (!dStatus) return fail('اختر حالة المرض: Initial treatment أو Relapse أو Maintenance');
+      const code = dxItem ? dxItem.icd : null;   // يُحفظ تلقائياً ولا يظهر
       if (!start.value) return fail('اختر تاريخ الجرعة الأولى');
       try {
-        await rpc('create_treatment', { p_patient: pid, p_protocol: chosen.id, p_diagnosis: diagnosis.value.trim(),
-          p_icd10: code || null, p_stage: stage.value.trim() || null, p_start: start.value });
+        await rpc('create_treatment', { p_patient: pid, p_protocol: chosen.id, p_diagnosis: dxText,
+          p_icd10: code || null, p_stage: stage.value || null, p_start: start.value, p_disease_status: dStatus });
         toast(pending ? 'أُرسلت الخطة للطبيب المختص للموافقة' : 'أُنشئت خطة العلاج');
         go('/patient?id=' + pid);
       } catch (e2) { fail(e2.message); }

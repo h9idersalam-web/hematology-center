@@ -1,5 +1,6 @@
 // طلب تعديل واحد: تقرير الصيدلاني، وبنوده، وقرار الطبيب المختص بنداً بنداً
 import { sb, q, rpc } from '../api.js';
+import { statusLabel } from '../diagnoses.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, fmtTime, fmtDay, toast, busy, confirmDialog, ROLES, count, field } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
@@ -114,7 +115,7 @@ export function describe(it, protos = []) {
     case 'add_drug': return [`${pl.drug_name} ${num(pl.final_dose)} ${OUT_UNITS[pl.final_unit] || pl.final_unit}`,
       `${pl.route} · ${daysText(pl.days)} · ${onward}${pl.supportive ? ' · دواء داعم' : ''}${pl.diluent ? ' · ' + pl.diluent : ''}`];
     case 'remove_drug': return [`حذف ${d?.drug_name}`, `${pl.reason || ''} · ${onward}`];
-    case 'diagnosis': return [pl.diagnosis, [pl.icd10, pl.stage].filter(Boolean).join(' · ')];
+    case 'diagnosis': return [pl.diagnosis, [pl.icd10, pl.stage, statusLabel(pl.disease_status)].filter(Boolean).join(' · ')];
     case 'protocol': return [`إلى ${(protos.find((x) => x.id === pl.protocol_id) || {}).name || 'بروتوكول آخر'}`, `أول جرعة ${fmtDate(pl.start_date)}`];
     default: return [it.kind, ''];
   }

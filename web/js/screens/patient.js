@@ -1,5 +1,6 @@
 // ملف المريض: البيانات، والحساسية، وخطة العلاج ودوراتها، والخطط السابقة
 import { sb, q, rpc, countOf } from '../api.js';
+import { statusLabel } from '../diagnoses.js';
 import { h, mount, icon, topbar, bottomNav, notice, empty, fmtDate, fmtDay, daysUntil, ageText, bsa, SEX, toast, confirmDialog, initials, count, busy } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
@@ -24,7 +25,7 @@ export async function render(root, params) {
 
   const [p, treatments, labsN, filesN] = await Promise.all([
     q(sb.from('patient_overview').select('*').eq('id', id).maybeSingle()),
-    q(sb.from('treatments').select('id, protocol_name, diagnosis, icd10, stage, status, stop_reason, start_date, bsa, height_cm, weight_kg, total_cycles, cycle_length_days, created_at')
+    q(sb.from('treatments').select('id, protocol_name, diagnosis, icd10, stage, disease_status, status, stop_reason, start_date, bsa, height_cm, weight_kg, total_cycles, cycle_length_days, created_at')
       .eq('patient_id', id).order('created_at', { ascending: false })),
     countOf('lab_results', (x) => x.eq('patient_id', id)).catch(() => 0),
     countOf('attachments', (x) => x.eq('patient_id', id)).catch(() => 0),
@@ -143,8 +144,8 @@ function treatmentCard(p, t, cycles, reload) {
         h('span', { style: 'font-size: 14px; color: var(--muted-2)', text: 'كل ' + count(t.cycle_length_days, 'day') })),
       h('div', { class: 'facts' },
         fact('التشخيص', t.diagnosis, { wide: true }),
-        fact('ICD-10', t.icd10, { ltr: true }),
-        fact('المرحلة', t.stage),
+        fact('حالة المرض', statusLabel(t.disease_status)),
+        fact('درجة المرض', t.stage),
         fact('بدء العلاج', fmtDate(t.start_date)),
         fact('BSA عند الخطة', `${t.bsa} م²`)),
       h('div', { class: 'progress-wrap' },

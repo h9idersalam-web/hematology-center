@@ -392,3 +392,5 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .xl.editing td.in.changed { background: var(--info-soft) !important; }
 .xl.editing td:nth-child(2) input { min-width: 160px; font-weight: 600; }
 .xl.editing td:last-child input { min-width: 160px; }
+.segmented button:has(> small) { flex-direction: column; gap: 1px; line-height: 1.25; height: auto; min-height: 56px; padding: 6px 4px; font-size: 14px; text-align: center; }
+.segmented button small { display: block; font-size: 11px; opacity: .8; font-weight: 500; }

@@ -2,6 +2,7 @@
 // الصيدلاني: يُرسل طلباً مع تقرير، ولا يُطبَّق قبل القرار.
 // صيدلي المزج: الجرعات فقط. الصيدلي السريري: الجرعة والمحلول والأدوية الداعمة.
 import { sb, q, rpc } from '../api.js';
+import { STATUS, GRADES, allDiagnoses } from '../diagnoses.js';
 import { h, mount, icon, topbar, field, notice, toast, busy, latinDigits, confirmDialog, todayISO, count } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
@@ -21,7 +22,7 @@ export async function render(root, params) {
   if (!doctor && !pharm) return shell(notice('info', 'lock', h('p', { text: 'التعديل للأطباء والصيادلة.' })));
 
   const [c, doses, protocols] = await Promise.all([
-    q(sb.from('cycles').select('id, cycle_no, status, treatment_id, treatments(id, protocol_id, protocol_name, diagnosis, icd10, stage, total_cycles, status, patients(id, full_name, archived_at))').eq('id', id).maybeSingle()),
+    q(sb.from('cycles').select('id, cycle_no, status, treatment_id, treatments(id, protocol_id, protocol_name, diagnosis, icd10, stage, disease_status, total_cycles, status, patients(id, full_name, archived_at))').eq('id', id).maybeSingle()),
     q(sb.from('cycle_doses').select('*').eq('cycle_id', id).is('archived_at', null).order('sort')),
     clinical ? Promise.resolve([]) : q(sb.from('protocols').select('id, name, disease').not('approved_at', 'is', null).is('archived_at', null).order('name')),
   ]);
@@ -37,9 +38,13 @@ export async function render(root, params) {
   const add = addEditor(clinical);
 
   // ----------------------------------------------------------- التشخيص
-  const dx = h('input', { class: 'input', value: t.diagnosis });
+  const dx = h('input', { class: 'input ltr', style: 'text-align: right', value: t.diagnosis, list: 'dx-all' });
+  const dxAll = h('datalist', { id: 'dx-all' }, allDiagnoses().map((d) => h('option', { value: d.abbr, label: d.en })));
   const icd = h('input', { class: 'input ltr', style: 'text-align: right; text-transform: uppercase', value: t.icd10 || '' });
-  const stage = h('input', { class: 'input', value: t.stage || '' });
+  const stage = h('select', { class: 'input' }, h('option', { value: '', text: 'غير محددة' }),
+    [...new Set([...GRADES, ...(t.stage ? [t.stage] : [])])].map((g) => h('option', { value: g, text: g, selected: g === t.stage })));
+  const dStatusSel = h('select', { class: 'input' }, h('option', { value: '', text: 'غير محددة' }),
+    STATUS.map(([k, en]) => h('option', { value: k, text: en, selected: k === t.disease_status })));
 
   // ----------------------------------------------------------- البروتوكول
   const protoSel = h('select', { class: 'input' }, h('option', { value: '', text: 'بدون تغيير' }),
@@ -71,11 +76,11 @@ export async function render(root, params) {
     for (const e of doseEds) { const r = e.items(); if (r.error) return r; items.push(...r.items); labels.push(...r.labels); }
     if (!mixing) { const a = add.item(); if (a.error) return a; if (a.item) { items.push(a.item); labels.push(a.label); } }
     if (!clinical) {
-      const nd = dx.value.trim(), ni = icd.value.trim().toUpperCase(), ns = stage.value.trim();
-      if (nd !== t.diagnosis || ni !== (t.icd10 || '') || ns !== (t.stage || '')) {
+      const nd = dx.value.trim(), ni = icd.value.trim().toUpperCase(), ns = stage.value.trim(), nst = dStatusSel.value;
+      if (nd !== t.diagnosis || ni !== (t.icd10 || '') || ns !== (t.stage || '') || nst !== (t.disease_status || '')) {
         if (!nd) return { error: 'التشخيص لا يكون فارغاً' };
         if (ni && !/^[A-Z]\d{2}(\.\d{1,2})?$/.test(ni)) return { error: 'رمز ICD-10 غير صحيح' };
-        items.push({ kind: 'diagnosis', payload: { diagnosis: nd, icd10: ni || null, stage: ns || null } });
+        items.push({ kind: 'diagnosis', payload: { diagnosis: nd, icd10: ni || null, stage: ns || null, disease_status: nst || null } });
         labels.push(`التشخيص: ${nd}${ni ? ' (' + ni + ')' : ''}${ns ? ' · ' + ns : ''}`);
       }
     }
@@ -124,8 +129,8 @@ export async function render(root, params) {
       ...doseEds.map((e) => e.el),
       mixing ? null : h('div', { class: 'section-head' }, h('h2', { text: clinical ? 'إضافة دواء داعم' : 'إضافة دواء' })),
       mixing ? null : add.el,
-      !clinical ? h('div', { class: 'card' }, h('h2', { text: 'التشخيص والمرحلة' }), field('التشخيص', dx),
-        h('div', { class: 'grid-2' }, field('ICD-10', icd), field('المرحلة', stage))) : null,
+      !clinical ? h('div', { class: 'card' }, h('h2', { text: 'التشخيص والمرحلة' }), field('التشخيص', dx), dxAll,
+        h('div', { class: 'grid-2' }, field('درجة المرض', stage), field('حالة المرض', dStatusSel))) : null,
       !clinical ? h('div', { class: 'card' }, h('h2', { text: 'تغيير البروتوكول' }), field('البروتوكول الجديد', protoSel), field('تاريخ أول جرعة', protoStart), protoNote) : null,
       h('div', { class: 'card' },
         h('h2', { text: doctor ? 'ملاحظة' : 'تقرير الأسباب للطبيب' }),

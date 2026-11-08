@@ -46,7 +46,7 @@ const passwords = {};
 async function setup() {
   await pool.query(RESET);
   for (const f of ['tests/00_supabase_stub.sql', 'supabase/01_schema.sql', 'supabase/02_storage.sql', 'supabase/03_seed_protocols.sql',
-    ...fs.readdirSync(path.join(ROOT, 'supabase')).filter((f) => /^(0[5-9]|[12][0-9])_.*\.sql$/.test(f) && !/^(11|23)_/.test(f)).sort().map((f) => 'supabase/' + f)]) {
+    ...fs.readdirSync(path.join(ROOT, 'supabase')).filter((f) => /^(0[5-9]|[1-9][0-9])_.*\.sql$/.test(f) && !/^(11|23)_/.test(f)).sort().map((f) => 'supabase/' + f)]) {
     psql(path.join(ROOT, f));
   }
   for (const [email, name, role, opt] of USERS) {
@@ -379,5 +379,5 @@ async function storage(req, res, url, raw, json) {
 
 await setup();
 await loadMeta();
-console.log('loaded', fs.readdirSync(path.join(ROOT, 'supabase')).filter((f) => /^(0[5-9]|[12][0-9])_/.test(f) && !/^(11|23)_/.test(f)).join(' '));
+console.log('loaded', fs.readdirSync(path.join(ROOT, 'supabase')).filter((f) => /^(0[5-9]|[1-9][0-9])_/.test(f) && !/^(11|23)_/.test(f)).join(' '));
 server.listen(PORT, () => console.log('pgrest-lite on', PORT));
