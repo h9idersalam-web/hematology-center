@@ -167,7 +167,20 @@ async function start() {
   route();
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    // التحديث التلقائي: يُفحص عند كل عودة إلى التطبيق؛ والنسخة الجديدة تُحمَّل فوراً إن وصلت أثناء فتح التطبيق،
+    // وإلا عند العودة التالية إليه (فلا تُقاطَع شاشة يعمل عليها المستخدم)
+    const hadController = !!navigator.serviceWorker.controller;
+    let pending = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController) return;
+      if (performance.now() < 15000) location.reload(); else pending = true;
+    });
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        if (pending) location.reload(); else reg.update().catch(() => {});
+      });
+    }).catch(() => {});
   }
 }
 

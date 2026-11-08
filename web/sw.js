@@ -1,6 +1,6 @@
 // يحفظ ملفات واجهة التطبيق فقط ليفتح بسرعة.
 // لا يحفظ أي بيانات مرضى: كل طلبات قاعدة البيانات تذهب إلى الخادم مباشرة.
-const VERSION = 'v25-2026-11-08-xlsx-note';
+const VERSION = 'v26-2026-11-08-auto-update';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'vendor/supabase-2.118.0.js',
@@ -29,7 +29,9 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;  // البيانات لا تُحفظ
   // الشبكة أولاً، والنسخة المحفوظة عند انقطاع الإنترنت
-  e.respondWith(fetch(e.request)
+  // no-cache: يسأل الخادم دائماً عن النسخة الأحدث (لا يكتفي بنسخة المتصفح لعشر دقائق)
+  const fresh = e.request.mode === 'navigate' ? new Request(e.request.url, { cache: 'no-cache' }) : new Request(e.request, { cache: 'no-cache' });
+  e.respondWith(fetch(fresh)
     .then((res) => {
       const copy = res.clone();
       caches.open(VERSION).then((c) => c.put(e.request, copy));
