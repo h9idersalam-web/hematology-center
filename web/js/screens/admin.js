@@ -1,7 +1,7 @@
 // الإدارة: المستخدمون، أكواد التفعيل، الاشتراكات، الصلاحيات (للمدير وحده)
 import { rpc } from '../api.js';
 import { APP_NAME } from '../config.js';
-import { h, mount, icon, topbar, empty, ROLES, fmtDate, fmtTime, daysUntil, toast, busy, field, notice, initials, confirmDialog, ROLE_GROUPS } from '../ui.js';
+import { h, mount, icon, topbar, empty, ROLES, TITLES, roleName, fmtDate, fmtTime, daysUntil, toast, busy, field, notice, initials, confirmDialog, ROLE_GROUPS } from '../ui.js';
 import { state, go } from '../app.js';
 
 const STATUS = { pending: ['بانتظار التفعيل', 'warn'], active: ['مفعّل', 'ok'], suspended: ['موقوف', 'muted'] };
@@ -121,7 +121,7 @@ export async function render(root, params) {
         h('span', { class: 'grow', style: 'display: flex; flex-direction: column; gap: 2px; min-width: 0' },
           h('span', { class: 't', style: 'font-size: 17px; font-weight: 700', text: u.full_name }),
           h('span', { class: 's', text: u.is_deputy && u.role === 'clinical_pharmacist'
-            ? 'صيدلي سريري · رديف مسؤول الصيادلة (' + (u.deputy_active ? 'الصلاحيات مفعّلة' : 'الصلاحيات موقوفة') + ')' : ROLES[u.role] || u.role }),
+            ? 'صيدلي سريري · رديف مسؤول الصيادلة (' + (u.deputy_active ? 'الصلاحيات مفعّلة' : 'الصلاحيات موقوفة') + ')' : roleName(u.role) }),
           u.email ? h('span', { class: 's ltr', style: 'text-align: right; font-size: 13px; overflow-wrap: anywhere', text: u.email }) : null),
         h('span', { class: 'pill ' + tone, text: label })),
       sub ? h('span', { class: 's', text: sub }) : null,
@@ -193,7 +193,7 @@ export async function render(root, params) {
   function userDialog(u) {
     const dlg = h('dialog', null);
     const close = () => { dlg.close(); dlg.remove(); };
-    const roleSel = h('select', { class: 'input' }, Object.entries(ROLES).map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
+    const roleSel = h('select', { class: 'input' }, [...Object.entries(ROLES), ...(TITLES[u.role] ? [[u.role, TITLES[u.role]]] : [])].map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
     const desc = Object.fromEntries(ROLE_GROUPS.flatMap((g) => g.subs.map((x) => [x.role, x.desc])));
     const what = h('p', { class: 'hint' });
     const warn = h('div');
@@ -212,7 +212,7 @@ export async function render(root, params) {
       h('button', { class: 'btn primary', text: 'حفظ الصلاحية', onclick: async (e) => {
         const btn = e.currentTarget;   // يُفقد بعد أول await
         if (roleSel.value === u.role) return close();
-        const ok = await confirmDialog({ title: 'تغيير صلاحية ' + u.full_name, body: `من «${ROLES[u.role]}» إلى «${ROLES[roleSel.value]}». تتغير صلاحياته فوراً ويُبلَّغ بذلك.`, okText: 'تغيير' });
+        const ok = await confirmDialog({ title: 'تغيير صلاحية ' + u.full_name, body: `من «${roleName(u.role)}» إلى «${roleName(roleSel.value)}». تتغير صلاحياته فوراً ويُبلَّغ بذلك.`, okText: 'تغيير' });
         if (!ok) return;
         await busy(btn, async () => {
           try { await rpc('admin_update_user', { p_user: u.id, p_role: roleSel.value }); toast('غُيّرت الصلاحية'); draw(); close(); }
@@ -238,7 +238,7 @@ export async function render(root, params) {
     const dlg = h('dialog', null);
     const close = () => { dlg.close(); dlg.remove(); };
     let months = 6, hours = 72;
-    const roleSel = h('select', { class: 'input' }, Object.entries(ROLES).map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
+    const roleSel = h('select', { class: 'input' }, [...Object.entries(ROLES), ...(TITLES[u.role] ? [[u.role, TITLES[u.role]]] : [])].map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
     const segM = h('div', { class: 'segmented' });
     const segH = h('div', { class: 'segmented' });
     const drawSeg = () => {
@@ -284,7 +284,7 @@ export async function render(root, params) {
       h('div', { class: 'card flush' }, active.length ? active.map((u) => {
         const left = daysUntil(u.subscription_ends);
         return h('button', { class: 'row', onclick: () => userDialog(u) },
-          h('span', { class: 'grow' }, h('span', { class: 't', text: u.full_name }), h('span', { class: 's', text: ROLES[u.role] })),
+          h('span', { class: 'grow' }, h('span', { class: 't', text: u.full_name }), h('span', { class: 's', text: roleName(u.role) })),
           h('span', { class: 'pill ' + (left === null ? 'ok' : left < 0 ? 'brand' : left <= 14 ? 'warn' : 'ok'),
             text: left === null ? 'دائم' : left < 0 ? 'منتهٍ' : left <= 14 ? `باقٍ ${left} يوماً` : 'حتى ' + fmtDate(u.subscription_ends) }));
       }) : empty('لا توجد اشتراكات مفعّلة بعد', 'calendar')));

@@ -104,6 +104,9 @@ export const ROLES = {
   internal_pharmacist: 'مسؤول الصيدلية الداخلية',
   nurse: 'ممرض',
 };
+// صفات لا تحمل صلاحيات بذاتها ولا تُسنَد من لوحة الإدارة (الملف 34): صفة مدير البرنامج
+export const TITLES = { practicing_pharmacist: 'صيدلاني ممارس' };
+export const roleName = (k) => ROLES[k] || TITLES[k] || k || '';
 
 // اسم الدور كما يظهر للمستخدم نفسه (الرديف يُميَّز عن مسؤول الصيادلة الأصلي)
 export function roleLabel(p) {
@@ -112,7 +115,7 @@ export function roleLabel(p) {
   if (p.is_deputy && (p.base_role || p.role) === 'clinical_pharmacist') {
     return p.deputy_active ? 'رديف مسؤول الصيادلة (الصلاحيات مفعّلة)' : 'صيدلي سريري · رديف (الصلاحيات موقوفة)';
   }
-  return ROLES[p.base_role || p.role] || '';
+  return roleName(p.base_role || p.role);
 }
 
 export const ROLE_GROUPS = [

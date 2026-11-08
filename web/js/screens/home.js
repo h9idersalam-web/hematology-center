@@ -1,6 +1,6 @@
 // الرئيسية: ملخص اليوم حسب الدور، وقسم الإدارة للمدير وحده
 import { sb, q, countOf, rpc } from '../api.js';
-import { h, mount, icon, roleLabel, ROLES, ROLE_GROUPS, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil, toast, busy } from '../ui.js';
+import { h, mount, icon, roleLabel, ROLES, roleName, ROLE_GROUPS, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil, toast, busy } from '../ui.js';
 import { state, logout, loadProfile } from '../app.js';
 import { can } from '../perms.js';
 import { APP_NAME } from '../config.js';
@@ -248,6 +248,7 @@ function roleSwitcher(root) {
   dlg.append(h('div', { class: 'dlg' },
     h('h2', { text: 'الدور الذي تعمل به' }),
     h('p', { style: 'color: var(--muted); font-size: 14px', text: 'تدخل أقسام الدور المختار وتعمل بصلاحياته، ويُسجَّل كل إجراء باسمك وبهذا الدور. تبقى مديراً في كل الأحوال.' }),
+    h('p', { style: 'font-size: 14px; font-weight: 600', text: 'صفتك المسجّلة: ' + roleName(p.base_role) }),
     h('div', { style: 'display: flex; flex-direction: column; gap: 6px' }, Object.entries(ROLES).map(([k, label]) =>
       h('button', { type: 'button', class: 'option', 'aria-pressed': p.role === k ? 'true' : 'false', onclick: async (e) => {
         await busy(e.currentTarget, async () => {
@@ -269,7 +270,7 @@ async function profileDialog() {
   const left = daysUntil(p.subscription_ends);
   const ok = await confirmDialog({
     title: p.full_name,
-    body: `${roleLabel(p)}${p.is_admin ? ' · يعمل الآن بدور ' + ROLES[p.role] : ''}. ` +
+    body: `${roleLabel(p)}${p.is_admin ? ' · ' + roleName(p.base_role) + ' · يعمل الآن بدور ' + ROLES[p.role] : ''}. ` +
       (p.subscription_ends ? `الاشتراك حتى ${fmtDate(p.subscription_ends)}${left !== null && left <= 14 ? ` (باقٍ ${left} يوماً)` : ''}.` : 'اشتراك دائم.'),
     okText: 'تسجيل الخروج', danger: true,
   });

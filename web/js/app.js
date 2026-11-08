@@ -87,6 +87,8 @@ export async function loadProfile() {
     if (p.acting) p.role = 'chief_clinical_pharmacist';
     // المدير يعمل بدور يختاره (acting_role)، كما في my_role بالقاعدة
     if (p.is_admin && p.acting_role) p.role = p.acting_role;
+    // صفة «صيدلاني ممارس» للمدير بلا صلاحيات بذاتها: بلا دور عمل مختار يعمل بصلاحيات طبيب الاختصاص (كما في _effective_role)
+    else if (p.is_admin && p.role === 'practicing_pharmacist') p.role = 'specialist';
   }
   state.profile = p;
   state.profileAt = Date.now();
