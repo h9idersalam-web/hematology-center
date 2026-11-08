@@ -124,6 +124,7 @@ tests/                  اختبارات قاعدة البيانات (PostgreSQL
 | 20_lab_alert_day_before | يشمل الإشعار التحليل المسحوب قبل الدورة بيوم |
 | 21_lock_prepared_doses | الجرعة المحضّرة لا تُعدَّل ولا تُحذف حتى يزيل صيدلي المزج علامة التحضير |
 | 27_ice_protocols | بروتوكولا «ICE (مجزأ)» و«ICE» من ملفات المركز: Carboplatin 400 ملغ/م² بحد 800، Ifosfamide وMesna 1666 ملغ/م² الأيام 1–3 (طُبّق، غير معتمدين) |
+| 29_tec_pembro_ice_fix | TEC: Bendamustine 70 ملغ/م² (يحدده الطبيب 60–120) ودورتان كل 21 يوماً؛ Pembro-ICE (مجزأ) 6 دورات (طُبّق) |
 | 28_carboplatin_mg_m2 | إعادة TEC وPola-R-ICE وPembro-ICE (مجزأ) من نسخها المؤرشفة: Carboplatin 400 ملغ/م² بحد 800 (طُبّق، غير معتمدة) |
 | 25_internal_pharmacist_role | نوع مستخدم ثامن «مسؤول الصيدلية الداخلية» (`internal_pharmacist`). يُنفَّذ وحده قبل 26 |
 | 26_internal_pharmacy | الصيدلية الداخلية: `inventory_reports/items` ودوال `inventory_*`، و`_role_label` و`baghdad_today()` |
