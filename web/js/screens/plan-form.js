@@ -37,8 +37,8 @@ export async function render(root, params) {
   const B = bsa(Number(p.height_cm), Number(p.weight_kg));
   const W = Number(p.weight_kg);
   let chosen = null;
-  // طبيب الاختصاص يعدّل أي جرعة محسوبة قبل إنشاء الخطة (الملف 35: create_plan)
-  const canEditDose = state.profile.role === 'specialist';
+  // من ينشئ الخطة (طبيب الاختصاص والمقيم الأقدم ومسؤول الصيادلة) يعدّل أي جرعة محسوبة قبل الاعتماد (الملف 35: create_plan)
+  const canEditDose = ['specialist', 'senior_resident', 'chief_clinical_pharmacist'].includes(state.profile.role);
   const overrides = new Map();   // protocol_drug_id -> { value, calc, name, unit }
 
   const picker = h('div', { class: 'section', role: 'radiogroup', 'aria-label': 'البروتوكول' });
@@ -106,7 +106,7 @@ export async function render(root, params) {
             c.capped ? h('span', { class: 'pill warn', style: 'align-self: flex-start; margin-top: 4px', text: `قُصّت إلى السقف ${num(d.max_dose)} ${OUT_UNITS[c.finalUnit]} (المحسوب ${num(c.calculated)})` }) : null),
           canEditDose ? doseInput(d, c) : h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(c.final) }), h('span', { text: OUT_UNITS[c.finalUnit] })));
       })),
-      canEditDose ? h('p', { class: 'hint', text: 'اضغط على أي جرعة لتعديلها قبل إنشاء الخطة. تُطبَّق الجرعة المعدّلة على هذا الدواء في كل الجرعات، وتُعلَّم «معدّلة» مع المحسوبة الأصلية في السجل.' }) : null,
+      canEditDose ? h('p', { class: 'hint', text: 'اضغط على أي جرعة لتعديلها قبل اعتماد الخطة. تُطبَّق الجرعة المعدّلة على هذا الدواء في كل الجرعات، وتُعلَّم «معدّلة» مع المحسوبة الأصلية في السجل.' }) : null,
       h('p', { class: 'hint', text: `حُسبت من طول ${num(p.height_cm)} سم ووزن ${num(p.weight_kg)} كغ بمعادلة موستيلر. هذه معاينة، والجرعات الدوائية المعتمدة تحسبها قاعدة البيانات عند الحفظ بالطريقة نفسها.` }),
       chosen.notes ? notice('info', 'info', h('p', { text: chosen.notes })) : null,
       protocolFileLink(chosen.file_path, 'مطابقة مع ملف البروتوكول ' + chosen.name));

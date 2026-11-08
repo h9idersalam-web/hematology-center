@@ -6,7 +6,7 @@
 
 -- (1) إنشاء الخطة مع جرعات معدّلة: { "<protocol_drug_id>": <الجرعة النهائية بوحدتها mg أو units> }
 --     تُطبَّق على هذا الدواء في كل دورات الخطة، وتُعلَّم «عُدّلت» مع الجرعة المحسوبة الأصلية (edited_from).
---     التعديل لطبيب الاختصاص فقط (ومدير البرنامج حين يعمل بدوره)، ويُسجَّل في سجل التعديلات.
+--     التعديل لطبيب الاختصاص والمقيم الأقدم ومسؤول الصيادلة السريريين (من ينشئ الخطط)، ويُسجَّل في سجل التعديلات.
 create or replace function public.create_plan(p_patient uuid, p_protocol uuid, p_diagnosis text,
                                               p_icd10 text, p_stage text, p_start date,
                                               p_disease_status text default null, p_doses jsonb default null)
@@ -14,8 +14,8 @@ returns uuid language plpgsql security definer set search_path = public as $$
 declare v_tid uuid; r record; d protocol_drugs; v_new numeric;
 begin
   if p_doses is not null and jsonb_typeof(p_doses) <> 'object' then raise exception 'صيغة الجرعات المعدّلة غير صحيحة'; end if;
-  if p_doses is not null and p_doses <> '{}'::jsonb and my_role() <> 'specialist' then
-    raise exception 'تعديل الجرعات قبل الاعتماد لطبيب الاختصاص فقط' using errcode = '42501';
+  if p_doses is not null and p_doses <> '{}'::jsonb and my_role() not in ('specialist', 'senior_resident', 'chief_clinical_pharmacist') then
+    raise exception 'تعديل الجرعات قبل الاعتماد لطبيب الاختصاص والمقيم الأقدم ومسؤول الصيادلة السريريين' using errcode = '42501';
   end if;
   v_tid := create_treatment(p_patient, p_protocol, p_diagnosis, p_icd10, p_stage, p_start, p_disease_status);
   for r in select key, value from jsonb_each_text(coalesce(p_doses, '{}'::jsonb)) loop
@@ -36,7 +36,7 @@ revoke all on function public.create_plan(uuid, uuid, text, text, text, date, te
 grant execute on function public.create_plan(uuid, uuid, text, text, text, date, text, jsonb) to authenticated;
 
 -- (2) إعادة بروتوكول مؤرشف إلى «غير معتمد»: لمدير البرنامج فقط. يعود لقائمة «بانتظار الاعتماد»
---     ويحتاج اعتماداً جديداً من طبيب الاختصاص قبل استعماله. يُسجَّل في سجل التعديلات.
+--     ويحتاج اعتماداً جديداً من طبيب الاختصاص قبل استعماله. يُسجَّل في سجل التعديلات، بلا إشعار للأطباء.
 create or replace function public.restore_protocol(p_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 declare v_p protocols;
@@ -45,9 +45,7 @@ begin
   select * into v_p from protocols where id = p_id;
   if v_p.id is null then raise exception 'البروتوكول غير موجود'; end if;
   if v_p.archived_at is null then raise exception 'البروتوكول غير مؤرشف'; end if;
-  update protocols set archived_at = null, approved_by = null, approved_at = null where id = p_id;
-  perform _notify_roles(array['specialist']::user_role[], 'protocol', 'بروتوكول أُعيد من الأرشيف بانتظار اعتمادك',
-                        v_p.name, 'protocol', p_id);
+  update protocols set archived_at = null, approved_by = null, approved_at = null where id = p_id;   -- بلا إشعار (بطلب صاحب المشروع)
 end $$;
 revoke all on function public.restore_protocol(uuid) from public, anon;
 grant execute on function public.restore_protocol(uuid) to authenticated;
