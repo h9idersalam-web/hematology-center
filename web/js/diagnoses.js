@@ -53,7 +53,8 @@ const RULES = [
 ];
 
 export const OTHER = '__other__';
-const item = (k) => ({ key: k, abbr: D[k][0], en: D[k][1], icd: D[k][2], label: D[k][0] });
+// يظهر الاختصار أولاً وبجانبه الاسم الكامل بالإنكليزية، ويُحفظ التشخيص بهذا الشكل نفسه
+const item = (k) => ({ key: k, abbr: D[k][0], en: D[k][1], icd: D[k][2], label: `${D[k][0]} — ${D[k][1]}` });
 
 // التشخيصات المقترحة لبروتوكول؛ إن لم يطابق شيء تُعرض كل القائمة
 export function diagnosesFor(protocol) {

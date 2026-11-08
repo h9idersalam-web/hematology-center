@@ -57,12 +57,17 @@ export async function render(root, params) {
     const keep = dxSel.value;
     dxSel.disabled = false;
     dxSel.replaceChildren(h('option', { value: '', text: 'اختر التشخيص' }),
-      dxList.map((d) => h('option', { value: d.key, text: d.label, title: d.en })),
+      dxList.map((d) => h('option', { value: d.key, text: d.label, dir: 'ltr' })),
       h('option', { value: OTHER, text: 'Other' }));
     dxSel.value = dxList.some((d) => d.key === keep) || keep === OTHER ? keep : (dxList.length === 1 ? dxList[0].key : '');
     onDx();
   }
-  function onDx() { diagnosis.hidden = dxSel.value !== OTHER; }
+  const dxFull = h('p', { class: 'hint ltr', style: 'text-align: right; font-weight: 600; color: var(--ink-2)', 'aria-live': 'polite' });
+  function onDx() {
+    const d = dxList.find((x) => x.key === dxSel.value);
+    diagnosis.hidden = dxSel.value !== OTHER;
+    dxFull.textContent = d ? d.label : '';   // الاسم الكامل ظاهراً حتى لو قُصّ في الخانة
+  }
   dxSel.addEventListener('change', onDx);
   const start = h('input', { class: 'input', type: 'date', value: todayISO(), min: addDaysISO(todayISO(), -365), max: addDaysISO(todayISO(), 180) });
   const schedule = h('p', { class: 'hint' });
@@ -126,7 +131,7 @@ export async function render(root, params) {
     picker, preview,
     h('div', { class: 'card' },
       h('h2', { text: 'التشخيص والبدء' }),
-      field('التشخيص', dxSel, 'القائمة حسب البروتوكول المختار'), diagnosis,
+      field('التشخيص', dxSel, 'القائمة حسب البروتوكول المختار'), dxFull, diagnosis,
       h('div', { class: 'field' }, h('span', { class: 'label', text: 'حالة المرض' }), statusBox),
       field('درجة المرض', stage),
       field('تاريخ الجرعة الأولى', start), schedule),
@@ -140,7 +145,7 @@ export async function render(root, params) {
       err.replaceChildren();
       if (!chosen) return fail('اختر البروتوكول');
       const dxItem = dxList.find((d) => d.key === dxSel.value);
-      const dxText = dxSel.value === OTHER ? diagnosis.value.trim() : (dxItem ? dxItem.abbr : '');
+      const dxText = dxSel.value === OTHER ? diagnosis.value.trim() : (dxItem ? dxItem.label : '');
       if (!dxText) return fail(dxSel.value === OTHER ? 'اكتب التشخيص' : 'اختر التشخيص');
       if (!dStatus) return fail('اختر حالة المرض: Initial treatment أو Relapse أو Maintenance');
       const code = dxItem ? dxItem.icd : null;   // يُحفظ تلقائياً ولا يظهر

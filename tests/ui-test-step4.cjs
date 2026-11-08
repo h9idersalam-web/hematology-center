@@ -78,7 +78,7 @@ const B = 'http://localhost:8788/';
   ok('preview rituximab 799', /Rituximab[\s\S]*799/.test(prev));
   ok('preview vincristine capped to 2', prev.includes('قُصّت إلى السقف 2 ملغ (المحسوب 3)'));
   const dxOpts = await sara.locator('#dx-sel option').allTextContents();
-  ok('diagnosis list: English abbreviations, lymphomas only + Other', dxOpts.includes('DLBCL') && dxOpts.includes('NHL') && dxOpts.includes('Other') && !dxOpts.some((t) => ['MM', 'AML', 'B-ALL', 'SCD'].includes(t)) && !dxOpts.some((t) => /[\u0600-\u06FF]/.test(t) && t !== 'اختر التشخيص'));
+  ok('diagnosis list: English abbreviations, lymphomas only + Other', dxOpts.includes('DLBCL — Diffuse large B-cell lymphoma') && dxOpts.includes('NHL — Non-Hodgkin lymphoma') && dxOpts.includes('Other') && !dxOpts.some((t) => /^(MM|AML|B-ALL|SCD) —/.test(t)) && !dxOpts.some((t) => /[\u0600-\u06FF]/.test(t) && t !== 'اختر التشخيص'));
   await sara.locator('#dx-sel').selectOption('DLBCL');
   ok('no ICD-10 field', (await sara.getByLabel('رمز ICD-10').count()) === 0);
   await sara.getByRole('button', { name: 'إنشاء الخطة' }).click();
@@ -90,7 +90,7 @@ const B = 'http://localhost:8788/';
   await sara.waitForSelector('text=خطة العلاج الحالية');
   ok('plan active', (await sara.locator('.pill', { hasText: 'فعّالة' }).count()) === 1);
   ok('dates: English digits + weekday', /\d{4}\/\d{1,2}\/\d{1,2} - (الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت)/.test(await sara.locator('main').textContent()) && !/(تشرين|كانون|شباط|آذار|نيسان|أيار|حزيران|تموز|أيلول)/.test(await sara.locator('main').textContent()));
-  { const pt = await sara.locator('main').textContent(); ok('patient shows status + grade + diagnosis (English)', pt.includes('Initial treatment') && pt.includes('Grade 3') && pt.includes('DLBCL') && !pt.includes('علاج أولي') && !pt.includes('C83.3')); }
+  { const pt = await sara.locator('main').textContent(); ok('patient shows status + grade + diagnosis (English)', pt.includes('Initial treatment') && pt.includes('Grade 3') && pt.includes('DLBCL — Diffuse large B-cell lymphoma') && !pt.includes('علاج أولي') && !pt.includes('C83.3')); }
   const pid = sara.url().split('id=')[1];
   await sara.locator('a[aria-label^="الجرعة 1،"]').click();
   await sara.waitForSelector('text=الجرعات الدوائية');

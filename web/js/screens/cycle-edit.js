@@ -39,7 +39,7 @@ export async function render(root, params) {
 
   // ----------------------------------------------------------- التشخيص
   const dx = h('input', { class: 'input ltr', style: 'text-align: right', value: t.diagnosis, list: 'dx-all' });
-  const dxAll = h('datalist', { id: 'dx-all' }, allDiagnoses().map((d) => h('option', { value: d.abbr, label: d.en })));
+  const dxAll = h('datalist', { id: 'dx-all' }, allDiagnoses().map((d) => h('option', { value: d.label })));
   const icd = h('input', { class: 'input ltr', style: 'text-align: right; text-transform: uppercase', value: t.icd10 || '' });
   const stage = h('select', { class: 'input' }, h('option', { value: '', text: 'غير محددة' }),
     [...new Set([...GRADES, ...(t.stage ? [t.stage] : [])])].map((g) => h('option', { value: g, text: g, selected: g === t.stage })));
