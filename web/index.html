@@ -18,6 +18,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/app.css">
+<script>/* المظهر قبل ظهور الصفحة: التصميم 2 رسمي، و'a' تجريبي، و'off' القديم (التفاصيل في js/theme.js) */
+(function () { var v = null; try { v = localStorage.getItem('hc-theme'); } catch (e) {}
+  var m = /[?&]theme=(a|b|off)\b/.exec(location.search + '&' + location.hash); if (m) v = m[1] === 'b' ? null : m[1];
+  var t = v === 'off' ? null : v === 'a' ? 'a' : 'b'; if (!t) return;
+  document.documentElement.setAttribute('data-theme', t);
+  document.write('<link rel="stylesheet" id="theme-css" href="css/theme-' + t + '.css">'); })();</script>
 </head>
 <body>
 <div id="app" aria-live="polite">

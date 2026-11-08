@@ -1,4 +1,5 @@
 // إشعار «تحليل خارج الحد الطبيعي» يفتح التحليل نفسه (pgrest-lite على 8788)
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const { execFileSync } = require('node:child_process');
 const OUT = process.argv[2];

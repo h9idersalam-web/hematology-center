@@ -1,4 +1,5 @@
 // اختبار شاشات الخطوة 3 (المرضى والملف والمواعيد) مع الخادم التجريبي
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const OUT = process.argv[2];
 const B = 'http://localhost:8787/';

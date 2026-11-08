@@ -1,5 +1,6 @@
 // قديم: يختبر نظام الأكواد السابق على المحاكي mock-server؛ حلّ محله ui-test-activation.cjs على القاعدة الحقيقية
 // اختبار الواجهة على مقاس الهاتف مع الخادم التجريبي
+require('./theme-env.cjs');
 const { chromium } = require('playwright');
 const OUT = process.argv[2];
 (async () => {

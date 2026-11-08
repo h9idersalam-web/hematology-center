@@ -1,5 +1,6 @@
 // اختبار الصيدلية الداخلية (pgrest-lite على 8788)
 //   node tests/ui-test-pharmacy.cjs ./shots <مجلد فيه week.xlsx و week.csv>
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');

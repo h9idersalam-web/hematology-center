@@ -1,5 +1,6 @@
 // اختبار دورات الدواء على الواجهة (pgrest-lite على 8788)
 //   node tests/ui-test-drug-cycles.cjs <out_dir> <seed.sql اختياري: بروتوكولات المركز>
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const { execFileSync } = require('node:child_process');
 const OUT = process.argv[2], SEED = process.argv[3];

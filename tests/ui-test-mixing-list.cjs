@@ -1,4 +1,5 @@
 // قسم المزج: جرعات اليوم افتراضياً، وغداً، وأي تاريخ، والمتأخرة، والبروتوكول كاملاً (pgrest-lite على 8788)
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const OUT = process.argv[2];
 const B = 'http://localhost:8788/';

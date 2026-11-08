@@ -1,5 +1,6 @@
 // اختبار التسجيل والتفعيل والإيقاف على الواجهة (pgrest-lite على 8788)
 //   node tests/ui-test-activation.cjs <out_dir>
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const OUT = process.argv[2];
 const B = 'http://localhost:8788/';

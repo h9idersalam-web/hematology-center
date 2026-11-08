@@ -1,5 +1,6 @@
 // اختبار القراءة الآلية لصورة تعداد الدم في المتصفح (pgrest-lite على 8788)
 //   node tests/ui-test-lab-ocr.cjs ./shots <مجلد العيّنات من tests/lab-ocr/make_samples.py>
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const { execFileSync } = require('node:child_process');
 const OUT = process.argv[2], FIX = process.argv[3];

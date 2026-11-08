@@ -1,4 +1,5 @@
 // اختبار دور عمل المدير وتغيير صلاحيات المستخدمين (pgrest-lite على 8788)
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const OUT = process.argv[2];
 const { execFileSync } = require('node:child_process');

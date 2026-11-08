@@ -1,5 +1,6 @@
 // اختبار سلسلة الموافقات الجديدة (الملف 14) على الواجهة: pgrest-lite على المنفذ 8788
 //   node tests/ui-test-approval-chain.cjs ./shots
+require('./theme-env.cjs');
 let pw; try { pw = require('playwright'); } catch { pw = require('playwright-core'); }
 const OUT = process.argv[2];
 const B = 'http://localhost:8788/';
