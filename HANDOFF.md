@@ -124,6 +124,7 @@ tests/                  اختبارات قاعدة البيانات (PostgreSQL
 | 20_lab_alert_day_before | يشمل الإشعار التحليل المسحوب قبل الدورة بيوم |
 | 21_lock_prepared_doses | الجرعة المحضّرة لا تُعدَّل ولا تُحذف حتى يزيل صيدلي المزج علامة التحضير |
 | 27_ice_protocols | بروتوكولا «ICE (مجزأ)» و«ICE» من ملفات المركز: Carboplatin 400 ملغ/م² بحد 800، Ifosfamide وMesna 1666 ملغ/م² الأيام 1–3 (طُبّق، غير معتمدين) |
+| 31_br_protocol | بروتوكول BR (Bendamustine 90 ملغ/م² يوم 1،2 + Rituximab 375 يوم 1)، كل 28 يوماً، 6 دورات (طُبّق، غير معتمد) |
 | 30_mesna_equals_ifosfamide | قاعدة Mesna = Ifosfamide (1:1): IBER أُضيفت Mesna، R-CODOX-M/R-IVAC تعليمة، Pembro-ICE وPola-R-ICE أُعيدا بنسخة مصححة وأُرشفت القديمة «(Mesna قديم 2026-11-08)» (طُبّق) |
 | 29_tec_pembro_ice_fix | TEC: Bendamustine 70 ملغ/م² (يحدده الطبيب 60–120) ودورتان كل 21 يوماً؛ Pembro-ICE (مجزأ) 6 دورات (طُبّق) |
 | 28_carboplatin_mg_m2 | إعادة TEC وPola-R-ICE وPembro-ICE (مجزأ) من نسخها المؤرشفة: Carboplatin 400 ملغ/م² بحد 800 (طُبّق، غير معتمدة) |
