@@ -19,9 +19,11 @@ export async function render(root, params) {
   mount(root, h('div', { class: 'screen' }, topbar({ title: id ? 'تعديل البيانات' : 'مريض جديد', back }),
     h('main', { class: 'main' }, h('div', { class: 'empty' }, h('span', { class: 'spinner' })))));
 
-  const [pt, specialists] = await Promise.all([
+  const [pt, specialists, notJoined] = await Promise.all([
     id ? q(sb.from('patients').select('*').eq('id', id).maybeSingle()) : Promise.resolve(null),
     q(sb.from('profiles').select('id, full_name').eq('role', 'specialist').eq('status', 'active').order('full_name')),
+    // أطباء اختصاص أضافهم المدير بالاسم قبل انضمامهم (الملف 36)
+    q(sb.from('pending_specialists').select('id, full_name').is('linked_at', null).is('archived_at', null).order('full_name')).catch(() => []),
   ]);
   if (id && !pt) throw new Error('المريض غير موجود');
   if (pt && pt.archived_at) throw new Error('ملف هذا المريض مؤرشف ولا يمكن تعديله');
@@ -47,10 +49,11 @@ export async function render(root, params) {
       onclick: () => { sex = k; drawSex(); } })));
   drawSex();
 
-  const defaultSp = v.specialist_id || (state.profile.role === 'specialist' ? state.profile.id : '');
+  const defaultSp = v.specialist_id || v.pending_specialist_id || (state.profile.role === 'specialist' ? state.profile.id : '');
   const spSelect = h('select', { class: 'input' },
-    h('option', { value: '', text: specialists.length ? 'اختر الطبيب المختص' : 'لا يوجد طبيب اختصاص مفعّل بعد' }),
-    specialists.map((s) => h('option', { value: s.id, text: s.full_name, selected: s.id === defaultSp })));
+    h('option', { value: '', text: specialists.length || notJoined.length ? 'اختر الطبيب المختص' : 'لا يوجد طبيب اختصاص بعد' }),
+    specialists.map((s) => h('option', { value: s.id, text: s.full_name, selected: s.id === defaultSp })),
+    notJoined.map((s) => h('option', { value: s.id, text: s.full_name + ' (لم ينضم بعد)', selected: s.id === defaultSp })));
 
   const bsaOut = h('p', { class: 'hint', 'aria-live': 'polite' });
   const drawBsa = () => {

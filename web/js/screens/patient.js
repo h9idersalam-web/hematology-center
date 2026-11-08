@@ -188,7 +188,8 @@ function planActions(p, t, reload) {
   if (p.archived_at) return null;
   const out = [];
   // الموافقة على الخطة ورفضها للطبيب المختص بهذا المريض حصراً
-  const mineToDecide = can('approvePlan') && p.specialist_id === state.profile.id;
+  // طبيب المريض لم ينضم بعد: يقرّر المدير وهو يعمل بدور طبيب الاختصاص (الملف 36)
+  const mineToDecide = can('approvePlan') && (p.specialist_id === state.profile.id || (!p.specialist_id && p.pending_specialist_id && state.profile.is_admin));
   if (t.status === 'pending_approval' && mineToDecide) {
     const b = h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), 'الموافقة على الخطة');
     b.addEventListener('click', () => busy(b, async () => {

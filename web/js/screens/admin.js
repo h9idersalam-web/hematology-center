@@ -1,5 +1,5 @@
 // الإدارة: المستخدمون، أكواد التفعيل، الاشتراكات، الصلاحيات (للمدير وحده)
-import { rpc } from '../api.js';
+import { rpc, sb, q } from '../api.js';
 import { APP_NAME } from '../config.js';
 import { h, mount, icon, topbar, empty, ROLES, TITLES, roleName, fmtDate, fmtTime, daysUntil, toast, busy, field, notice, initials, confirmDialog, ROLE_GROUPS } from '../ui.js';
 import { state, go } from '../app.js';
@@ -22,7 +22,7 @@ export async function render(root, params) {
       stats),
     tabs, body));
 
-  const TABS = [['users', 'إدارة المستخدمين'], ['subscriptions', 'الاشتراكات'], ['permissions', 'الصلاحيات']];
+  const TABS = [['users', 'إدارة المستخدمين'], ['doctors', 'أطباء لم ينضموا'], ['subscriptions', 'الاشتراكات'], ['permissions', 'الصلاحيات']];
   function drawTabs() {
     tabs.replaceChildren(...TABS.map(([id, label]) => h('button', {
       role: 'tab', 'aria-selected': tab === id ? 'true' : 'false',
@@ -44,11 +44,58 @@ export async function render(root, params) {
     body.replaceChildren(h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
     try {
       if (tab === 'users') await drawUsers();
+      else if (tab === 'doctors') await drawDoctors();
       else if (tab === 'subscriptions') await drawSubscriptions();
       else drawPermissions();
     } catch (e) {
       body.replaceChildren(notice('err', 'warn', h('p', { text: e.message })));
     }
+  }
+
+  // ------------------------------------------------------------ أطباء اختصاص قبل انضمامهم (الملف 36)
+  // 1. يُضاف الطبيب بالاسم فيظهر في قائمة «الطبيب المختص» عند تسجيل المرضى
+  // 2. عند انضمامه وتفعيله طبيب اختصاص يُربط بحسابه فينتقل كل مرضاه إليه
+  async function drawDoctors() {
+    const [list, pts, specs] = await Promise.all([
+      q(sb.from('pending_specialists').select('id, full_name, created_at').is('linked_at', null).is('archived_at', null).order('full_name')),
+      q(sb.from('patients').select('pending_specialist_id').not('pending_specialist_id', 'is', null).is('archived_at', null)),
+      q(sb.from('profiles').select('id, full_name').eq('role', 'specialist').eq('status', 'active').order('full_name')),
+    ]);
+    const nOf = (id) => pts.filter((x) => x.pending_specialist_id === id).length;
+    const nameIn = h('input', { class: 'input', maxlength: 120, placeholder: 'مثال: د. أحمد كاظم', 'aria-label': 'اسم الطبيب' });
+    const add = h('button', { type: 'button', class: 'btn primary', onclick: () => busy(add, async () => {
+      try { await rpc('admin_add_pending_specialist', { p_name: nameIn.value }); toast('أُضيف الطبيب'); draw(); }
+      catch (x) { toast(x.message, true); }
+    }) }, icon('plus', 20, '#fff'), h('span', { text: 'إضافة' }));
+    nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') add.click(); });
+    const row = (d) => {
+      const n = nOf(d.id);
+      const linkSel = h('select', { class: 'input', 'aria-label': 'حساب ' + d.full_name },
+        h('option', { value: '', text: specs.length ? 'اختر حسابه بعد انضمامه' : 'لا يوجد طبيب اختصاص مفعّل بعد' }),
+        specs.map((x) => h('option', { value: x.id, text: x.full_name })));
+      const linkBtn = h('button', { type: 'button', class: 'btn secondary', disabled: !specs.length, onclick: async () => {
+        if (!linkSel.value) return toast('اختر حساب الطبيب', true);
+        const who = specs.find((x) => x.id === linkSel.value).full_name;
+        if (!await confirmDialog({ title: 'ربط ' + d.full_name, body: `بحساب «${who}». ينتقل إليه ${n} مريض، ويصبح هو الطبيب المختص بهم ويقرّر خططهم.`, okText: 'ربط' })) return;
+        busy(linkBtn, async () => {
+          try { const moved = await rpc('admin_link_pending_specialist', { p_pending: d.id, p_user: linkSel.value }); toast(`رُبط ونُقل ${moved} مريض`); draw(); }
+          catch (x) { toast(x.message, true); }
+        });
+      } }, icon('check', 20), h('span', { text: 'ربط' }));
+      return h('div', { class: 'card', style: 'gap: 10px' },
+        h('div', { style: 'display: flex; justify-content: space-between; align-items: center; gap: 8px' },
+          h('b', { text: d.full_name }), h('span', { class: 'pill ' + (n ? 'brand' : 'muted'), text: n ? n + ' مريض' : 'بلا مرضى' })),
+        h('div', { class: 'grid-2' }, linkSel, linkBtn),
+        n ? null : h('button', { type: 'button', class: 'link-btn', style: 'color: var(--muted); align-self: flex-start', onclick: async (e) => {
+          if (!await confirmDialog({ title: 'إزالة ' + d.full_name, body: 'يختفي من قائمة الأطباء، ويبقى في سجل التعديلات.', okText: 'إزالة', danger: true })) return;
+          try { await rpc('admin_archive_pending_specialist', { p_id: d.id }); toast('أُزيل'); draw(); } catch (x) { toast(x.message, true); }
+        } }, 'إزالة الاسم'));
+    };
+    body.replaceChildren(h('section', { class: 'section' },
+      h('div', { class: 'section-head' }, h('h2', { text: 'أطباء اختصاص لم ينضموا بعد' }), h('span', { class: 'meta', text: `${list.length}` })),
+      h('p', { class: 'hint', text: 'أضف الطبيب باسمه فقط، فيظهر في قائمة «الطبيب المختص» عند تسجيل المرضى. عند انضمامه وتفعيل حسابه طبيب اختصاص، اختر حسابه هنا واضغط «ربط» فينتقل إليه كل مرضاه. قبل انضمامه توافق أنت على خطط مرضاه وأنت تعمل بدور طبيب الاختصاص.' }),
+      h('div', { class: 'card', style: 'flex-direction: row; gap: 8px; align-items: center' }, nameIn, add),
+      ...(list.length ? list.map(row) : [h('div', { class: 'card' }, empty('لم تُضف أسماء بعد', 'users'))])));
   }
 
   // ------------------------------------------------------------ إدارة المستخدمين
@@ -100,6 +147,8 @@ export async function render(root, params) {
         : left < 0 ? 'انتهى الاشتراك' : 'الاشتراك حتى ' + fmtDate(u.subscription_ends);
     const btn = (cls, text, onclick) => h('button', { type: 'button', class: 'btn sm ' + cls, onclick }, text);
     const actions = [];
+    // طبيب اختصاص انضم: يُربط بالاسم الذي أُضيف قبل انضمامه فينتقل إليه مرضاه (الملف 36)
+    if (u.role === 'specialist' && u.status === 'active' && !u.is_admin) actions.push(h('button', { type: 'button', class: 'link-btn', onclick: () => { tab = 'doctors'; history.replaceState(null, '', '#/admin?tab=doctors'); drawTabs(); draw(); } }, 'ربط بطبيب مضاف مسبقاً'));
     if (u.is_admin) actions.push(h('span', { class: 'pill ok', text: isSelf ? 'أنت المدير' : 'مدير' }));
     else {
       if (u.status === 'pending') actions.push(btn('primary', u.code && !u.code.expired ? 'إصدار كود جديد' : 'إصدار كود', () => issueDialog(u)));
