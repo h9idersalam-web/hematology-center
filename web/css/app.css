@@ -381,3 +381,14 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .inv-preview { max-height: 46vh; overflow: auto; }
 .inv-preview tr.warn td:not(:first-child) { background: var(--warn-soft); }
 .inv-preview td.bad { color: var(--warn-ink); font-weight: 700; }
+/* تحديث التقرير السابق: الجدول قابل للكتابة */
+.inv-editbar { position: sticky; top: 0; z-index: 3; background: var(--bg); padding: 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.xl.editing td.in { padding: 0; }
+.xl.editing td.in input, .xl.editing td.in select { width: 100%; min-width: 90px; border: 0; background: transparent; font: inherit; color: var(--ink); padding: 8px; }
+.xl.editing td.in input.q { min-width: 64px; text-align: center; direction: ltr; }
+.xl.editing td.in input.u { min-width: 60px; }
+.xl.editing td.in input[type=date] { direction: ltr; min-width: 130px; }
+.xl.editing td.in:focus-within { outline: 2px solid var(--brand); outline-offset: -2px; }
+.xl.editing td.in.changed { background: var(--info-soft) !important; }
+.xl.editing td:nth-child(2) input { min-width: 160px; font-weight: 600; }
+.xl.editing td:last-child input { min-width: 160px; }

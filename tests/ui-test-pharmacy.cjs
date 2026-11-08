@@ -87,6 +87,26 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.getByRole('searchbox', { name: 'ابحث باسم الدواء' }).fill('ritux');
   ok('search', await page.locator('.xl tbody tr').count() === 1);
   await page.getByRole('searchbox', { name: 'ابحث باسم الدواء' }).fill('');
+  // تحديث التقرير السابق: تعديل الخانات مباشرة في الجدول
+  ok('no empty-report button', await page.getByRole('button', { name: 'تقرير فارغ' }).count() === 0);
+  await page.getByRole('button', { name: 'تحديث التقرير السابق' }).click();
+  ok('table becomes editable', await page.locator('.xl.editing input').count() > 10);
+  await page.getByLabel('العدد: Cytarabine 100mg').fill('5');
+  await page.getByLabel('الحالة: Cytarabine 100mg').selectOption('available');
+  await page.getByLabel('الصلاحية: Methotrexate 50mg').fill('2027-06-30');
+  ok('changed cells marked', await page.locator('.xl td.in.changed').count() === 3);
+  await shot('edit-all', false);
+  await page.getByRole('button', { name: 'حفظ التعديلات' }).click();
+  await page.waitForSelector('.xl:not(.editing)');
+  await page.waitForTimeout(500);
+  ok('bulk update saved', psql("select quantity || ':' || status from inventory_items where drug_name like 'Cytarabine%' and archived_at is null") === '5:available'
+     && psql("select expiry_date from inventory_items where drug_name like 'Methotrexate%'") === '2027-06-30');
+  ok('same report updated (no new report)', psql("select count(*) from inventory_reports") === '1');
+  await page.getByRole('button', { name: 'تحديث التقرير السابق' }).click();
+  await page.getByLabel('العدد: Vincristine 1mg').fill('1');
+  await page.getByRole('button', { name: 'إلغاء', exact: true }).click();
+  ok('cancel discards', psql("select quantity from inventory_items where drug_name like 'Vincristine%'") === '9');
+
   // التنزيل كإكسل ثم إعادة قراءته
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'تنزيل كملف إكسل' }).click()]);
   const xf = `${OUT}/rep-export.xlsx`; await dl.saveAs(xf);

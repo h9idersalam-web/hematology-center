@@ -39,7 +39,15 @@ export async function render(root, params) {
       onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileIn.click(); } } },
       icon('upload', 20, '#fff'), h('span', { text: 'رفع ملف إكسل الأسبوع' })),
     rep ? h('button', { type: 'button', class: 'btn secondary', onclick: (e) => copyLast(e.currentTarget) }, icon('copy', 20), h('span', { text: 'نسخ هذا التقرير لأسبوع جديد' })) : null,
-    h('button', { type: 'button', class: 'btn secondary', onclick: (e) => createReport(e.currentTarget, [], 'إدخال يدوي') }, icon('plus', 20), h('span', { text: 'تقرير فارغ' }))) : null;
+    rep ? h('button', { type: 'button', class: 'btn secondary', id: 'inv-edit-all', onclick: () => startEdit() }, icon('edit', 20), h('span', { text: 'تحديث التقرير السابق' })) : null) : null;
+  // شريط التعديل الجماعي: يظهر أثناء «تحديث التقرير السابق»
+  const editBar = h('div', { class: 'inv-editbar', hidden: true },
+    h('p', { class: 'hint', text: 'عدّل أي خانة في الجدول مباشرة، ثم احفظ. الخانة المعدّلة تُعلَّم بالأزرق.' }),
+    h('div', { class: 'inv-actions' },
+      h('button', { type: 'button', class: 'btn primary', onclick: (e) => saveEdits(e.currentTarget) }, icon('check', 20, '#fff'), h('span', { text: 'حفظ التعديلات' })),
+      h('button', { type: 'button', class: 'btn secondary', onclick: () => stopEdit() }, h('span', { text: 'إلغاء' }))));
+  let editing = false;
+  const drafts = new Map();   // id -> القيم المعدّلة
 
   mount(root, h('div', { class: 'screen' },
     topbar({ title: 'الصيدلية الداخلية', sub: rep ? `تقرير بتاريخ ${ymd(rep.report_date)}` : 'توافر الأدوية في المركز' }),
@@ -58,6 +66,7 @@ export async function render(root, params) {
         : h('div', { class: 'card' }, empty(editor ? 'لا يوجد تقرير بعد. ارفع ملف إكسل الأسبوع لإنشائه.' : 'لم يرفع مسؤول الصيدلية الداخلية تقريراً بعد.', 'pill')),
       rep ? h('input', { class: 'input', type: 'search', placeholder: 'ابحث باسم الدواء', 'aria-label': 'ابحث باسم الدواء',
         oninput: (e) => { search = e.target.value; drawList(); } }) : null,
+      rep ? editBar : null,
       rep ? listBox : null,
       rep ? h('div', { class: 'inv-actions' },
         editor ? h('button', { type: 'button', class: 'btn primary', onclick: () => itemDialog(null) }, icon('plus', 20, '#fff'), h('span', { text: 'إضافة دواء' })) : null,
@@ -67,25 +76,81 @@ export async function render(root, params) {
   if (rep) drawList();
 
   // جدول مثل الإكسل: خطوط بين كل الخانات، وعمود ترقيم، ويُعدَّل الدواء بالضغط على صفه
+  // وفي «تحديث التقرير السابق» تصبح كل خانة قابلة للكتابة مباشرة
   function drawList() {
     const qs = arNorm(search.trim());
     const rows = items.filter((i) => !qs || arNorm(i.drug_name).includes(qs));
     if (!rows.length) return listBox.replaceChildren(h('div', { class: 'card' }, empty(items.length ? 'لا يوجد دواء بهذا الاسم' : 'التقرير فارغ. أضف الأدوية.', 'pill')));
-    listBox.replaceChildren(h('table', { class: 'xl' },
+    listBox.replaceChildren(h('table', { class: 'xl' + (editing ? ' editing' : '') },
       h('thead', null, h('tr', null, ['#', 'اسم الدواء', 'العدد', 'الوحدة', 'الصلاحية', 'الحالة', 'الملاحظات'].map((t) => h('th', { scope: 'col', text: t })))),
-      h('tbody', null, rows.map((i, n) => {
-        const es = expiryState(i.expiry_date);
-        const tr = h('tr', { class: 'st-' + i.status + (editor ? ' edit' : ''), tabindex: editor ? 0 : null, 'aria-label': editor ? 'تعديل ' + i.drug_name : null,
-          onclick: editor ? () => itemDialog(i) : null, onkeydown: editor ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); itemDialog(i); } } : null },
-          h('td', { class: 'rn', text: n + 1 }),
-          h('td', { class: 'nm', dir: 'auto', text: i.drug_name }),
-          h('td', { class: 'num', text: numTxt(i.quantity) }),
-          h('td', { dir: 'auto', text: i.unit || '' }),
-          h('td', { class: 'num' + (es === 'expired' || es === 'soon' ? ' exp ' + es : ''), title: es === 'expired' ? 'منتهي الصلاحية' : es === 'soon' ? 'تنتهي خلال 3 أشهر' : null, text: ymd(i.expiry_date) }),
-          h('td', null, h('span', { class: 'pill ' + STATUS_PILL[i.status], text: STATUS[i.status] })),
-          h('td', { class: 'nt', dir: 'auto', text: i.notes || '' }));
-        return tr;
-      }))));
+      h('tbody', null, rows.map((i, n) => (editing ? editRow(i, n) : viewRow(i, n))))));
+  }
+  function viewRow(i, n) {
+    const es = expiryState(i.expiry_date);
+    return h('tr', { class: 'st-' + i.status + (editor ? ' edit' : ''), tabindex: editor ? 0 : null, 'aria-label': editor ? 'تعديل ' + i.drug_name : null,
+      onclick: editor ? () => itemDialog(i) : null, onkeydown: editor ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); itemDialog(i); } } : null },
+      h('td', { class: 'rn', text: n + 1 }),
+      h('td', { class: 'nm', dir: 'auto', text: i.drug_name }),
+      h('td', { class: 'num', text: numTxt(i.quantity) }),
+      h('td', { dir: 'auto', text: i.unit || '' }),
+      h('td', { class: 'num' + (es === 'expired' || es === 'soon' ? ' exp ' + es : ''), title: es === 'expired' ? 'منتهي الصلاحية' : es === 'soon' ? 'تنتهي خلال 3 أشهر' : null, text: ymd(i.expiry_date) }),
+      h('td', null, h('span', { class: 'pill ' + STATUS_PILL[i.status], text: STATUS[i.status] })),
+      h('td', { class: 'nt', dir: 'auto', text: i.notes || '' }));
+  }
+  const val = (i) => ({ drug_name: i.drug_name, quantity: i.quantity === null ? '' : String(+i.quantity), unit: i.unit || '', expiry_date: i.expiry_date || '', status: i.status, notes: i.notes || '' });
+  function editRow(i, n) {
+    const d = drafts.get(i.id) || val(i);
+    const orig = val(i);
+    const tr = h('tr', { class: 'st-' + d.status });
+    const set = (k, v, cell) => {
+      d[k] = v; drafts.set(i.id, d);
+      cell.classList.toggle('changed', String(v) !== String(orig[k]));
+      if (k === 'status') tr.className = 'st-' + v;
+    };
+    const inp = (k, attrs) => {
+      const td = h('td', { class: 'in' + (String(d[k]) !== String(orig[k]) ? ' changed' : '') });
+      const el = k === 'status'
+        ? h('select', { 'aria-label': 'الحالة: ' + i.drug_name, onchange: (e) => set(k, e.target.value, td) }, Object.entries(STATUS).map(([v, l]) => h('option', { value: v, selected: d.status === v, text: l })))
+        : h('input', { ...attrs, value: d[k], oninput: (e) => set(k, e.target.value, td) });
+      td.append(el); return td;
+    };
+    tr.append(
+      h('td', { class: 'rn', text: n + 1 }),
+      inp('drug_name', { dir: 'auto', maxlength: 200, 'aria-label': 'اسم الدواء ' + (n + 1) }),
+      inp('quantity', { type: 'number', min: 0, step: 'any', inputmode: 'decimal', class: 'q', 'aria-label': 'العدد: ' + i.drug_name }),
+      inp('unit', { dir: 'auto', maxlength: 40, class: 'u', 'aria-label': 'الوحدة: ' + i.drug_name }),
+      inp('expiry_date', { type: 'date', 'aria-label': 'الصلاحية: ' + i.drug_name }),
+      inp('status'),
+      inp('notes', { dir: 'auto', maxlength: 500, 'aria-label': 'الملاحظات: ' + i.drug_name }));
+    return tr;
+  }
+  function startEdit() {
+    editing = true; drafts.clear();
+    editBar.hidden = false;
+    for (const b of root.querySelectorAll('.inv-actions button, .inv-actions label, select.input')) if (!editBar.contains(b)) b.setAttribute('disabled', '');
+    drawList();
+    editBar.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  function stopEdit() {
+    editing = false; drafts.clear();
+    editBar.hidden = true;
+    for (const b of root.querySelectorAll('[disabled]')) if (!editBar.contains(b)) b.removeAttribute('disabled');
+    drawList();
+  }
+  async function saveEdits(btn) {
+    const changed = items.filter((i) => drafts.has(i.id) && JSON.stringify(drafts.get(i.id)) !== JSON.stringify(val(i)));
+    if (!changed.length) { toast('لم تغيّر أي خانة'); return stopEdit(); }
+    await busy(btn, async () => {
+      const failed = [];
+      for (const i of changed) {
+        try { await rpc('inventory_save_item', { p_report: rep.id, p_item: i.id, p_data: drafts.get(i.id) }); drafts.delete(i.id); }
+        catch (x) { failed.push(`${drafts.get(i.id).drug_name || i.drug_name}: ${x.message}`); }
+      }
+      items = await q(sb.from('inventory_items').select('*').eq('report_id', rep.id).is('archived_at', null).order('sort'));
+      if (failed.length) { toast(`لم يُحفظ ${failed.length}: ${failed[0]}`, true); drawList(); return; }
+      toast(`حُفظ تحديث ${count(changed.length, 'drug')}`);
+      stopEdit();
+    });
   }
 
   async function reload(id) { location.hash = '#/report-pharmacy?id=' + id + '&r=' + Date.now(); }
