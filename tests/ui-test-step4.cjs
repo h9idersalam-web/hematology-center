@@ -89,6 +89,7 @@ const B = 'http://localhost:8788/';
   await sara.getByRole('button', { name: 'إنشاء الخطة' }).click();
   await sara.waitForSelector('text=خطة العلاج الحالية');
   ok('plan active', (await sara.locator('.pill', { hasText: 'فعّالة' }).count()) === 1);
+  ok('dates: English digits + weekday', /\d{4}\/\d{1,2}\/\d{1,2} - (الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت)/.test(await sara.locator('main').textContent()) && !/(تشرين|كانون|شباط|آذار|نيسان|أيار|حزيران|تموز|أيلول)/.test(await sara.locator('main').textContent()));
   { const pt = await sara.locator('main').textContent(); ok('patient shows status + grade + diagnosis (English)', pt.includes('Initial treatment') && pt.includes('Grade 3') && pt.includes('DLBCL') && !pt.includes('علاج أولي') && !pt.includes('C83.3')); }
   const pid = sara.url().split('id=')[1];
   await sara.locator('a[aria-label^="الجرعة 1،"]').click();

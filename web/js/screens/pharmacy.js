@@ -1,13 +1,13 @@
 // الصيدلية الداخلية (تبويب «الصيدلية» في شريط التنقل): تقرير أسبوعي من ملف إكسل
 import { sb, q, rpc } from '../api.js';
-import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, field, todayISO, count, confirmDialog, arNorm } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, field, fmtDate, fmtYMD, todayISO, count, confirmDialog, arNorm } from '../ui.js';
 import { can } from '../perms.js';
 import { readSheet, writeXlsx, download } from '../xlsx.js';
 import { FIELDS, STATUS, guessColumns, rowsToItems, expiryState } from '../inventory.js';
 
 const STATUS_PILL = { available: 'ok', low: 'warn', out: 'err' };
 // التواريخ بالأرقام الإنكليزية مثل 2026/11/12 (بقرار صاحب المشروع)
-const ymd = (d) => { if (!d) return '—'; const s = typeof d === 'string' && d.length === 10 ? d : new Date(d).toLocaleDateString('en-CA'); return s.replace(/-/g, '/'); };
+const ymd = (d) => fmtDate(d);   // 2026/11/8 - الأحد
 const hm = (d) => new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 const numTxt = (n) => (n === null || n === undefined ? '—' : String(+n));
 
@@ -201,7 +201,7 @@ export async function render(root, params) {
   }
   function copyLast(btn) {
     createReport(btn, items.map(({ drug_name, quantity, unit, expiry_date, status, notes }) => ({ drug_name, quantity, unit, expiry_date, status, notes })),
-      'نسخة من تقرير ' + ymd(rep.report_date));
+      'نسخة من تقرير ' + fmtYMD(rep.report_date));
   }
   async function archiveReport(btn) {
     const reason = await confirmDialog({ title: 'حذف تقرير ' + ymd(rep.report_date), body: 'يختفي التقرير من القائمة ويبقى في سجل التعديلات.',
@@ -214,7 +214,7 @@ export async function render(root, params) {
   }
   function exportXlsx() {
     const rows = [['اسم الدواء', 'العدد', 'الوحدة', 'تاريخ انتهاء الصلاحية', 'الحالة', 'الملاحظات'],
-      ...items.map((i) => [i.drug_name, i.quantity === null ? '' : +i.quantity, i.unit || '', i.expiry_date ? ymd(i.expiry_date) : '', STATUS[i.status], i.notes || ''])];
+      ...items.map((i) => [i.drug_name, i.quantity === null ? '' : +i.quantity, i.unit || '', i.expiry_date ? fmtYMD(i.expiry_date) : '', STATUS[i.status], i.notes || ''])];
     download(writeXlsx(rows, 'الصيدلية الداخلية', [34, 10, 12, 20, 10, 40]), `تقرير الصيدلية الداخلية ${rep.report_date}.xlsx`);
   }
 

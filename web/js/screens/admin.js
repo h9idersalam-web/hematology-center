@@ -1,13 +1,13 @@
 // الإدارة: المستخدمون، أكواد التفعيل، الاشتراكات، الصلاحيات (للمدير وحده)
 import { rpc } from '../api.js';
 import { APP_NAME } from '../config.js';
-import { h, mount, icon, topbar, empty, ROLES, fmtDate, daysUntil, toast, busy, field, notice, initials, confirmDialog, ROLE_GROUPS } from '../ui.js';
+import { h, mount, icon, topbar, empty, ROLES, fmtDate, fmtTime, daysUntil, toast, busy, field, notice, initials, confirmDialog, ROLE_GROUPS } from '../ui.js';
 import { state, go } from '../app.js';
 
 const STATUS = { pending: ['بانتظار التفعيل', 'warn'], active: ['مفعّل', 'ok'], suspended: ['موقوف', 'muted'] };
 const MONTHS = [3, 6, 12];
 const VALID = [[24, '24 ساعة'], [72, '3 أيام'], [168, '7 أيام']];
-const fmtDateTime = (d) => new Intl.DateTimeFormat('ar-IQ', { day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }).format(new Date(d));
+const fmtDateTime = (d) => `${fmtDate(d)} · ${fmtTime(d)}`;
 
 export async function render(root, params) {
   let tab = params.get('tab') || 'users';

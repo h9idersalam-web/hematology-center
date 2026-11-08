@@ -132,14 +132,23 @@ export const ROLE_GROUPS = [
   ] },
 ];
 
-// التاريخ والأرقام (أرقام لاتينية وأشهر عراقية)
+// التاريخ (بقرار صاحب المشروع): كل التواريخ ميلادية بأرقام إنكليزية مع اسم اليوم، مثل «2026/11/8 - الأحد»
 const LOCALE = 'ar-IQ-u-nu-latn';
-export function fmtDate(d, opts = { day: 'numeric', month: 'long', year: 'numeric' }) {
+const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const toDate = (d) => (typeof d === 'string' && d.length === 10 ? new Date(d + 'T00:00:00') : new Date(d));
+// التاريخ بالأرقام فقط: 2026/11/8
+export function fmtYMD(d) {
   if (!d) return '—';
-  const date = typeof d === 'string' && d.length === 10 ? new Date(d + 'T00:00:00') : new Date(d);
-  return new Intl.DateTimeFormat(LOCALE, opts).format(date);
+  const x = toDate(d);
+  return isNaN(x) ? '—' : `${x.getFullYear()}/${x.getMonth() + 1}/${x.getDate()}`;
 }
-export function fmtDay(d) { return fmtDate(d, { weekday: 'long', day: 'numeric', month: 'long' }); }
+// المعامل الثاني القديم (خيارات الشكل) يُتجاهل: الشكل موحّد في كل التطبيق
+export function fmtDate(d) {
+  if (!d) return '—';
+  const x = toDate(d);
+  return isNaN(x) ? '—' : `${fmtYMD(x)} - ${WEEKDAYS[x.getDay()]}`;
+}
+export const fmtDay = fmtDate;
 export function fmtTime(d) { return new Intl.DateTimeFormat(LOCALE, { hour: 'numeric', minute: '2-digit' }).format(new Date(d)); }
 export function relTime(d) {
   const diff = (Date.now() - new Date(d).getTime()) / 60000;

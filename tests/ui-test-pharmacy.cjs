@@ -47,8 +47,8 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.waitForSelector('text=مراجعة ملف week.xlsx');
   const prev = page.locator('.inv-preview tbody tr');
   ok('preview 5 drugs', await prev.count() === 5);
-  ok('xlsx date read', (await prev.nth(0).textContent()).includes('2027/03/31'));
-  ok('month/year => end of month', (await prev.nth(2).textContent()).includes('2027/03/31'));
+  ok('xlsx date read', (await prev.nth(0).textContent()).includes('2027/3/31'));
+  ok('month/year => end of month', (await prev.nth(2).textContent()).includes('2027/3/31'));
   ok('qty 0 => نافد', (await prev.nth(2).textContent()).includes('نافد'));
   ok('Arabic digits qty', (await prev.nth(3).textContent()).includes('8 vial'));
   ok('unclear values flagged', await page.locator('.inv-preview tr.warn').count() === 1);
@@ -82,7 +82,7 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   ok('list now 5 rows', await page.locator('.xl tbody tr').count() === 5);
   // جدول مثل الإكسل وتواريخ إنكليزية
   ok('table grid lines', await page.locator('.xl td').first().evaluate((td) => getComputedStyle(td).borderBottomStyle === 'solid'));
-  ok('english dates', (await page.locator('.xl tbody').textContent()).includes('2027/03/31') && /تقرير بتاريخ \d{4}\/\d{2}\/\d{2}/.test(await page.locator('main').textContent()));
+  ok('english dates with weekday', (await page.locator('.xl tbody').textContent()).includes('2027/3/31 - الأربعاء') && /تقرير بتاريخ \d{4}\/\d{1,2}\/\d{1,2} - (الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت)/.test(await page.locator('main').textContent()));
   ok('out row highlighted', await page.locator('.xl tr.st-out').count() === 1);
   await page.getByRole('searchbox', { name: 'ابحث باسم الدواء' }).fill('ritux');
   ok('search', await page.locator('.xl tbody tr').count() === 1);
@@ -117,7 +117,7 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.locator('#inv-file').setInputFiles(`${FIX}/week.csv`);
   await page.waitForSelector('text=مراجعة ملف week.csv');
   ok('csv preview 2', await page.locator('.inv-preview tbody tr').count() === 2);
-  ok('csv dd/mm/yyyy', (await page.locator('.inv-preview tbody tr').nth(1).textContent()).includes('2027/02/15'));
+  ok('csv dd/mm/yyyy', (await page.locator('.inv-preview tbody tr').nth(1).textContent()).includes('2027/2/15'));
   await page.getByRole('button', { name: 'حفظ التقرير' }).click();
   await page.waitForTimeout(800);
   ok('2 reports, history select', await page.getByLabel('التقارير السابقة').locator('option').count() === 2);
