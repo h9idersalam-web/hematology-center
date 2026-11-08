@@ -212,3 +212,30 @@ body { font-size: 15px; }
 .phb-add { background: #fff; border: 1.5px dashed var(--field); color: var(--brand); }
 .phb-more { justify-content: center; gap: 18px; }
 .phb-more .link-btn { gap: 6px; font-size: 13.5px; }
+
+/* ---------- إعطاء الجرعة (مطابقة لصورة التصميم 2) ---------- */
+.adb-hero { flex-direction: column; align-items: stretch; gap: 14px; }
+.adb-top { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+.adb-day { background: rgba(255, 255, 255, .18); color: #fff; border-radius: 999px; padding: 4px 14px; font-size: 13px; font-weight: 600; }
+.adb-hero h1 { font-size: 30px; font-weight: 700; }
+.adb-h { display: flex; justify-content: space-between; align-items: baseline; }
+.adb .card h2 { font-size: 18px; font-weight: 600; margin: 0; }
+.adb-opt { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.adb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.adb-tile { background: #F7F1F2; border-radius: 18px; padding: 12px 12px; display: flex; flex-direction: column; gap: 2px; cursor: text; }
+.adb-tile:focus-within { box-shadow: 0 0 0 2px var(--brand); }
+.adb-tile .l { font-size: 13px; color: var(--muted); }
+.adb-tile .v { display: flex; align-items: baseline; gap: 6px; direction: ltr; }
+.adb-tile .v small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.adb-v { width: 100%; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 23px; letter-spacing: -.5px; font-weight: 700; color: var(--ink); text-align: right; direction: ltr; padding: 0; flex: 1; outline: none; font-variant-numeric: tabular-nums; }
+.adb-v::placeholder { color: #CDBDC1; }
+.adb-drugs { gap: 0; }
+.adb-drugs h2 { margin-bottom: 6px !important; }
+.adb-drug { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line-2); }
+.adb-drugs h2 + .adb-drug { border-top: 0; }
+.adb-drug .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.adb-drug .grow b { font-size: 16.5px; font-weight: 600; }
+.adb-drug .grow span { font-size: 13px; color: var(--muted); }
+.adb-go { background: var(--brand-soft); color: var(--brand-dark); border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; min-height: 44px; }
+.adb-react { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 58px; border: 0; border-radius: 22px; background: #FBE3E8; color: var(--brand-dark); font: inherit; font-size: 16.5px; font-weight: 600; cursor: pointer; }
+.adb-note { text-align: center; font-size: 13px; color: var(--muted); margin-top: -4px; }

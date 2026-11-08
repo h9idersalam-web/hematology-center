@@ -80,6 +80,7 @@ export async function administer(root, params) {
   const allGiven = doses.length && doses.every((d) => adm.some((a) => a.cycle_dose_id === d.id));
 
   const future = addDaysISO(c.planned_date, day - 1) > todayISO();
+  if (document.documentElement.dataset.theme === 'b') return administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future });
   const rows = doses.map((d) => {
     const a = adm.find((x) => x.cycle_dose_id === d.id);
     const isSent = !d.is_mixed || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at);
@@ -129,6 +130,118 @@ export async function administer(root, params) {
     bottomNav('home')));
 }
 
+// --------------------------------------------------------------- التصميم 2: شاشة «إعطاء الجرعة»
+// العلامات الحيوية في الأعلى اختيارية: تُرفق بكل دواء يُسجَّل إعطاؤه إن كُتبت، ولا تمنع الإعطاء إن تُركت فارغة.
+const VITALS = [['bp', 'ضغط الدم', 'mmHg', '120/80', 'text'], ['hr', 'النبض', 'bpm', '78', 'numeric'], ['temp', 'الحرارة', '°C', '36.8', 'decimal'], ['spo2', 'الأكسجين', '% SpO₂', '98', 'numeric']];
+function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future }) {
+  const last = adm.filter((a) => a.vitals && Object.keys(a.vitals).length).sort((a, b) => b.given_at.localeCompare(a.given_at))[0];
+  const vin = {};
+  const tiles = VITALS.map(([k, l, u, ph, mode]) => {
+    vin[k] = h('input', { class: 'adb-v', inputmode: mode, placeholder: '—', 'aria-label': l + ' (اختياري) مثل ' + ph, value: last?.vitals?.[k] || '' });
+    return h('label', { class: 'adb-tile' }, h('span', { class: 'l', text: l }), h('span', { class: 'v' }, vin[k], h('small', { text: u })));
+  });
+  const vitals = () => Object.fromEntries(VITALS.map(([k]) => [k, vin[k].value.trim().replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))]).filter(([, v]) => v));
+  const vErr = h('div');
+  const checkVitals = () => {
+    const v = vitals();
+    if (v.bp && !/^\d{2,3}\/\d{2,3}$/.test(v.bp)) { vErr.replaceChildren(notice('err', 'warn', h('p', { text: 'اكتب الضغط بصيغة 120/80 أو اتركه فارغاً' }))); return null; }
+    vErr.replaceChildren(); return v;
+  };
+
+  const ready = (d) => !adm.some((a) => a.cycle_dose_id === d.id) && !future && approved && live && can('administer')
+    && (!d.is_mixed || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at));
+  async function give(d, btn, reaction = null) {
+    const v = checkVitals(); if (!v) return false;
+    if (!reaction && !await confirmDialog({ title: 'تسجيل إعطاء ' + d.drug_name, body: `${num(d.final_dose)} ${OUT_UNITS[d.final_unit] || d.final_unit} · ${p.full_name} · ${p.file_no}\nطابق اسم المريض ورقم ملفه مع ملصق الكيس.`, okText: 'تأكيد الإعطاء' })) return false;
+    let ok = false;
+    await busy(btn, async () => {
+      try {
+        await rpc('record_administration', { p_dose: d.id, p_day: day, p_vitals: v, p_reaction: reaction, p_notes: null });
+        toast(reaction ? 'سُجّل الإعطاء وأُبلغ الطبيب بالتفاعل' : 'سُجّل الإعطاء'); ok = true;
+      } catch (e) { toast(e.message, true); }
+    });
+    if (ok) reload();
+    return ok;
+  }
+
+  const rows = doses.map((d) => {
+    const a = adm.find((x) => x.cycle_dose_id === d.id);
+    const isSent = !d.is_mixed || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at);
+    let right;
+    if (a) right = h('span', { class: 'pill ok', text: 'أُعطي' });
+    else if (future) right = h('span', { class: 'pill muted', text: 'لم يحن موعده' });
+    else if (!approved) right = h('span', { class: 'pill muted', text: 'بانتظار الاعتماد' });
+    else if (!isSent) right = h('span', { class: 'pill info', text: 'لم يصل من المزج' });
+    else if (ready(d)) right = h('button', { type: 'button', class: 'adb-go', text: 'تسجيل الإعطاء', onclick: (e) => give(d, e.currentTarget) });
+    else right = h('span', { class: 'pill brand', text: 'جاهز' });
+    return h('div', { class: 'adb-drug' },
+      h('span', { class: 'grow' },
+        h('b', { class: 'ltr', text: d.drug_name }),
+        h('span', { class: 'ltr', text: [`${num(d.final_dose)} ${d.final_unit}`, d.route, a ? new Date(a.given_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null].filter(Boolean).join(' · ') }),
+        a?.nurse?.full_name ? h('span', { text: a.nurse.full_name }) : null,
+        a?.reaction ? h('span', { class: 'pill warn wrap', style: 'align-self: flex-start; margin-top: 4px', text: 'تفاعل: ' + a.reaction }) : null),
+      right);
+  });
+
+  const closeBtn = live && allGiven && day === lastDay && can('completeCycle')
+    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), `إغلاق الجرعة ${c.cycle_no}`) : null;
+  closeBtn?.addEventListener('click', () => busy(closeBtn, async () => {
+    const ok = await confirmDialog({ title: `إغلاق الجرعة ${c.cycle_no}`, body: 'أُعطيت كل الجرعات الدوائية في هذه الجرعة. تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.', okText: 'إغلاق' });
+    if (!ok) return;
+    try { await rpc('complete_cycle', { p_cycle: cid }); toast('أُغلقت الجرعة'); reload(); } catch (e) { toast(e.message, true); }
+  }));
+
+  // الإبلاغ عن تفاعل: لدواء أُعطي (يُضاف إلى سجله)، أو لدواء جاهز لم يُسجَّل بعد (يُسجَّل إعطاؤه مع التفاعل)
+  const reactable = doses.filter((d) => adm.some((a) => a.cycle_dose_id === d.id) || ready(d));
+  function reactionDialog() {
+    if (!reactable.length) return toast('لا يوجد دواء أُعطي أو جاهز للإعطاء في هذا اليوم', true);
+    const sel = h('select', { class: 'input ltr' }, reactable.map((d) => h('option', { value: d.id, text: d.drug_name + (adm.some((a) => a.cycle_dose_id === d.id) ? '' : '  (يُسجَّل إعطاؤه الآن)') })));
+    const txt = h('textarea', { class: 'input', rows: 3, maxlength: 1000, placeholder: 'الأعراض، وقت ظهورها، ما فُعل' });
+    const err = h('div');
+    const dlg = h('dialog', null);
+    const close = () => { dlg.close(); dlg.remove(); };
+    dlg.append(h('div', { class: 'dlg' }, h('h2', { text: 'الإبلاغ عن تفاعل دوائي' }),
+      h('p', { class: 'hint', text: `${p.full_name} · ${p.file_no}` }),
+      field('الدواء', sel), field('وصف التفاعل', txt), err,
+      h('button', { type: 'button', class: 'btn primary block', text: 'إرسال البلاغ', onclick: (e) => {
+        const r = txt.value.trim(); if (!r) return err.replaceChildren(notice('err', 'warn', h('p', { text: 'صف التفاعل' })));
+        const d = reactable.find((x) => x.id === sel.value); const a = adm.find((x) => x.cycle_dose_id === d.id);
+        if (!a) { close(); return give(d, e.currentTarget, r); }
+        busy(e.currentTarget, async () => {
+          try { await rpc('report_reaction', { p_admin: a.id, p_reaction: r }); close(); toast('أُرسل البلاغ إلى الطبيب والصيادلة'); reload(); }
+          catch (x) { err.replaceChildren(notice('err', 'warn', h('p', { text: x.message }))); }
+        });
+      } }),
+      h('button', { type: 'button', class: 'link-btn', text: 'إلغاء', onclick: close })));
+    document.body.append(dlg); dlg.addEventListener('cancel', close); dlg.showModal(); txt.focus();
+  }
+
+  const daysNav = allDays.length > 1 ? h('div', { class: 'segmented', style: 'grid-auto-columns: minmax(44px, 1fr); overflow-x: auto' },
+    [...allDays].sort((a, b) => a - b).map((n) => h('a', { href: `#/administer?cycle=${cid}&day=${n}`, 'aria-current': n === day ? 'page' : null, 'aria-label': 'اليوم ' + n, text: String(n) }))) : null;
+
+  mount(root, h('div', { class: 'screen adb' },
+    h('header', { class: 'topbar adb-hero' },
+      h('div', { class: 'adb-top' },
+        h('a', { class: 'icon-btn', href: '#/nursing', 'aria-label': 'رجوع' }, icon('back', 24, 'currentColor', 2)),
+        h('span', { class: 'adb-day', text: 'اليوم ' + day })),
+      h('div', { class: 'titles' }, h('h1', { text: 'إعطاء الجرعة' }),
+        h('p', { class: 'sub' }, h('span', { text: p.full_name }), ' · ', h('span', { class: 'ltr', style: 'display: inline-block', text: c.treatments.protocol_name })))),
+    h('main', { class: 'main with-nav' },
+      h('section', { class: 'card adb-vitals', 'aria-label': 'العلامات الحيوية' },
+        h('div', { class: 'adb-h' }, h('h2', { text: 'العلامات الحيوية' }), h('span', { class: 'adb-opt', text: last ? new Date(last.given_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'اختيارية' })),
+        h('div', { class: 'adb-grid' }, tiles), vErr),
+      p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null,
+      !approved ? notice('warn', 'lock', h('p', { text: 'لا يُعطى أي دواء قبل اعتماد الطبيب.' })) : null,
+      daysNav,
+      h('section', { class: 'card adb-drugs', 'aria-label': 'الأدوية' }, h('h2', { text: 'الأدوية' }),
+        rows.length ? rows : empty(`لا توجد أدوية في اليوم ${day}`, 'pill')),
+      can('administer') && live ? h('button', { type: 'button', class: 'adb-react', onclick: reactionDialog }, icon('warn', 22, 'currentColor', 2), h('span', { text: 'الإبلاغ عن تفاعل دوائي' })) : null,
+      can('administer') && live ? h('p', { class: 'adb-note', text: 'أي تفاعل تسجّله يصل فوراً إلى الطبيب والصيادلة' }) : null,
+      closeBtn,
+      h('a', { href: '#/cycle?id=' + cid, class: 'link-btn', text: 'تفاصيل الجرعة ' + c.cycle_no })),
+    bottomNav('home')));
+}
+
 function vitalsText(v = {}) {
   return [v.bp && 'ض ' + v.bp, v.hr && 'ن ' + v.hr, v.temp && 'ح ' + v.temp, v.spo2 && 'أكسجة ' + v.spo2 + '%'].filter(Boolean).join(' · ') || 'بلا علامات حيوية';
 }
@@ -162,6 +275,7 @@ function giveDialog(d, day, p) {
     dlg.append(h('div', { class: 'dlg' },
       h('h2', { class: 'ltr', style: 'text-align: right', text: `${d.drug_name} ${num(d.final_dose)} ${OUT_UNITS[d.final_unit]}` }),
       h('p', { style: 'color: var(--muted)', text: `${p.full_name} · ${p.file_no}` }),
+      h('p', { class: 'hint', text: 'العلامات الحيوية اختيارية: اكتب ما قسته، أو اتركها فارغة.' }),
       h('div', { class: 'grid-2' }, field('الضغط', bp), field('النبض', hr)),
       h('div', { class: 'grid-2' }, field('الحرارة', temp), field('الأكسجة %', spo2)),
       seg, reaction, field('ملاحظة', notes), err,
