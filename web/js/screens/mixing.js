@@ -1,8 +1,9 @@
 // قسم المزج الكيميائي: التحويل من الصيدلي السريري، والطلبات الواردة، والتحضير والإرسال
 import { sb, q, rpc } from '../api.js';
 import { terms } from '../terms.js';
-import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDate, fmtTime, initials, count, confirmDialog, todayISO } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDate, fmtTime, initials, count, confirmDialog, todayISO, fmtYMD } from '../ui.js';
 import { can } from '../perms.js';
+import { state } from '../app.js';
 import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
 import { signedUrl, openFile, isImage } from '../files.js';
 import { NKDA } from './patient-form.js';
@@ -32,6 +33,7 @@ function itemLine(d) {
 
 // --------------------------------------------------------------- قائمة قسم المزج
 export async function list(root, params) {
+  if (document.documentElement.dataset.theme === 'b' && params.get('t') !== 'late') return listB(root, params);
   // يُعرض يوم واحد: اليوم افتراضياً، أو غداً، أو أي تاريخ؛ و«المتأخرة» لما فات ولم يُرسل
   const today = todayISO();
   let day = /^\d{4}-\d{2}-\d{2}$/.test(params.get('d') || '') ? params.get('d') : today;
@@ -185,4 +187,110 @@ export async function order(root, params) {
       can('requestEdit') && o.status !== 'sent' ? h('a', { class: 'btn secondary block', href: '#/cycle-edit?id=' + o.cycles.id }, icon('edit', 22), 'اقتراح تعديل على الطبيب') : null,
       h('a', { class: 'btn secondary block', href: '#/cycle?id=' + o.cycles.id }, icon('file', 20), 'البروتوكول كاملاً للمريض (كل أيام الجرعة)')),
     bottomNav('home')));
+}
+
+
+// --------------------------------------------------------------- قائمة المزج في التصميم 2 (تجريبي)
+// كما في صورة الشكل 7: رأس قرمزي، اليوم/غداً/تاريخ، واردة/قيد التحضير/أُرسلت، وبطاقة لكل طلب
+// فيها الأدوية بعلامة تحضير وزر «إرسال المحضّر» مباشرة (بالدوال نفسها في شاشة الطلب)
+export async function listB(root, params) {
+  const today = todayISO();
+  let day = /^\d{4}-\d{2}-\d{2}$/.test(params.get('d') || '') ? params.get('d') : today;
+  let tab = params.get('t') || 'incoming';
+  let open = params.get('o') || null;
+  const mine = can('prepare');
+  const daySeg = h('div', { class: 'segmented mxb-seg', role: 'group', 'aria-label': 'اليوم' });
+  const stSeg = h('div', { class: 'segmented mxb-seg', role: 'group', 'aria-label': 'حالة الطلبات' });
+  const lateBox = h('div');
+  const box = h('div', { class: 'mxb-list' }, h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
+  const bell = h('a', { class: 'icon-btn boxed', href: '#/notifications', 'aria-label': 'الإشعارات' }, icon('bell', 22));
+  mount(root, h('div', { class: 'screen' },
+    topbar({ title: 'قسم المزج', sub: `${mine ? 'صيدلي المزج' : 'عرض'} · ${state.profile.full_name}`, actions: bell }),
+    h('main', { class: 'main with-nav' }, daySeg, stSeg, lateBox, box),
+    bottomNav('home')));
+  if (!can('seeMixing')) return box.replaceChildren(notice('info', 'lock', h('p', { text: 'قسم المزج للصيادلة والأطباء.' })));
+
+  const sel = 'id, day, status, hold_reason, patients(full_name, allergies), cycles!inner(id, cycle_no, planned_date, status, chart_attachment_id, treatments(protocol_name)), mixing_items(id, prepared_at, sent_at, cycle_doses(drug_name, final_dose, final_unit, diluent, route, archived_at))';
+  let rows = [];
+  async function load() { rows = await q(sb.from('mixing_orders').select(sel).gte('cycles.planned_date', addDays(today, -120)).order('transferred_at')); }
+  await load();
+  const openCycle = (r) => ['planned', 'held'].includes(r.cycles.status);
+  const sync = () => history.replaceState(null, '', `#/mixing?d=${day}&t=${tab}${open ? '&o=' + open : ''}`);
+
+  function draw() {
+    const picked = h('input', { type: 'date', value: day, class: 'mxb-date', 'aria-label': 'اختر تاريخاً' });
+    picked.addEventListener('change', () => { if (picked.value) { day = picked.value; open = null; sync(); draw(); } });
+    const quick = (d, label) => h('button', { type: 'button', 'aria-pressed': day === d ? 'true' : 'false', onclick: () => { day = d; open = null; sync(); draw(); }, text: label });
+    const other = day !== today && day !== addDays(today, 1);
+    daySeg.replaceChildren(quick(today, 'اليوم'), quick(addDays(today, 1), 'غداً'),
+      h('label', { class: 'mxb-pick', 'aria-pressed': other ? 'true' : 'false' }, h('span', { class: 'ltr', text: fmtYMD(other ? day : addDays(today, 2)) }), picked));
+
+    const ofDay = rows.filter((r) => dueDate(r) === day);
+    const G = {
+      incoming: ofDay.filter((r) => r.status === 'incoming' && openCycle(r)),
+      progress: ofDay.filter((r) => ['in_progress', 'partially_sent', 'held'].includes(r.status) && openCycle(r)),
+      sent: ofDay.filter((r) => r.status === 'sent'),
+    };
+    // الطلب المفتوح انتقلت حالته (بدأ تحضيره أو أُرسل): التبويب يتبعه فلا تختفي البطاقة
+    if (open && !(G[tab] || []).some((r) => r.id === open)) { const k = Object.keys(G).find((x) => G[x].some((r) => r.id === open)); if (k) { tab = k; sync(); } }
+    stSeg.replaceChildren(...[['incoming', 'واردة'], ['progress', 'قيد التحضير'], ['sent', 'أُرسلت']].map(([id, l]) =>
+      h('button', { type: 'button', 'aria-pressed': tab === id ? 'true' : 'false', onclick: () => { tab = id; open = null; sync(); draw(); } }, `${l} · ${G[id].length}`)));
+    const late = rows.filter((r) => r.status !== 'sent' && openCycle(r) && dueDate(r) < today);
+    lateBox.replaceChildren(late.length ? h('a', { class: 'notice warn', href: '#/mixing?t=late', style: 'text-decoration: none; align-items: center' },
+      icon('warn', 20), h('span', { style: 'flex: 1; font-weight: 600', text: `${late.length} طلب من أيام سابقة لم يُرسل` }), h('b', { text: 'عرض' })) : null);
+
+    const L = G[tab] || [];
+    if (!open && L.length) open = L[0].id;
+    box.replaceChildren(...(L.length ? L.map((o) => o.id === open ? cardOpen(o) : cardClosed(o))
+      : [h('div', { class: 'card' }, empty(tab === 'sent' ? 'لم يُرسل شيء لهذا اليوم' : 'لا توجد جرعات دوائية هنا لهذا اليوم', 'check'))]));
+  }
+
+  const head = (o) => {
+    const [l, k] = O_STATUS[o.status];
+    return h('div', { class: 'mxb-head' },
+      h('span', { class: 'avatar', text: initials(o.patients.full_name) }),
+      h('span', { class: 'grow' }, h('b', { text: o.patients.full_name }),
+        h('span', null, h('span', { class: 'ltr', text: o.cycles.treatments.protocol_name }), ` · الجرعة ${o.cycles.cycle_no} · اليوم ${o.day}`)),
+      h('span', { class: 'pill ' + (o.status === 'incoming' ? 'brand-solid' : k), text: l }));
+  };
+  function cardClosed(o) {
+    const n = o.mixing_items.filter((i) => !i.cycle_doses.archived_at || i.sent_at).length;
+    const c = h('button', { type: 'button', class: 'card mxb-card closed', onclick: () => { open = o.id; sync(); draw(); } }, head(o));
+    c.querySelector('.grow > span').append(` · ${count(n, 'drug')}`);
+    return c;
+  }
+  function cardOpen(o) {
+    const held = o.status === 'held';
+    const canAct = mine && !held;
+    const items = o.mixing_items.filter((it) => !it.cycle_doses.archived_at || it.sent_at);
+    const allergy = o.patients.allergies && o.patients.allergies !== NKDA ? o.patients.allergies : null;
+    const chips = h('div', { class: 'mxb-chips' },
+      o.cycles.chart_attachment_id ? h('span', { class: 'pill ok', text: 'وصلت صورة الطبلة' }) : h('span', { class: 'pill muted', text: 'بانتظار صورة الطبلة' }),
+      allergy ? h('span', { class: 'pill warn', text: 'حساسية: ' + allergy }) : null);
+    const rowsEl = items.map((it) => {
+      const d = it.cycle_doses;
+      const box = canAct && !it.sent_at ? h('input', { type: 'checkbox', class: 'mxb-cb', checked: !!it.prepared_at, 'aria-label': 'تم تحضير ' + d.drug_name }) : null;
+      box?.addEventListener('change', async () => {
+        box.disabled = true;
+        try { await rpc('mark_prepared', { p_item: it.id, p_prepared: box.checked }); await load(); draw(); }
+        catch (e) { toast(e.message, true); box.checked = !box.checked; box.disabled = false; }
+      });
+      return h(box ? 'label' : 'div', { class: 'mxb-drug' + (it.prepared_at ? ' done' : '') },
+        box || (it.sent_at ? h('span', { class: 'mxb-cb sent', 'aria-label': 'أُرسل' }, icon('check', 16, '#fff', 3)) : h('span', { class: 'mxb-cb off' })),
+        h('span', { class: 'grow' }, h('b', { class: 'ltr', text: d.drug_name }), h('span', { class: 'ltr', text: d.diluent || d.route })),
+        h('span', { class: 'mxb-dose ltr' }, h('b', { text: num(d.final_dose) }), h('small', { text: d.final_unit })));
+    });
+    const ready = o.mixing_items.filter((i) => i.prepared_at && !i.sent_at).length;
+    const send = canAct && ready ? h('button', { type: 'button', class: 'btn primary block', text: `إرسال المحضّر · ${ready} من ${items.length}` }) : null;
+    send?.addEventListener('click', () => busy(send, async () => {
+      const ok = await confirmDialog({ title: 'إرسال إلى ردهة العلاج', body: `يُرسل ${count(ready, 'drug')} ويُبلَّغ الصيادلة السريريون والتمريض. لا يمكن تعديل ما أُرسل.`, okText: 'إرسال' });
+      if (!ok) return;
+      try { await rpc('send_prepared', { p_order: o.id }); toast('أُرسلت الأدوية المحضّرة'); await load(); draw(); } catch (e) { toast(e.message, true); }
+    }));
+    return h('div', { class: 'card mxb-card' }, head(o), chips,
+      held ? notice('warn', 'lock', h('p', { text: 'معلّق: ' + (terms(o.hold_reason) || 'بانتظار الطبيب') + '. لا يُحضَّر شيء حتى يعيد الطبيب اعتماد الجرعة.' })) : null,
+      h('div', { class: 'mxb-drugs' }, rowsEl), send,
+      h('a', { class: 'mxb-more', href: '#/mixing-order?id=' + o.id, text: 'التفاصيل والتحقق (صورة الطبلة والجرعات) ›' }));
+  }
+  sync(); draw();
 }
