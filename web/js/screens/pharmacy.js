@@ -1,12 +1,14 @@
 // الصيدلية الداخلية (تبويب «الصيدلية» في شريط التنقل): تقرير أسبوعي من ملف إكسل
 import { sb, q, rpc } from '../api.js';
-import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, field, fmtDate, fmtTime, todayISO, count, confirmDialog, arNorm, initials } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, field, todayISO, count, confirmDialog, arNorm } from '../ui.js';
 import { can } from '../perms.js';
 import { readSheet, writeXlsx, download } from '../xlsx.js';
 import { FIELDS, STATUS, guessColumns, rowsToItems, expiryState } from '../inventory.js';
 
 const STATUS_PILL = { available: 'ok', low: 'warn', out: 'err' };
-const fmtShort = (d) => fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' });
+// التواريخ بالأرقام الإنكليزية مثل 2026/11/12 (بقرار صاحب المشروع)
+const ymd = (d) => { if (!d) return '—'; const s = typeof d === 'string' && d.length === 10 ? d : new Date(d).toLocaleDateString('en-CA'); return s.replace(/-/g, '/'); };
+const hm = (d) => new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 const numTxt = (n) => (n === null || n === undefined ? '—' : String(+n));
 
 function dialog(title, build) {
@@ -27,10 +29,8 @@ export async function render(root, params) {
   const isLatest = rep && rep.id === reports[0]?.id;
   let items = rep ? await q(sb.from('inventory_items').select('*').eq('report_id', rep.id).is('archived_at', null).order('sort')) : [];
 
-  let filter = params.get('f') || 'all', search = '';
-  const listBox = h('div', { class: 'card flush' });
-  const seg = h('div', { class: 'segmented', role: 'group', 'aria-label': 'تصفية الأدوية' });
-  const summary = h('div', { class: 'inv-summary' });
+  let search = '';
+  const listBox = h('div', { class: 'xl-wrap', role: 'region', 'aria-label': 'جدول الأدوية', tabindex: 0 });
   const fileIn = h('input', { type: 'file', accept: '.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv', hidden: true, id: 'inv-file',
     onchange: (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); } });
 
@@ -42,69 +42,49 @@ export async function render(root, params) {
     h('button', { type: 'button', class: 'btn secondary', onclick: (e) => createReport(e.currentTarget, [], 'إدخال يدوي') }, icon('plus', 20), h('span', { text: 'تقرير فارغ' }))) : null;
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: 'الصيدلية الداخلية', sub: rep ? `تقرير أسبوع ${fmtShort(rep.report_date)}` : 'توافر الأدوية في المركز' }),
+    topbar({ title: 'الصيدلية الداخلية', sub: rep ? `تقرير بتاريخ ${ymd(rep.report_date)}` : 'توافر الأدوية في المركز' }),
     h('main', { class: 'main with-nav' },
       fileIn,
       editor ? h('p', { class: 'hint', text: 'ارفع ملف الإكسل كل أسبوع (xlsx أو CSV): يتعرف التطبيق على أعمدة اسم الدواء والعدد والصلاحية والحالة، وتراجعها قبل الحفظ. ثم أضف أو عدّل أو احذف أي دواء.' }) : null,
       actions,
       rep ? h('div', { class: 'card', style: 'gap: 6px' },
         h('div', { style: 'display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap' },
-          h('strong', { text: `تقرير أسبوع ${fmtDate(rep.report_date)}` }),
+          h('strong', { text: `تقرير بتاريخ ${ymd(rep.report_date)}` }),
           isLatest ? h('span', { class: 'pill ok', text: 'الأحدث' }) : h('span', { class: 'pill muted', text: 'تقرير سابق' })),
-        h('p', { class: 'hint', text: [rep.profiles?.full_name, rep.source, 'آخر تعديل ' + fmtShort(rep.updated_at) + ' ' + fmtTime(rep.updated_at)].filter(Boolean).join(' · ') }),
+        h('p', { class: 'hint', text: [rep.profiles?.full_name, rep.source, 'آخر تعديل ' + ymd(rep.updated_at) + ' ' + hm(rep.updated_at)].filter(Boolean).join(' · ') }),
         reports.length > 1 ? field('التقارير السابقة', h('select', { class: 'input', onchange: (e) => { location.hash = '#/report-pharmacy?id=' + e.target.value; } },
-          reports.map((r) => h('option', { value: r.id, selected: r.id === rep.id, text: `أسبوع ${fmtShort(r.report_date)}${r.id === reports[0].id ? ' (الأحدث)' : ''}` })))) : null)
+          reports.map((r) => h('option', { value: r.id, selected: r.id === rep.id, text: `تقرير ${ymd(r.report_date)}${r.id === reports[0].id ? ' (الأحدث)' : ''}` })))) : null)
         : h('div', { class: 'card' }, empty(editor ? 'لا يوجد تقرير بعد. ارفع ملف إكسل الأسبوع لإنشائه.' : 'لم يرفع مسؤول الصيدلية الداخلية تقريراً بعد.', 'pill')),
-      rep ? summary : null,
       rep ? h('input', { class: 'input', type: 'search', placeholder: 'ابحث باسم الدواء', 'aria-label': 'ابحث باسم الدواء',
         oninput: (e) => { search = e.target.value; drawList(); } }) : null,
-      rep ? seg : null,
       rep ? listBox : null,
       rep ? h('div', { class: 'inv-actions' },
         editor ? h('button', { type: 'button', class: 'btn primary', onclick: () => itemDialog(null) }, icon('plus', 20, '#fff'), h('span', { text: 'إضافة دواء' })) : null,
         h('button', { type: 'button', class: 'btn secondary', onclick: exportXlsx }, icon('download', 20), h('span', { text: 'تنزيل كملف إكسل' })),
         editor ? h('button', { type: 'button', class: 'btn secondary', style: 'color: var(--brand-dark)', onclick: (e) => archiveReport(e.currentTarget) }, icon('archive', 20), h('span', { text: 'حذف التقرير' })) : null) : null),
     bottomNav('pharmacy')));
-  if (rep) { drawSeg(); drawList(); }
+  if (rep) drawList();
 
-  function stats() {
-    const exp = items.map((i) => expiryState(i.expiry_date));
-    return {
-      all: items.length,
-      low: items.filter((i) => i.status === 'low').length,
-      out: items.filter((i) => i.status === 'out').length,
-      exp: exp.filter((x) => x === 'expired' || x === 'soon').length,
-      expired: exp.filter((x) => x === 'expired').length,
-    };
-  }
-  function drawSeg() {
-    const s = stats();
-    summary.replaceChildren(
-      h('div', { class: 'stat plain' }, h('span', { class: 'n', text: s.all }), h('span', { class: 'l', text: 'دواء في التقرير' })),
-      h('div', { class: 'stat warn' }, h('span', { class: 'n', text: s.low }), h('span', { class: 'l', text: 'شحيح' })),
-      h('div', { class: 'stat brand' }, h('span', { class: 'n', text: s.out }), h('span', { class: 'l', text: 'نافد' })),
-      h('div', { class: 'stat info' }, h('span', { class: 'n', text: s.exp }), h('span', { class: 'l', text: s.expired ? `منتهي أو قريب (${s.expired} منتهٍ)` : 'تنتهي صلاحيته خلال 3 أشهر' })));
-    seg.replaceChildren(...[['all', 'الكل', s.all], ['low', 'شحيح', s.low], ['out', 'نافد', s.out], ['exp', 'الصلاحية', s.exp]].map(([id, l, n]) =>
-      h('button', { type: 'button', 'aria-pressed': filter === id ? 'true' : 'false', onclick: () => { filter = id; drawSeg(); drawList(); } }, `${l} (${n})`)));
-  }
+  // جدول مثل الإكسل: خطوط بين كل الخانات، وعمود ترقيم، ويُعدَّل الدواء بالضغط على صفه
   function drawList() {
     const qs = arNorm(search.trim());
-    const rows = items.filter((i) => (filter === 'all' || (filter === 'exp' ? ['expired', 'soon'].includes(expiryState(i.expiry_date)) : i.status === filter))
-      && (!qs || arNorm(i.drug_name).includes(qs)));
-    if (filter === 'exp') rows.sort((a, b) => a.expiry_date.localeCompare(b.expiry_date));
-    listBox.replaceChildren(...(rows.length ? rows.map(itemRow) : [empty(items.length ? 'لا توجد أدوية بهذه التصفية' : 'التقرير فارغ. أضف الأدوية.', 'pill')]));
-  }
-  function itemRow(i) {
-    const es = expiryState(i.expiry_date);
-    const tag = editor ? 'button' : 'div';
-    return h(tag, { class: 'row inv-row', type: editor ? 'button' : null, onclick: editor ? () => itemDialog(i) : null, 'aria-label': editor ? 'تعديل ' + i.drug_name : null },
-      h('span', { class: 'grow' },
-        h('span', { class: 't ltr-auto', dir: 'auto', text: i.drug_name }),
-        h('span', { class: 's inv-meta' },
-          h('span', { text: 'العدد: ' + numTxt(i.quantity) + (i.unit ? ' ' + i.unit : '') }),
-          i.expiry_date ? h('span', { class: 'exp ' + es, text: (es === 'expired' ? 'منتهي الصلاحية ' : 'الصلاحية ') + fmtShort(i.expiry_date) }) : h('span', { text: 'الصلاحية: —' })),
-        i.notes ? h('span', { class: 's', dir: 'auto', text: i.notes }) : null),
-      h('span', { class: 'pill ' + STATUS_PILL[i.status], text: STATUS[i.status] }));
+    const rows = items.filter((i) => !qs || arNorm(i.drug_name).includes(qs));
+    if (!rows.length) return listBox.replaceChildren(h('div', { class: 'card' }, empty(items.length ? 'لا يوجد دواء بهذا الاسم' : 'التقرير فارغ. أضف الأدوية.', 'pill')));
+    listBox.replaceChildren(h('table', { class: 'xl' },
+      h('thead', null, h('tr', null, ['#', 'اسم الدواء', 'العدد', 'الوحدة', 'الصلاحية', 'الحالة', 'الملاحظات'].map((t) => h('th', { scope: 'col', text: t })))),
+      h('tbody', null, rows.map((i, n) => {
+        const es = expiryState(i.expiry_date);
+        const tr = h('tr', { class: 'st-' + i.status + (editor ? ' edit' : ''), tabindex: editor ? 0 : null, 'aria-label': editor ? 'تعديل ' + i.drug_name : null,
+          onclick: editor ? () => itemDialog(i) : null, onkeydown: editor ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); itemDialog(i); } } : null },
+          h('td', { class: 'rn', text: n + 1 }),
+          h('td', { class: 'nm', dir: 'auto', text: i.drug_name }),
+          h('td', { class: 'num', text: numTxt(i.quantity) }),
+          h('td', { dir: 'auto', text: i.unit || '' }),
+          h('td', { class: 'num' + (es === 'expired' || es === 'soon' ? ' exp ' + es : ''), title: es === 'expired' ? 'منتهي الصلاحية' : es === 'soon' ? 'تنتهي خلال 3 أشهر' : null, text: ymd(i.expiry_date) }),
+          h('td', null, h('span', { class: 'pill ' + STATUS_PILL[i.status], text: STATUS[i.status] })),
+          h('td', { class: 'nt', dir: 'auto', text: i.notes || '' }));
+        return tr;
+      }))));
   }
 
   async function reload(id) { location.hash = '#/report-pharmacy?id=' + id + '&r=' + Date.now(); }
@@ -131,13 +111,13 @@ export async function render(root, params) {
             p_data: { drug_name: name.value, quantity: qty.value, unit: unit.value, expiry_date: exp.value, status: st, notes: notes.value } });
           close(); toast(it ? 'حُفظ التعديل' : 'أُضيف الدواء');
           items = await q(sb.from('inventory_items').select('*').eq('report_id', rep.id).is('archived_at', null).order('sort'));
-          drawSeg(); drawList();
+          drawList();
         } catch (x) { err.replaceChildren(notice('err', 'warn', h('p', { text: x.message }))); }
       }) }),
       it ? h('button', { type: 'button', class: 'btn secondary block', style: 'color: var(--brand-dark)', text: 'حذف الدواء من التقرير', onclick: async () => {
         close();
         if (!await confirmDialog({ title: 'حذف ' + it.drug_name, body: 'يُحذف من هذا التقرير، ويبقى في سجل التعديلات.', okText: 'حذف', danger: true })) return;
-        try { await rpc('inventory_remove_item', { p_item: it.id }); toast('حُذف الدواء'); items = items.filter((x) => x.id !== it.id); drawSeg(); drawList(); }
+        try { await rpc('inventory_remove_item', { p_item: it.id }); toast('حُذف الدواء'); items = items.filter((x) => x.id !== it.id); drawList(); }
         catch (x) { toast(x.message, true); }
       } }) : null,
       h('button', { type: 'button', class: 'link-btn', text: 'إلغاء', onclick: close }),
@@ -155,10 +135,10 @@ export async function render(root, params) {
   }
   function copyLast(btn) {
     createReport(btn, items.map(({ drug_name, quantity, unit, expiry_date, status, notes }) => ({ drug_name, quantity, unit, expiry_date, status, notes })),
-      'نسخة من تقرير أسبوع ' + rep.report_date);
+      'نسخة من تقرير ' + ymd(rep.report_date));
   }
   async function archiveReport(btn) {
-    const reason = await confirmDialog({ title: 'حذف تقرير أسبوع ' + fmtShort(rep.report_date), body: 'يختفي التقرير من القائمة ويبقى في سجل التعديلات.',
+    const reason = await confirmDialog({ title: 'حذف تقرير ' + ymd(rep.report_date), body: 'يختفي التقرير من القائمة ويبقى في سجل التعديلات.',
       okText: 'حذف', danger: true, input: { label: 'سبب الحذف', placeholder: 'مثلاً: رُفع الملف الخطأ' } });
     if (reason === null) return;
     await busy(btn, async () => {
@@ -168,7 +148,7 @@ export async function render(root, params) {
   }
   function exportXlsx() {
     const rows = [['اسم الدواء', 'العدد', 'الوحدة', 'تاريخ انتهاء الصلاحية', 'الحالة', 'الملاحظات'],
-      ...items.map((i) => [i.drug_name, i.quantity === null ? '' : +i.quantity, i.unit || '', i.expiry_date || '', STATUS[i.status], i.notes || ''])];
+      ...items.map((i) => [i.drug_name, i.quantity === null ? '' : +i.quantity, i.unit || '', i.expiry_date ? ymd(i.expiry_date) : '', STATUS[i.status], i.notes || ''])];
     download(writeXlsx(rows, 'الصيدلية الداخلية', [34, 10, 12, 20, 10, 40]), `تقرير الصيدلية الداخلية ${rep.report_date}.xlsx`);
   }
 
@@ -205,13 +185,13 @@ export async function render(root, params) {
           : notice(parsed.length ? 'ok' : 'warn', parsed.length ? 'check' : 'warn', h('p', { text: parsed.length
             ? `قُرئ ${count(parsed.length, 'drug')}: ${s.low} شحيح و${s.out} نافد.` : 'لم يُقرأ أي دواء. تأكد من اختيار الأعمدة.' })),
         warn.length ? notice('warn', 'warn', h('p', { text: `${warn.length} صفاً فيه قيمة لم تُفهم (معلّمة بالأصفر)؛ حُفظ نصها الأصلي في الملاحظات. راجعها قبل الحفظ أو عدّلها بعده.` })) : null,
-        parsed.length ? h('div', { class: 'inv-preview', role: 'region', 'aria-label': 'معاينة الأدوية', tabindex: 0 },
-          h('table', null,
+        parsed.length ? h('div', { class: 'inv-preview xl-wrap', role: 'region', 'aria-label': 'معاينة الأدوية', tabindex: 0 },
+          h('table', { class: 'xl' },
             h('thead', null, h('tr', null, ['#', 'اسم الدواء', 'العدد', 'الصلاحية', 'الحالة'].map((t) => h('th', { text: t })))),
             h('tbody', null, parsed.slice(0, 300).map((i) => h('tr', { class: i.warnings.length ? 'warn' : null },
               h('td', { text: i.row }), h('td', { dir: 'auto', text: i.drug_name }),
               h('td', { class: i.warnings.includes('العدد') ? 'bad' : null, text: numTxt(i.quantity) + (i.unit ? ' ' + i.unit : '') }),
-              h('td', { class: i.warnings.includes('تاريخ الصلاحية') ? 'bad' : null, text: i.expiry_date || (i.warnings.includes('تاريخ الصلاحية') ? 'لم يُفهم' : '—') }),
+              h('td', { class: i.warnings.includes('تاريخ الصلاحية') ? 'bad' : null, text: i.expiry_date ? ymd(i.expiry_date) : (i.warnings.includes('تاريخ الصلاحية') ? 'لم يُفهم' : '—') }),
               h('td', null, h('span', { class: 'pill ' + STATUS_PILL[i.status], text: STATUS[i.status] }))))))) : null,
         parsed.length > 300 ? h('p', { class: 'hint', text: `تُعرض أول 300 صف من ${parsed.length}؛ تُحفظ كلها.` }) : null);
     }

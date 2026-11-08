@@ -46,8 +46,8 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.waitForSelector('text=مراجعة ملف week.xlsx');
   const prev = page.locator('.inv-preview tbody tr');
   ok('preview 5 drugs', await prev.count() === 5);
-  ok('xlsx date read', (await prev.nth(0).textContent()).includes('2027-03-31'));
-  ok('month/year => end of month', (await prev.nth(2).textContent()).includes('2027-03-31'));
+  ok('xlsx date read', (await prev.nth(0).textContent()).includes('2027/03/31'));
+  ok('month/year => end of month', (await prev.nth(2).textContent()).includes('2027/03/31'));
   ok('qty 0 => نافد', (await prev.nth(2).textContent()).includes('نافد'));
   ok('Arabic digits qty', (await prev.nth(3).textContent()).includes('8 vial'));
   ok('unclear values flagged', await page.locator('.inv-preview tr.warn').count() === 1);
@@ -57,12 +57,11 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.waitForTimeout(500);
   ok('saved 5 items', psql("select count(*) from inventory_items where archived_at is null") === '5');
   ok('unclear kept in notes', psql("select notes from inventory_items where drug_name like 'Ondansetron%'").includes('عشرة'));
-  ok('summary: low 1, out 1', (await page.locator('.inv-summary .stat.warn .n').textContent()) === '1' && (await page.locator('.inv-summary .stat.brand .n').textContent()) === '1');
-  ok('expired flagged', await page.locator('.exp.expired').count() >= 1);
+    ok('expired flagged', await page.locator('.xl td.exp.expired').count() >= 1);
   await shot('report');
 
   // تعديل دواء، إضافة، حذف
-  await page.locator('.inv-row', { hasText: 'Vincristine' }).click();
+  await page.locator('.xl tbody tr', { hasText: 'Vincristine' }).click();
   await page.locator('dialog').getByLabel('العدد', { exact: true }).fill('9');
   await page.locator('dialog .segmented button', { hasText: 'شحيح' }).click();
   await shot('edit-dialog', false);
@@ -74,17 +73,19 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.locator('dialog').getByLabel('العدد', { exact: true }).fill('20');
   await page.getByRole('button', { name: 'حفظ', exact: true }).click();
   await page.waitForSelector('text=Methotrexate 50mg');
-  await page.locator('.inv-row', { hasText: 'Ondansetron' }).click();
+  await page.locator('.xl tbody tr', { hasText: 'Ondansetron' }).click();
   await page.getByRole('button', { name: 'حذف الدواء من التقرير' }).click();
   await page.locator('dialog').getByRole('button', { name: 'حذف', exact: true }).click();
   await page.waitForTimeout(600);
   ok('delete = archived', psql("select (archived_at is not null)::text from inventory_items where drug_name like 'Ondansetron%'") === 'true');
-  ok('list now 5 rows', await page.locator('.inv-row').count() === 5);
-  // التصفية
-  await page.locator('.segmented button', { hasText: 'شحيح' }).click();
-  ok('filter low', await page.locator('.inv-row').count() === 2);
-  await page.locator('.segmented button', { hasText: 'الكل' }).click();
-
+  ok('list now 5 rows', await page.locator('.xl tbody tr').count() === 5);
+  // جدول مثل الإكسل وتواريخ إنكليزية
+  ok('table grid lines', await page.locator('.xl td').first().evaluate((td) => getComputedStyle(td).borderBottomStyle === 'solid'));
+  ok('english dates', (await page.locator('.xl tbody').textContent()).includes('2027/03/31') && /تقرير بتاريخ \d{4}\/\d{2}\/\d{2}/.test(await page.locator('main').textContent()));
+  ok('out row highlighted', await page.locator('.xl tr.st-out').count() === 1);
+  await page.getByRole('searchbox', { name: 'ابحث باسم الدواء' }).fill('ritux');
+  ok('search', await page.locator('.xl tbody tr').count() === 1);
+  await page.getByRole('searchbox', { name: 'ابحث باسم الدواء' }).fill('');
   // التنزيل كإكسل ثم إعادة قراءته
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'تنزيل كملف إكسل' }).click()]);
   const xf = `${OUT}/rep-export.xlsx`; await dl.saveAs(xf);
@@ -95,7 +96,7 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.locator('#inv-file').setInputFiles(`${FIX}/week.csv`);
   await page.waitForSelector('text=مراجعة ملف week.csv');
   ok('csv preview 2', await page.locator('.inv-preview tbody tr').count() === 2);
-  ok('csv dd/mm/yyyy', (await page.locator('.inv-preview tbody tr').nth(1).textContent()).includes('2027-02-15'));
+  ok('csv dd/mm/yyyy', (await page.locator('.inv-preview tbody tr').nth(1).textContent()).includes('2027/02/15'));
   await page.getByRole('button', { name: 'حفظ التقرير' }).click();
   await page.waitForTimeout(800);
   ok('2 reports, history select', await page.getByLabel('التقارير السابقة').locator('option').count() === 2);
@@ -111,12 +112,12 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.goto(B + '#/report-pharmacy');
   await page.waitForSelector('text=الأحدث');
   ok('cp: no upload button', await page.locator('label[for="inv-file"]').count() === 0);
-  ok('cp: rows read-only', await page.locator('button.inv-row').count() === 0);
+  ok('cp: rows read-only', await page.locator('.xl tr.edit').count() === 0);
   // ===== الممرض يقرأ فقط
   await login('nurse@test.iq');
   await page.goto(B + '#/report-pharmacy');
   await page.waitForSelector('text=الأحدث');
-  ok('nurse reads, cannot edit', await page.locator('label[for="inv-file"]').count() === 0 && await page.locator('.inv-row').count() === 2);
+  ok('nurse reads, cannot edit', await page.locator('label[for="inv-file"]').count() === 0 && await page.locator('.xl tbody tr').count() === 2);
   ok('nurse got inventory notification', psql("select count(*) from notifications n join profiles p on p.id = n.user_id where p.email = 'nurse@test.iq' and n.link_type = 'inventory_report'") === '2');
 
   // ===== المدير

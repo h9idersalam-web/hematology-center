@@ -356,19 +356,28 @@ details[open] > summary::before { transform: rotate(-90deg); }
 /* الصيدلية الداخلية */
 .inv-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .inv-actions > .btn { flex: 1 1 200px; }
-.inv-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-@media (max-width: 479px) { .inv-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.inv-row .t { unicode-bidi: plaintext; text-align: right; }
-.inv-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; }
-.inv-meta .exp.expired { color: var(--brand-dark); font-weight: 700; }
-.inv-meta .exp.soon { color: var(--warn); font-weight: 700; }
-.pill.err { background: var(--brand-soft); color: var(--brand-dark); }
+@media (max-width: 479px) { .pill.err { background: var(--brand-soft); color: var(--brand-dark); }
 .inv-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.inv-preview { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
-.inv-preview table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.inv-preview th, .inv-preview td { padding: 6px 8px; border-bottom: 1px solid var(--line-2); text-align: right; vertical-align: top; }
-.inv-preview th { position: sticky; top: 0; background: var(--chip); font-weight: 700; }
-.inv-preview tr.warn td { background: var(--warn-soft); }
-.inv-preview td.bad { color: var(--warn-ink); font-weight: 700; }
 .dept-t { text-align: center; padding: 6px 4px; line-height: 1.4; }
 @media (max-width: 400px) { .bottom-nav { padding-left: 2px; padding-right: 2px; } .bottom-nav a { font-size: 12px; } }
+/* جدول الصيدلية الداخلية: خطوط متقاطعة مثل الإكسل */
+.xl-wrap { overflow-x: auto; background: var(--card); border: 1px solid #B9C0C8; border-radius: 6px; }
+.xl { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+.xl th, .xl td { border: 1px solid #C9CFD6; padding: 6px 8px; text-align: right; vertical-align: middle; white-space: nowrap; }
+.xl thead th { background: #E9EDF1; color: var(--ink-2); font-weight: 700; position: sticky; top: 0; z-index: 1; }
+.xl tr > :first-child { border-right: 0; } .xl tr > :last-child { border-left: 0; }
+.xl thead tr > * { border-top: 0; } .xl tbody tr:last-child > * { border-bottom: 0; }
+.xl td.rn { background: #F2F4F6; color: var(--muted-2); text-align: center; font-size: 12px; width: 1%; }
+.xl td.num { text-align: center; direction: ltr; }
+.xl td.nm { font-weight: 600; unicode-bidi: plaintext; }
+.xl td.nt { white-space: normal; min-width: 140px; color: var(--muted); font-size: 13px; }
+.xl tr.st-out td:not(.rn) { background: var(--brand-soft); }
+.xl tr.st-low td:not(.rn) { background: var(--warn-soft); }
+.xl td.exp.expired { color: var(--brand-dark); font-weight: 700; }
+.xl td.exp.soon { color: var(--warn); font-weight: 700; }
+.xl tr.edit { cursor: pointer; }
+.xl tr.edit:hover td:not(.rn) { filter: brightness(0.97); }
+.xl tr.edit:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; }
+.inv-preview { max-height: 46vh; overflow: auto; }
+.inv-preview tr.warn td:not(:first-child) { background: var(--warn-soft); }
+.inv-preview td.bad { color: var(--warn-ink); font-weight: 700; }
