@@ -1,0 +1,75 @@
+/* =====================================================================
+   التصميم 2 (تجريبي): الشكل 7 «منحنيات وهوية» بخط Alexandria
+   رأس قرمزي منحني، بطاقات بيضاء تطفو فوقه، صور رمزية على شكل ورقة،
+   وخلفية وردية دافئة خفيفة.
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600;700&display=swap');
+
+:root {
+  --brand: #A1122F; --brand-dark: #7A0D23; --brand-soft: #FBE3E8;
+  --ink: #1C1416; --ink-2: #3A2C30; --muted: #7E6A6E; --muted-2: #7E6A6E;
+  --line: #EADDE0; --line-2: #F1E7E9; --field: #E0CFD3;
+  --bg: #F7F3F3; --card: #FFFFFF; --chip: #F3E8EA; --seg: #F0E4E7;
+  --radius: 24px;
+  --font: 'Alexandria', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+}
+body { font-size: 15px; }
+#app { background: var(--bg); }
+.stat .n, .dose-big b, .lab-v { font-variant-numeric: tabular-nums; }
+
+/* الشريط العلوي: قرمزي بحافة منحنية */
+.topbar { background: var(--brand); color: #fff; border-bottom: 0; border-radius: 0 0 50% 50% / 0 0 26px 26px; padding: 14px 14px 26px; box-shadow: none; overflow: hidden; }
+.topbar .sub { color: rgba(255, 255, 255, .82); }
+.topbar h1 { font-weight: 600; }
+.topbar .icon-btn { background: rgba(255, 255, 255, .16); color: #fff; border-radius: 50%; width: 42px; height: 42px; }
+.topbar a { color: #fff; }
+.topbar + .main { margin-top: -6px; }
+
+/* البطاقات والصفوف */
+.card { border: 0; box-shadow: 0 10px 28px rgba(122, 13, 35, .08); }
+.row { border-bottom-color: var(--line-2); }
+.avatar { border-radius: 15px 15px 15px 4px; background: var(--brand); color: #fff; font-weight: 600; }
+.tag { background: var(--chip); }
+
+/* الرئيسية: رأس قرمزي كبير وبطاقات تطفو فوقه */
+.home-hero { background: var(--brand); color: #fff; margin: -20px -20px 0; padding: 20px 20px 70px; border-radius: 0 0 50% 50% / 0 0 40px 40px; position: relative; overflow: hidden; }
+.home-hero::after { content: ''; position: absolute; left: -60px; top: 30px; width: 240px; height: 280px; opacity: .08; pointer-events: none;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.2'%3E%3Cpath d='M12 2.8c3.6 4.3 6.5 7.9 6.5 11.4a6.5 6.5 0 0 1-13 0c0-3.5 2.9-7.1 6.5-11.4z'/%3E%3Cpath d='M12 11.5v5.5M9.25 14.25h5.5'/%3E%3C/svg%3E"); }
+.home-hero > * { position: relative; z-index: 1; }
+.home-hero .app-brand { color: #fff; }
+.home-hero .app-brand-logo { background: rgba(255, 255, 255, .18); }
+.home-hero p, .home-hero h1 { color: #fff !important; }
+.home-hero h1 { font-size: 30px !important; font-weight: 700 !important; }
+.home-hero .pill.brand { background: rgba(255, 255, 255, .18); color: #fff; }
+.home-hero .pill.dark { background: #fff; color: var(--brand); }
+.home-hero .icon-btn.boxed { background: rgba(255, 255, 255, .16); border: 0; color: #fff; border-radius: 50%; }
+.home-hero .icon-btn.boxed span { color: #fff !important; }
+.home-hero .install-btn { background: #fff; color: var(--brand); }
+.home-hero + * { margin-top: -54px; position: relative; z-index: 2; }
+.stats { gap: 10px; }
+.stat { border-radius: 22px; }
+.stat.plain { border: 0; box-shadow: 0 10px 28px rgba(122, 13, 35, .08); }
+.stat.warn { background: #FFF0DD; }
+.stat.info { background: #FFFFFF; color: var(--brand); box-shadow: 0 10px 28px rgba(122, 13, 35, .08); }
+.dept-t { border: 0; border-radius: 22px; box-shadow: 0 10px 28px rgba(122, 13, 35, .08); }
+.dept-t svg { color: var(--brand); }
+.notice { border-radius: 18px; }
+
+/* الأزرار والحقول */
+.btn { border-radius: 18px; font-weight: 600; }
+.btn.secondary { border-color: var(--field); }
+.input, select.input, textarea.input { border-radius: 16px; background: #fff; border: 1.5px solid var(--field); }
+.option { border-radius: 18px; border-color: var(--field); }
+.segmented { background: #fff; border-radius: 18px; padding: 4px; box-shadow: 0 6px 18px rgba(122, 13, 35, .06); }
+.segmented button, .segmented a { font-size: 13.5px; white-space: nowrap; }
+.segmented [aria-pressed="true"], .segmented [aria-current="page"] { background: var(--brand); color: #fff; border-radius: 14px; }
+.pill { font-weight: 500; }
+
+/* الشريط السفلي: أبيض بزوايا علوية دائرية */
+.bottom-nav { border-top: 0; border-radius: 26px 26px 0 0; box-shadow: 0 -6px 20px rgba(0, 0, 0, .06); height: 76px; }
+.bottom-nav a { color: #A4959A; font-size: 11.5px; }
+.bottom-nav a[aria-current="page"] { color: var(--brand); font-weight: 600; }
+
+/* صفحة الدخول */
+.hero { border-radius: 0 0 50% 50% / 0 0 40px 40px; padding-bottom: 46px; }
+.hero .logo { border-radius: 22px 22px 22px 6px; }

@@ -1,0 +1,59 @@
+/* =====================================================================
+   التصميم 1 (تجريبي): تصميم Figma الأول
+   سريري هادئ: رمادي بارد، بطاقات بيضاء بزوايا 20 وظل خفيف، عناوين Readex Pro،
+   نصوص Noto Sans Arabic، والأرقام والجرعات بخط أحادي IBM Plex Mono.
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+:root {
+  --brand: #A1122F; --brand-dark: #7A0D23; --brand-soft: #FBEEF1;
+  --ink: #14171C; --ink-2: #2B3139; --muted: #59616B; --muted-2: #59616B;
+  --line: #E2E5EA; --line-2: #EEF0F3; --field: #C9CFD6;
+  --bg: #F3F4F6; --card: #FFFFFF; --chip: #EBEDF0; --seg: #EBEDF0;
+  --ok: #0F7A4A; --ok-soft: #E3F3EA; --warn: #A14E00; --warn-ink: #7A3B00; --warn-soft: #FFF0DD;
+  --info: #2350C8; --info-ink: #1D42A6; --info-soft: #E7EDFC;
+  --radius: 20px;
+  --font: 'Noto Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  --display: 'Readex Pro', 'Noto Sans Arabic', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+body { font-size: 15.5px; }
+h1, h2, h3, .topbar h1, .section-head h2, .card h2, .row .t, .app-brand-name, .hero h1 { font-family: var(--display); letter-spacing: 0; }
+.stat .n, .dose-big b, .num, .tag, .lab-v, .xl td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* البطاقات والصفوف */
+.card { border-color: var(--line); box-shadow: 0 2px 8px rgba(20, 23, 28, .06); }
+.row { padding: 13px 16px; }
+.avatar { background: var(--brand-soft); color: var(--brand-dark); }
+
+/* الشريط العلوي */
+.topbar { padding: 14px 16px 12px; border-bottom-color: var(--line); }
+.topbar h1 { font-size: 20px; font-weight: 600; }
+.icon-btn.boxed { border-radius: 14px; box-shadow: 0 1px 3px rgba(20, 23, 28, .05); }
+.topbar .icon-btn { background: var(--bg); border-radius: 12px; width: 42px; height: 42px; }
+
+/* الرئيسية */
+.home-hero h1 { font-size: 28px !important; font-weight: 600 !important; }
+.stats { gap: 10px; }
+.stat { border-radius: 20px; padding: 16px; }
+.stat .n { font-size: 30px; font-weight: 600; }
+.stat .l { font-size: 13.5px; }
+.stat.plain { box-shadow: 0 2px 8px rgba(20, 23, 28, .05); }
+.dept-t { border-radius: 20px; min-height: 92px; box-shadow: 0 2px 8px rgba(20, 23, 28, .05); }
+.dept-t svg { background: var(--brand-soft); border-radius: 12px; padding: 8px; box-sizing: content-box; }
+
+/* الأزرار والحقول */
+.btn { border-radius: 14px; height: 52px; font-size: 16px; font-weight: 600; }
+.input, select.input, textarea.input { border-radius: 14px; border-color: var(--field); }
+.pill { font-weight: 500; font-size: 12.5px; padding: 3px 10px; }
+.segmented { border-radius: 14px; }
+
+/* الشريط السفلي: مؤشر قرصي خلف أيقونة التبويب النشط */
+.bottom-nav { height: 76px; border-top-color: var(--line); }
+.bottom-nav a { font-size: 12px; gap: 4px; }
+.bottom-nav a svg { padding: 3px 14px; border-radius: 999px; box-sizing: content-box; }
+.bottom-nav a[aria-current="page"] svg { background: var(--brand-soft); }
+
+/* صفحة الدخول */
+.hero { border-radius: 0 0 32px 32px; padding-top: 40px; }
+.hero .logo { border-radius: 20px; }

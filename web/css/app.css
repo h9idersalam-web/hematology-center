@@ -394,3 +394,8 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .xl.editing td:last-child input { min-width: 160px; }
 .segmented button:has(> small) { flex-direction: column; gap: 1px; line-height: 1.25; height: auto; min-height: 56px; padding: 6px 4px; font-size: 14px; text-align: center; }
 .segmented button small { display: block; font-size: 11px; opacity: .8; font-weight: 500; }
+/* المظهر التجريبي: شريط صغير للتبديل أو الخروج */
+.home-hero { display: flex; flex-direction: column; gap: 16px; }
+.theme-chip { position: fixed; z-index: 30; bottom: calc(84px + env(safe-area-inset-bottom)); left: 8px; opacity: .92; display: flex; align-items: center; gap: 6px; background: #16191D; color: #fff; border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 12px; font-weight: 600; box-shadow: 0 6px 18px rgba(0, 0, 0, .25); }
+.theme-chip button { border: 0; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; background: rgba(255, 255, 255, .16); color: #fff; }
+.theme-chip button:last-child { background: #A1122F; }

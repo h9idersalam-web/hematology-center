@@ -33,6 +33,7 @@ export async function render(root) {
   mount(root, h('div', { class: 'screen' },
     h('main', { class: 'main with-nav' },
       // اسم التطبيق في أعلى الواجهة
+      h('div', { class: 'home-hero' },
       h('div', { class: 'app-brand' }, h('span', { class: 'app-brand-logo' }, icon('drop', 18, '#fff')), h('span', { class: 'app-brand-name', text: APP_NAME }), installButton('light')),
       h('header', { style: 'display: flex; justify-content: space-between; align-items: center; gap: 12px' },
         h('div', { style: 'display: flex; flex-direction: column; gap: 2px; min-width: 0' },
@@ -42,7 +43,7 @@ export async function render(root) {
             h('span', { class: 'pill ' + (p.is_admin ? 'dark' : 'brand'), text: roleLabel(p) }),
             p.is_admin ? h('button', { type: 'button', class: 'pill brand role-switch', 'aria-label': 'تغيير دور العمل',
               onclick: () => roleSwitcher(root) }, icon('refresh', 14, 'currentColor', 2.4), h('span', { text: 'أعمل بدور: ' + ROLES[p.role] })) : null)),
-        h('div', { style: 'display: flex; gap: 8px' }, bell, profileBtn)),
+        h('div', { style: 'display: flex; gap: 8px' }, bell, profileBtn))),
       p.role === 'intern' ? h('div', { class: 'notice info' }, icon('info', 20), h('p', { text: 'حسابك للعرض فقط، دون إضافة أو تعديل.' })) : null,
       soundCard(),
       deptBox,

@@ -151,8 +151,14 @@ export async function render(root, params) {
       const code = dxItem ? dxItem.icd : null;   // يُحفظ تلقائياً ولا يظهر
       if (!start.value) return fail('اختر تاريخ الجرعة الأولى');
       try {
-        await rpc('create_treatment', { p_patient: pid, p_protocol: chosen.id, p_diagnosis: dxText,
-          p_icd10: code || null, p_stage: stage.value || null, p_start: start.value, p_disease_status: dStatus });
+        const args = { p_patient: pid, p_protocol: chosen.id, p_diagnosis: dxText,
+          p_icd10: code || null, p_stage: stage.value || null, p_start: start.value, p_disease_status: dStatus };
+        try { await rpc('create_treatment', args); }
+        catch (e1) {
+          // قاعدة بيانات لم يُطبَّق عليها الملف 32 بعد: تُنشأ الخطة بلا حالة المرض
+          if (!/disease_status/.test(e1.message)) throw e1;
+          delete args.p_disease_status; await rpc('create_treatment', args);
+        }
         toast(pending ? 'أُرسلت الخطة للطبيب المختص للموافقة' : 'أُنشئت خطة العلاج');
         go('/patient?id=' + pid);
       } catch (e2) { fail(e2.message); }

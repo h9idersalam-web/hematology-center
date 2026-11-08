@@ -2,6 +2,7 @@
 import { APP_NAME } from './config.js';
 import * as notifier from './notify.js';
 import './install.js';   // يلتقط نافذة التثبيت من كروم مبكراً
+import './theme.js';     // المظهر التجريبي (?theme=a أو b)
 import { sb, configured, q } from './api.js';
 import { h, mount, icon, notice } from './ui.js';
 import * as auth from './screens/auth.js';

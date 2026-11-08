@@ -1,10 +1,10 @@
 // يحفظ ملفات واجهة التطبيق فقط ليفتح بسرعة.
 // لا يحفظ أي بيانات مرضى: كل طلبات قاعدة البيانات تذهب إلى الخادم مباشرة.
-const VERSION = 'v28-2026-11-08-diagnosis-dates';
+const VERSION = 'v29-2026-11-08-trial-themes';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'vendor/supabase-2.118.0.js',
-  'js/app.js', 'js/api.js', 'js/terms.js', 'js/notify.js', 'js/install.js', 'js/ui.js', 'js/config.js', 'js/perms.js', 'js/dose.js', 'js/files.js', 'js/labs.js', 'js/ocr-labs.js', 'js/xlsx.js', 'js/inventory.js', 'js/diagnoses.js',
+  'js/app.js', 'js/api.js', 'js/terms.js', 'js/notify.js', 'js/install.js', 'js/ui.js', 'js/config.js', 'js/perms.js', 'js/dose.js', 'js/files.js', 'js/labs.js', 'js/ocr-labs.js', 'js/xlsx.js', 'js/inventory.js', 'js/diagnoses.js', 'js/theme.js', 'css/theme-a.css', 'css/theme-b.css',
   'js/screens/auth.js', 'js/screens/activation.js', 'js/screens/home.js',
   'js/screens/notifications.js', 'js/screens/admin.js',
   'js/screens/patients.js', 'js/screens/patient.js', 'js/screens/patient-form.js',
