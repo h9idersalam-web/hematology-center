@@ -192,3 +192,23 @@ body { font-size: 15px; }
 .mxb-cb.sent { background: #0F7A4A; border-color: #0F7A4A; }
 .mxb-cb.off { background: #F3ECEE; border-color: #F3ECEE; }
 .mxb-more { font-size: 13px; font-weight: 500; text-decoration: none; text-align: center; }
+
+/* ---------- الصيدلية الداخلية (مطابقة لصورة التصميم 2) ---------- */
+.phb .topbar .titles { flex: 1; }
+.phb .main > .phb-top { background: transparent !important; box-shadow: none !important; padding: 0 !important; gap: 10px; flex-wrap: nowrap; }
+.phb-top > .btn { flex: 1 1 0; min-width: 0; height: 54px; border-radius: 18px; font-size: 14.5px; gap: 8px; padding: 0 10px; white-space: nowrap; }
+.phb-top > .btn.primary { box-shadow: 0 14px 28px rgba(161, 18, 47, .32); }
+.phb-top > .btn.secondary { background: #fff; border: 0; color: var(--ink); box-shadow: 0 14px 28px rgba(122, 13, 35, .14); }
+.phb-top > .btn.secondary svg { color: var(--brand); }
+.phb .xl-wrap { border: 0; border-radius: 20px; box-shadow: 0 10px 28px rgba(122, 13, 35, .08); }
+.phb .xl { font-size: 13px; }
+.phb .xl th, .phb .xl td { border-color: var(--line); padding: 10px 6px; }
+.phb .xl:not(.editing) td.nm { white-space: normal; min-width: 96px; font-weight: 600; }
+.phb .xl .pill { font-size: 11.5px; padding: 2px 8px; }
+.phb .xl thead th { background: #FBF4F5; color: var(--muted); font-weight: 600; font-size: 12px; }
+.phb .xl td.rn { background: #fff; }
+.phb .xl td.qty b { font-weight: 600; }
+.phb .xl td.qty small { color: var(--muted); font-size: 11.5px; }
+.phb-add { background: #fff; border: 1.5px dashed var(--field); color: var(--brand); }
+.phb-more { justify-content: center; gap: 18px; }
+.phb-more .link-btn { gap: 6px; font-size: 13.5px; }

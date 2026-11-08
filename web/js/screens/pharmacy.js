@@ -23,6 +23,7 @@ function dialog(title, build) {
 
 export async function render(root, params) {
   const editor = can('editInventory');
+  const B = document.documentElement.dataset.theme === 'b';   // التصميم 2: الزران في الأعلى، والتنزيل في الرأس، بلا ملاحظة xlsx
   const reports = await q(sb.from('inventory_reports').select('id, report_date, source, created_at, updated_at, profiles!inventory_reports_created_by_fkey(full_name)')
     .is('archived_at', null).order('report_date', { ascending: false }).order('created_at', { ascending: false }).limit(60));
   const rep = reports.find((r) => r.id === params.get('id')) || reports[0] || null;
@@ -34,7 +35,12 @@ export async function render(root, params) {
   const fileIn = h('input', { type: 'file', accept: '.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv', hidden: true, id: 'inv-file',
     onchange: (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); } });
 
-  const actions = editor ? h('div', { class: 'inv-actions' },
+  const actions = editor && B ? h('div', { class: 'inv-actions phb-top' },
+    h('label', { class: 'btn primary', for: 'inv-file', role: 'button', tabindex: 0,
+      onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileIn.click(); } } },
+      icon('upload', 20, '#fff'), h('span', { text: 'رفع ملف إكسل' })),
+    rep ? h('button', { type: 'button', class: 'btn secondary', id: 'inv-edit-all', onclick: () => startEdit() }, icon('edit', 20), h('span', { text: 'تحديث التقرير' })) : null)
+    : editor ? h('div', { class: 'inv-actions' },
     h('label', { class: 'btn primary', for: 'inv-file', role: 'button', tabindex: 0,
       onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileIn.click(); } } },
       icon('upload', 20, '#fff'), h('span', { text: 'رفع ملف إكسل الأسبوع' })),
@@ -49,6 +55,26 @@ export async function render(root, params) {
   let editing = false;
   const drafts = new Map();   // id -> القيم المعدّلة
 
+  if (B) {
+    mount(root, h('div', { class: 'screen phb' },
+      topbar({ title: 'الصيدلية الداخلية', sub: rep ? [`تقرير بتاريخ ${fmtYMD(rep.report_date)}`, rep.profiles?.full_name].filter(Boolean).join(' · ') : 'توافر الأدوية في المركز',
+        actions: rep ? h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'تنزيل كملف إكسل', onclick: exportXlsx }, icon('download', 22, 'currentColor')) : null }),
+      h('main', { class: 'main with-nav' },
+        fileIn,
+        actions,
+        rep ? null : h('div', { class: 'card' }, empty(editor ? 'لا يوجد تقرير بعد. ارفع ملف إكسل الأسبوع لإنشائه.' : 'لم يرفع مسؤول الصيدلية الداخلية تقريراً بعد.', 'pill')),
+        rep ? h('input', { class: 'input', type: 'search', placeholder: 'ابحث باسم الدواء', 'aria-label': 'ابحث باسم الدواء',
+          oninput: (e) => { search = e.target.value; drawList(); } }) : null,
+        rep ? editBar : null,
+        rep ? listBox : null,
+        rep && editor ? h('button', { type: 'button', class: 'btn secondary block phb-add', onclick: () => itemDialog(null) }, icon('plus', 20), h('span', { text: 'إضافة دواء' })) : null,
+        rep && reports.length > 1 ? field('التقارير السابقة', h('select', { class: 'input', onchange: (e) => { location.hash = '#/report-pharmacy?id=' + e.target.value; } },
+          reports.map((r) => h('option', { value: r.id, selected: r.id === rep.id, text: `تقرير ${ymd(r.report_date)}${r.id === reports[0].id ? ' (الأحدث)' : ''}` })))) : null,
+        rep && editor ? h('div', { class: 'inv-actions phb-more' },
+          h('button', { type: 'button', class: 'link-btn', onclick: (e) => copyLast(e.currentTarget) }, icon('copy', 18), h('span', { text: 'نسخ لأسبوع جديد' })),
+          h('button', { type: 'button', class: 'link-btn', style: 'color: var(--brand-dark)', onclick: (e) => archiveReport(e.currentTarget) }, icon('archive', 18), h('span', { text: 'حذف التقرير' }))) : null),
+      bottomNav('pharmacy')));
+  } else
   mount(root, h('div', { class: 'screen' },
     topbar({ title: 'الصيدلية الداخلية', sub: rep ? `تقرير بتاريخ ${ymd(rep.report_date)}` : 'توافر الأدوية في المركز' }),
     h('main', { class: 'main with-nav' },
@@ -82,7 +108,7 @@ export async function render(root, params) {
     const rows = items.filter((i) => !qs || arNorm(i.drug_name).includes(qs));
     if (!rows.length) return listBox.replaceChildren(h('div', { class: 'card' }, empty(items.length ? 'لا يوجد دواء بهذا الاسم' : 'التقرير فارغ. أضف الأدوية.', 'pill')));
     listBox.replaceChildren(h('table', { class: 'xl' + (editing ? ' editing' : '') },
-      h('thead', null, h('tr', null, ['#', 'اسم الدواء', 'العدد', 'الوحدة', 'الصلاحية', 'الحالة', 'الملاحظات'].map((t) => h('th', { scope: 'col', text: t })))),
+      h('thead', null, h('tr', null, (B && !editing ? ['#', 'اسم الدواء', 'العدد', 'الصلاحية', 'الحالة'] : ['#', 'اسم الدواء', 'العدد', 'الوحدة', 'الصلاحية', 'الحالة', 'الملاحظات']).map((t) => h('th', { scope: 'col', text: t })))),
       h('tbody', null, rows.map((i, n) => (editing ? editRow(i, n) : viewRow(i, n))))));
   }
   function viewRow(i, n) {
@@ -91,11 +117,11 @@ export async function render(root, params) {
       onclick: editor ? () => itemDialog(i) : null, onkeydown: editor ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); itemDialog(i); } } : null },
       h('td', { class: 'rn', text: n + 1 }),
       h('td', { class: 'nm', dir: 'auto', text: i.drug_name }),
-      h('td', { class: 'num', text: numTxt(i.quantity) }),
-      h('td', { dir: 'auto', text: i.unit || '' }),
-      h('td', { class: 'num' + (es === 'expired' || es === 'soon' ? ' exp ' + es : ''), title: es === 'expired' ? 'منتهي الصلاحية' : es === 'soon' ? 'تنتهي خلال 3 أشهر' : null, text: ymd(i.expiry_date) }),
+      B ? h('td', { class: 'num qty' }, h('b', { text: numTxt(i.quantity) }), i.unit && i.quantity !== null ? h('small', { text: ' ' + i.unit }) : null) : h('td', { class: 'num', text: numTxt(i.quantity) }),
+      B ? null : h('td', { dir: 'auto', text: i.unit || '' }),
+      h('td', { class: 'num' + (es === 'expired' || es === 'soon' ? ' exp ' + es : ''), title: es === 'expired' ? 'منتهي الصلاحية' : es === 'soon' ? 'تنتهي خلال 3 أشهر' : null, text: B ? (i.expiry_date ? fmtYMD(i.expiry_date) : '—') : ymd(i.expiry_date) }),
       h('td', null, h('span', { class: 'pill ' + STATUS_PILL[i.status], text: STATUS[i.status] })),
-      h('td', { class: 'nt', dir: 'auto', text: i.notes || '' }));
+      B ? null : h('td', { class: 'nt', dir: 'auto', text: i.notes || '' }));
   }
   const val = (i) => ({ drug_name: i.drug_name, quantity: i.quantity === null ? '' : String(+i.quantity), unit: i.unit || '', expiry_date: i.expiry_date || '', status: i.status, notes: i.notes || '' });
   function editRow(i, n) {
