@@ -15,13 +15,13 @@ Carboplatin بالملغ/م² (400 ملغ/م² بحد أعلى 800 ملغ) بق�
 ترتيب الإعطاء: Etoposide ثم Carboplatin ثم Ifosfamide مع Mesna.
 Filgrastim 5 ميكروغرام/كغ تحت الجلد من اليوم 4 يومياً حتى تعافي العدلات. لم يُدخل سطراً لأن التطبيق لا يدعم وحدة الميكروغرام.$q$) returning id into v;
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
-  values (v, $q$Etoposide$q$, 100, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 1);
+  values (v, $q$Etoposide$q$, 100, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, $q$ترتيب الإعطاء: 1 (أولاً)$q$, null, 1);
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
-  values (v, $q$Carboplatin$q$, 400, $q$mg/m2$q$, $q$IV$q$, $q$1$q$, 800, true, null, null, 2);
+  values (v, $q$Carboplatin$q$, 400, $q$mg/m2$q$, $q$IV$q$, $q$1$q$, 800, true, $q$ترتيب الإعطاء: 2 (بعد Etoposide)$q$, null, 2);
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
-  values (v, $q$Ifosfamide$q$, 1666, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 3);
+  values (v, $q$Ifosfamide$q$, 1666, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, $q$ترتيب الإعطاء: 3 (بعد Carboplatin، مع Mesna)$q$, null, 3);
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
-  values (v, $q$Mesna$q$, 1666, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, false, $q$مع Ifosfamide$q$, null, 4);
+  values (v, $q$Mesna$q$, 1666, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, false, $q$ترتيب الإعطاء: 3 (مع Ifosfamide)$q$, null, 4);
 end $do$;
 
 -- ICE  (الملف: fractionated_ICE_ ، عنوانه «ICE 21 DAYS CYCLE» بست دورات)
@@ -35,11 +35,11 @@ Carboplatin بالملغ/م² (400 ملغ/م² بحد أعلى 800 ملغ) بق�
 ترتيب الإعطاء: Etoposide ثم Carboplatin ثم Ifosfamide مع Mesna.
 Filgrastim 5 ميكروغرام/كغ تحت الجلد من اليوم 4 يومياً حتى تعافي العدلات. لم يُدخل سطراً لأن التطبيق لا يدعم وحدة الميكروغرام.$q$) returning id into v;
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
-  values (v, $q$Etoposide$q$, 100, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 1);
+  values (v, $q$Etoposide$q$, 100, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, $q$ترتيب الإعطاء: 1 (أولاً)$q$, null, 1);
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
-  values (v, $q$Carboplatin$q$, 400, $q$mg/m2$q$, $q$IV$q$, $q$2$q$, 800, true, null, null, 2);
+  values (v, $q$Carboplatin$q$, 400, $q$mg/m2$q$, $q$IV$q$, $q$2$q$, 800, true, $q$ترتيب الإعطاء: 2 (بعد Etoposide)$q$, null, 2);
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
-  values (v, $q$Ifosfamide$q$, 1666, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, null, null, 3);
+  values (v, $q$Ifosfamide$q$, 1666, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, true, $q$ترتيب الإعطاء: 3 (بعد Carboplatin، مع Mesna)$q$, null, 3);
   insert into public.protocol_drugs(protocol_id, drug_name, dose_value, dose_unit, route, days, max_dose, is_mixed, instructions, cycles, sort)
-  values (v, $q$Mesna$q$, 1666, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, false, $q$مع Ifosfamide$q$, null, 4);
+  values (v, $q$Mesna$q$, 1666, $q$mg/m2$q$, $q$IV$q$, $q$1-3$q$, null, false, $q$ترتيب الإعطاء: 3 (مع Ifosfamide)$q$, null, 4);
 end $do$;
