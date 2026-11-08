@@ -45,6 +45,18 @@ export async function render(root, params) {
         catch (e) { toast(e.message, true); }
       } }, icon('archive', 22), 'أرشفة') : null;
 
+  // مدير البرنامج يعيد البروتوكول المؤرشف بالخطأ إلى «غير معتمد» (الملف 35)، ثم يعتمده طبيب الاختصاص من جديد
+  const restoreBtn = p.archived_at && state.profile.is_admin
+    ? h('button', { class: 'btn secondary block', type: 'button', onclick: async (e) => {
+        const btn = e.currentTarget;
+        const ok = await confirmDialog({ title: 'إعادة ' + p.name, body: 'يخرج من الأرشيف ويعود «غير معتمد» في قائمة «بانتظار الاعتماد». لا يُستخدم لأي مريض حتى يعتمده طبيب الاختصاص من جديد.', okText: 'إعادة إلى غير معتمد' });
+        if (!ok) return;
+        busy(btn, async () => {
+          try { await rpc('restore_protocol', { p_id: p.id }); toast('أُعيد البروتوكول إلى غير معتمد'); go('/protocol?id=' + p.id + '&r=' + Date.now()); }
+          catch (x) { toast(x.message, true); }
+        });
+      } }, icon('refresh', 22), 'إعادة إلى غير معتمد') : null;
+
   mount(root, h('div', { class: 'screen' },
     topbar({ title: p.name, sub: p.disease, back: '#/protocols' }),
     h('main', { class: 'main with-nav' },
@@ -61,7 +73,7 @@ export async function render(root, params) {
         h('div', { class: 'section-head' }, h('h2', { text: 'الأدوية' }), h('span', { class: 'meta', text: count(drugs.length, 'drug') })),
         h('div', { class: 'card flush' }, drugs.map(drugRow)),
         h('p', { class: 'hint', text: `عمود «مثال» محسوب لمريض مساحة جسمه ${EX.bsa} م² ووزنه ${EX.weight} كغ، للتوضيح فقط.` })),
-      approveBtn, archiveBtn),
+      approveBtn, archiveBtn, restoreBtn),
     bottomNav('protocols')));
 }
 

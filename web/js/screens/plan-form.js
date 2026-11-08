@@ -1,6 +1,6 @@
 // إنشاء خطة علاج: اختيار بروتوكول معتمد، ومعاينة الجرعات المحسوبة للمريض، ثم الحفظ
 import { sb, q, rpc } from '../api.js';
-import { h, mount, icon, topbar, field, notice, toast, busy, bsa, fmtDate, todayISO, addDaysISO, count } from '../ui.js';
+import { h, mount, icon, topbar, field, notice, toast, busy, confirmDialog, bsa, fmtDate, todayISO, addDaysISO, count } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, UNITS, calcDose, daysText, num, instrLine, withCycles } from '../dose.js';
@@ -37,6 +37,9 @@ export async function render(root, params) {
   const B = bsa(Number(p.height_cm), Number(p.weight_kg));
   const W = Number(p.weight_kg);
   let chosen = null;
+  // طبيب الاختصاص يعدّل أي جرعة محسوبة قبل إنشاء الخطة (الملف 35: create_plan)
+  const canEditDose = state.profile.role === 'specialist';
+  const overrides = new Map();   // protocol_drug_id -> { value, calc, name, unit }
 
   const picker = h('div', { class: 'section', role: 'radiogroup', 'aria-label': 'البروتوكول' });
   const preview = h('div', { class: 'section' });
@@ -78,7 +81,7 @@ export async function render(root, params) {
   function drawPicker() {
     picker.replaceChildren(...protocols.map((pr) => h('button', {
       type: 'button', class: 'option', 'aria-pressed': chosen === pr ? 'true' : 'false',
-      onclick: () => { chosen = pr; drawDx(); if (!statusBox.dataset.touched) { dStatus = guessStatus(pr); drawStatus(); } drawPicker(); drawPreview(); drawSchedule(); submit.disabled = false; },
+      onclick: () => { if (chosen !== pr) overrides.clear(); chosen = pr; drawDx(); if (!statusBox.dataset.touched) { dStatus = guessStatus(pr); drawStatus(); } drawPicker(); drawPreview(); drawSchedule(); submit.disabled = false; },
     }, h('span', { class: 'radio' }),
       h('span', null, h('span', { class: 'ot ltr', style: 'text-align: right', text: pr.name }),
         h('span', { class: 'od', text: `${pr.disease} · كل ${count(pr.cycle_length_days, 'day')} · ${count(pr.total_cycles, 'cycle')}` })))));
@@ -101,11 +104,33 @@ export async function render(root, params) {
             instrLine(d),
             h('span', { class: 's ltr', style: 'text-align: right', text: calcText(d, c) }),
             c.capped ? h('span', { class: 'pill warn', style: 'align-self: flex-start; margin-top: 4px', text: `قُصّت إلى السقف ${num(d.max_dose)} ${OUT_UNITS[c.finalUnit]} (المحسوب ${num(c.calculated)})` }) : null),
-          h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(c.final) }), h('span', { text: OUT_UNITS[c.finalUnit] })));
+          canEditDose ? doseInput(d, c) : h('span', { class: 'dose-big' }, h('b', { class: 'ltr', text: num(c.final) }), h('span', { text: OUT_UNITS[c.finalUnit] })));
       })),
+      canEditDose ? h('p', { class: 'hint', text: 'اضغط على أي جرعة لتعديلها قبل إنشاء الخطة. تُطبَّق الجرعة المعدّلة على هذا الدواء في كل الجرعات، وتُعلَّم «معدّلة» مع المحسوبة الأصلية في السجل.' }) : null,
       h('p', { class: 'hint', text: `حُسبت من طول ${num(p.height_cm)} سم ووزن ${num(p.weight_kg)} كغ بمعادلة موستيلر. هذه معاينة، والجرعات الدوائية المعتمدة تحسبها قاعدة البيانات عند الحفظ بالطريقة نفسها.` }),
       chosen.notes ? notice('info', 'info', h('p', { text: chosen.notes })) : null,
       protocolFileLink(chosen.file_path, 'مطابقة مع ملف البروتوكول ' + chosen.name));
+  }
+  function doseInput(d, c) {
+    const calc = Number(num(c.final));
+    const o = overrides.get(d.id);
+    const note = h('span', { class: 'dose-note', 'aria-live': 'polite' });
+    const box = h('label', { class: 'dose-big dose-edit' + (o ? ' changed' : '') });
+    const inp = h('input', { type: 'number', inputmode: 'decimal', min: 0, step: 'any', class: 'ltr', value: o ? o.value : calc,
+      'aria-label': `جرعة ${d.drug_name} (${OUT_UNITS[c.finalUnit]})، المحسوبة ${calc}` });
+    const sync = () => {
+      const v = inp.value.trim();
+      const n = Number(v);
+      if (v !== '' && n !== calc) overrides.set(d.id, { value: v, calc, name: d.drug_name, unit: OUT_UNITS[c.finalUnit] });
+      else overrides.delete(d.id);
+      box.classList.toggle('changed', overrides.has(d.id));
+      note.textContent = overrides.has(d.id) ? `المحسوبة ${calc}` : '';
+    };
+    inp.addEventListener('input', sync);
+    inp.addEventListener('blur', () => { if (inp.value.trim() === '') { inp.value = calc; sync(); } });
+    box.append(inp, h('span', { text: OUT_UNITS[c.finalUnit] }), note);
+    sync();
+    return box;
   }
   function calcText(d, c) {
     if (d.dose_unit === 'mg' || d.dose_unit === 'units') return `${num(d.dose_value)} ${d.dose_unit} (fixed)`;
@@ -150,15 +175,15 @@ export async function render(root, params) {
       if (!dStatus) return fail('اختر حالة المرض: Initial treatment أو Relapse أو Maintenance');
       const code = dxItem ? dxItem.icd : null;   // يُحفظ تلقائياً ولا يظهر
       if (!start.value) return fail('اختر تاريخ الجرعة الأولى');
+      const edits = [...overrides.entries()];
+      const bad = edits.find(([, o]) => !(Number(o.value) > 0));
+      if (bad) return fail('جرعة غير صحيحة لـ ' + bad[1].name);
+      if (edits.length && !await confirmDialog({ title: 'تأكيد الجرعات المعدّلة',
+        body: edits.map(([, o]) => `${o.name}: ${o.calc} ← ${Number(o.value)} ${o.unit}`).join(' · ') + '. تُطبَّق على هذا الدواء في كل جرعات الخطة.', okText: 'تأكيد' })) return;
       try {
         const args = { p_patient: pid, p_protocol: chosen.id, p_diagnosis: dxText,
           p_icd10: code || null, p_stage: stage.value || null, p_start: start.value, p_disease_status: dStatus };
-        try { await rpc('create_treatment', args); }
-        catch (e1) {
-          // قاعدة بيانات لم يُطبَّق عليها الملف 32 بعد: تُنشأ الخطة بلا حالة المرض
-          if (!/disease_status/.test(e1.message)) throw e1;
-          delete args.p_disease_status; await rpc('create_treatment', args);
-        }
+        await rpc('create_plan', { ...args, p_doses: edits.length ? Object.fromEntries(edits.map(([id, o]) => [id, Number(o.value)])) : null });
         toast(pending ? 'أُرسلت الخطة للطبيب المختص للموافقة' : 'أُنشئت خطة العلاج');
         go('/patient?id=' + pid);
       } catch (e2) { fail(e2.message); }
