@@ -42,6 +42,7 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await page.locator('.bottom-nav a[href="#/report-pharmacy"]').click();
   ok('pharmacy tab active', await page.locator('.bottom-nav a[aria-current="page"][href="#/report-pharmacy"]').waitFor({ timeout: 5000 }).then(() => true, () => false));
   await page.waitForSelector('text=لا يوجد تقرير بعد');
+  ok('format note shown to editor', await page.locator('.xls-note').count() === 1);
   await page.locator('#inv-file').setInputFiles(`${FIX}/week.xlsx`);
   await page.waitForSelector('text=مراجعة ملف week.xlsx');
   const prev = page.locator('.inv-preview tbody tr');
@@ -111,7 +112,7 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await login('cp@test.iq');
   await page.goto(B + '#/report-pharmacy');
   await page.waitForSelector('text=الأحدث');
-  ok('cp: no upload button', await page.locator('label[for="inv-file"]').count() === 0);
+  ok('cp: no upload button', await page.locator('label[for="inv-file"]').count() === 0 && await page.locator('.xls-note').count() === 0);
   ok('cp: rows read-only', await page.locator('.xl tr.edit').count() === 0);
   // ===== الممرض يقرأ فقط
   await login('nurse@test.iq');

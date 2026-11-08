@@ -47,6 +47,7 @@ export async function render(root, params) {
       fileIn,
       editor ? h('p', { class: 'hint', text: 'ارفع ملف الإكسل كل أسبوع (xlsx أو CSV): يتعرف التطبيق على أعمدة اسم الدواء والعدد والصلاحية والحالة، وتراجعها قبل الحفظ. ثم أضف أو عدّل أو احذف أي دواء.' }) : null,
       actions,
+      editor ? notice('info', 'info', h('p', { class: 'xls-note', text: 'يجب أن يكون الملف بصيغة xlsx أو CSV. ملفات xls القديمة لا تُقرأ، فتُحفظ من الإكسل بصيغة xlsx أولاً.' })) : null,
       rep ? h('div', { class: 'card', style: 'gap: 6px' },
         h('div', { style: 'display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap' },
           h('strong', { text: `تقرير بتاريخ ${ymd(rep.report_date)}` }),
