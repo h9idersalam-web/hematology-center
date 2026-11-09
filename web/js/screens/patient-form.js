@@ -69,13 +69,14 @@ export async function render(root, params) {
   const errBox = h('div');
   const submit = h('button', { class: 'btn primary block', type: 'submit', text: id ? 'حفظ التعديلات' : 'تسجيل المريض' });
 
-  const form = h('form', { novalidate: true },
+  // حقول بإطار قرمزي ظاهر على الخلفية البيضاء (بطلب صاحب المشروع)
+  const form = h('form', { novalidate: true, class: 'pf-form' },
     h('div', { class: 'card' },
       h('h2', { text: 'البيانات الشخصية' }),
       field('الاسم الكامل (الرباعي)', name),
       h('div', { class: 'field' }, h('span', { class: 'label', text: 'الجنس' }), sexBox),
       h('div', { class: 'field' }, h('label', { for: birth.id = 'f-birth', text: 'تاريخ الميلاد' }), birth, ageOut),
-      field('رقم الهاتف', phone, 'هاتف المريض أو ذويه، 11 رقماً يبدأ بـ 07')),
+      field('رقم هاتف المريض أو مرافقه', phone, 'يجب أن يكون الرقم عليه واتساب للتواصل معه. 11 رقماً يبدأ بـ 07')),
     h('div', { class: 'card' },
       h('h2', { text: 'القياسات' }),
       h('div', { class: 'grid-2' }, field('الطول (سم)', height), field('الوزن (كغ)', weight)),
@@ -137,7 +138,7 @@ export async function render(root, params) {
     if (!spSelect.value) return { error: 'اختر الطبيب المختص بالمريض' };
     if (birth.value && birth.value > todayISO()) return { error: 'تاريخ الميلاد في المستقبل' };
     const ph = latinDigits(phone.value).replace(/[\s-]/g, '').replace(/^\+?964/, '0');
-    if (ph && !/^07\d{9}$/.test(ph)) return { error: 'رقم الهاتف غير صحيح، اكتبه بصيغة 07XXXXXXXXX' };
+    if (ph && !/^07\d{9}$/.test(ph)) return { error: 'رقم هاتف المريض أو مرافقه غير صحيح، اكتبه بصيغة 07XXXXXXXXX' };
     const hgt = height.value ? Number(latinDigits(height.value)) : null;
     const wgt = weight.value ? Number(latinDigits(weight.value)) : null;
     if (hgt !== null && !(hgt >= 30 && hgt <= 250)) return { error: 'الطول يجب أن يكون بين 30 و250 سم' };
