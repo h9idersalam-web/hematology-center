@@ -166,10 +166,16 @@ const B = 'http://localhost:8788/';
   await mix.getByRole('button', { name: /إرسال المحضَّر/ }).click(); await confirm(mix, 'إرسال');
   await mix.waitForSelector('.pill >> text=أُرسل كاملاً');
   const cid = ruq.split('id=')[1];
-  for (let day = 1; day <= 5; day++) await giveAll(nurse, `${B}#/administer?cycle=${cid}&day=${day}`, day);
-  // الممرض يؤكد «تم إعطاء الجرعة بالكامل» بعد اكتمال كل الأدوية في كل الأيام (الملف 41)
-  ok('nurse sees full-given button on last day', await nurse.getByRole('button', { name: 'تم إعطاء الجرعة بالكامل' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
-  await nurse.getByRole('button', { name: 'تم إعطاء الجرعة بالكامل' }).click(); await confirm(nurse, 'تأكيد');
+  // «تم إعطاء الجرعة بالكامل» يوماً بيوم (الملف 41): الممرض يؤكد كل يوم بعد إعطاء أدويته، وآخر يوم يُغلق الجرعة
+  for (let day = 1; day <= 5; day++) {
+    await giveAll(nurse, `${B}#/administer?cycle=${cid}&day=${day}`, day);
+    const dayBtn = nurse.getByRole('button', { name: `تم إعطاء الجرعة بالكامل لليوم ${day}` });
+    if (day === 1) ok('per-day button shown after giving day 1', await dayBtn.waitFor({ timeout: 8000 }).then(() => true, () => false));
+    await dayBtn.click(); await confirm(nurse, 'تأكيد');
+    await nurse.locator('.notice.ok', { hasText: `لليوم ${day}` }).waitFor({ timeout: 8000 });
+    if (day === 1) ok('day 1 marked complete, cycle still open', (await nurse.locator('.notice.ok', { hasText: 'لليوم 1' }).count()) === 1
+      && (await nurse.locator('.segmented a', { hasText: '1 ✓' }).count()) === 1);
+  }
   const chief = nurse;
   await chief.waitForTimeout(800);
   await nav(sara, ruq); await sara.waitForSelector('text=الجرعات الدوائية');

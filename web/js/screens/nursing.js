@@ -68,10 +68,13 @@ export async function administer(root, params) {
   const p = c.treatments.patients;
   const doses = c.cycle_doses.filter((d) => !d.archived_at && daysList(d.days).includes(day)).sort((a, b) => a.sort - b.sort);
   const ids = doses.map((d) => d.id);
-  const [adm, sent] = await Promise.all([
+  const [adm, sent, completions] = await Promise.all([
     ids.length ? q(sb.from('administrations').select('id, cycle_dose_id, day, given_at, vitals, reaction, notes, nurse:profiles(full_name)').in('cycle_dose_id', ids).eq('day', day)) : [],
     ids.length ? q(sb.from('mixing_items').select('cycle_dose_id, sent_at, mixing_orders!inner(day)').in('cycle_dose_id', ids).eq('mixing_orders.day', day)) : [],
+    // اكتمال الإعطاء لكل يوم (الملف 41)
+    q(sb.from('cycle_day_completions').select('day, completed_at, by:profiles(full_name)').eq('cycle_id', cid)).catch(() => []),
   ]);
+  const doneDays = new Set(completions.map((x) => x.day));
   const approved = !!c.doctor_approved_at;
   const live = c.treatments.status === 'active' && (c.status === 'planned' || c.status === 'held');
   const reload = () => administer(root, params);
@@ -80,7 +83,7 @@ export async function administer(root, params) {
   const allGiven = doses.length && doses.every((d) => adm.some((a) => a.cycle_dose_id === d.id));
 
   const future = addDaysISO(c.planned_date, day - 1) > todayISO();
-  if (document.documentElement.dataset.theme === 'b') return administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future });
+  if (document.documentElement.dataset.theme === 'b') return administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future, completions, doneDays });
   const rows = doses.map((d) => {
     const a = adm.find((x) => x.cycle_dose_id === d.id);
     const isSent = !d.is_mixed || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at);
@@ -102,16 +105,10 @@ export async function administer(root, params) {
       right);
   });
 
-  const closeBtn = live && allGiven && day === lastDay && can('completeCycle')
-    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), 'تم إعطاء الجرعة بالكامل') : null;
-  closeBtn?.addEventListener('click', () => busy(closeBtn, async () => {
-    const ok = await confirmDialog({ title: `تم إعطاء الجرعة ${c.cycle_no} بالكامل`, body: 'أُعطيت كل الجرعات الدوائية في هذه الجرعة. تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.', okText: 'تأكيد' });
-    if (!ok) return;
-    try { await rpc('complete_cycle', { p_cycle: cid }); toast('سُجّلت الجرعة مُعطاة بالكامل'); reload(); } catch (e) { toast(e.message, true); }
-  }));
+  const closeBtn = dayCompletion({ c, cid, day, live, allGiven, completions, doneDays, allDays, reload });
 
   const daysNav = allDays.length > 1 ? h('div', { class: 'segmented', style: 'grid-auto-columns: minmax(44px, 1fr); overflow-x: auto' },
-    allDays.sort((a, b) => a - b).map((n) => h('a', { href: `#/administer?cycle=${cid}&day=${n}`, 'aria-current': n === day ? 'page' : null, 'aria-label': 'اليوم ' + n, text: String(n) }))) : null;
+    allDays.sort((a, b) => a - b).map((n) => h('a', { href: `#/administer?cycle=${cid}&day=${n}`, 'aria-current': n === day ? 'page' : null, 'aria-label': 'اليوم ' + n + (doneDays.has(n) ? '، اكتمل إعطاؤه' : ''), text: n + (doneDays.has(n) ? ' ✓' : '') }))) : null;
 
   mount(root, h('div', { class: 'screen' },
     topbar({ title: p.full_name, sub: `${c.treatments.protocol_name} · الجرعة ${c.cycle_no} · اليوم ${day}`, back: '#/nursing' }),
@@ -133,7 +130,7 @@ export async function administer(root, params) {
 // --------------------------------------------------------------- التصميم 2: شاشة «إعطاء الجرعة»
 // العلامات الحيوية في الأعلى اختيارية: تُرفق بكل دواء يُسجَّل إعطاؤه إن كُتبت، ولا تمنع الإعطاء إن تُركت فارغة.
 const VITALS = [['bp', 'ضغط الدم', 'mmHg', '120/80', 'text'], ['hr', 'النبض', 'bpm', '78', 'numeric'], ['temp', 'الحرارة', '°C', '36.8', 'decimal'], ['spo2', 'الأكسجين', '% SpO₂', '98', 'numeric']];
-function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future }) {
+function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future, completions, doneDays }) {
   const last = adm.filter((a) => a.vitals && Object.keys(a.vitals).length).sort((a, b) => b.given_at.localeCompare(a.given_at))[0];
   const vin = {};
   const tiles = VITALS.map(([k, l, u, ph, mode]) => {
@@ -183,13 +180,7 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
       right);
   });
 
-  const closeBtn = live && allGiven && day === lastDay && can('completeCycle')
-    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), 'تم إعطاء الجرعة بالكامل') : null;
-  closeBtn?.addEventListener('click', () => busy(closeBtn, async () => {
-    const ok = await confirmDialog({ title: `تم إعطاء الجرعة ${c.cycle_no} بالكامل`, body: 'أُعطيت كل الجرعات الدوائية في هذه الجرعة. تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.', okText: 'تأكيد' });
-    if (!ok) return;
-    try { await rpc('complete_cycle', { p_cycle: cid }); toast('سُجّلت الجرعة مُعطاة بالكامل'); reload(); } catch (e) { toast(e.message, true); }
-  }));
+  const closeBtn = dayCompletion({ c, cid, day, live, allGiven, completions, doneDays, allDays, reload });
 
   // الإبلاغ عن تفاعل: لدواء أُعطي (يُضاف إلى سجله)، أو لدواء جاهز لم يُسجَّل بعد (يُسجَّل إعطاؤه مع التفاعل)
   const reactable = doses.filter((d) => adm.some((a) => a.cycle_dose_id === d.id) || ready(d));
@@ -217,7 +208,7 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
   }
 
   const daysNav = allDays.length > 1 ? h('div', { class: 'segmented', style: 'grid-auto-columns: minmax(44px, 1fr); overflow-x: auto' },
-    [...allDays].sort((a, b) => a - b).map((n) => h('a', { href: `#/administer?cycle=${cid}&day=${n}`, 'aria-current': n === day ? 'page' : null, 'aria-label': 'اليوم ' + n, text: String(n) }))) : null;
+    [...allDays].sort((a, b) => a - b).map((n) => h('a', { href: `#/administer?cycle=${cid}&day=${n}`, 'aria-current': n === day ? 'page' : null, 'aria-label': 'اليوم ' + n + (doneDays.has(n) ? '، اكتمل إعطاؤه' : ''), text: n + (doneDays.has(n) ? ' ✓' : '') }))) : null;
 
   mount(root, h('div', { class: 'screen adb' },
     h('header', { class: 'topbar adb-hero' },
@@ -240,6 +231,33 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
       closeBtn,
       h('a', { href: '#/cycle?id=' + cid, class: 'link-btn', text: 'تفاصيل الجرعة ' + c.cycle_no })),
     bottomNav('home')));
+}
+
+// «تم إعطاء الجرعة بالكامل» لهذا اليوم (الملف 41): يظهر بعد إعطاء كل أدوية اليوم، وآخر يوم يُغلق الجرعة كلها
+function dayCompletion({ c, cid, day, live, allGiven, completions, doneDays, allDays, reload }) {
+  const rec = completions.find((x) => x.day === day);
+  if (rec) {
+    return notice('ok', 'check', h('p', { style: 'font-weight: 600', text: `تم إعطاء الجرعة بالكامل لليوم ${day}` }),
+      h('p', { style: 'font-size: 13px', text: [rec.by?.full_name, fmtDay(rec.completed_at), fmtTime(rec.completed_at)].filter(Boolean).join(' · ') }));
+  }
+  if (!(live && allGiven && can('completeDay'))) return null;
+  const remaining = allDays.filter((n) => n !== day && !doneDays.has(n));
+  const btn = h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2),
+    allDays.length > 1 ? `تم إعطاء الجرعة بالكامل لليوم ${day}` : 'تم إعطاء الجرعة بالكامل');
+  btn.addEventListener('click', () => busy(btn, async () => {
+    const last = !remaining.length;
+    const ok = await confirmDialog({
+      title: allDays.length > 1 ? `تم إعطاء الجرعة ${c.cycle_no} بالكامل لليوم ${day}` : `تم إعطاء الجرعة ${c.cycle_no} بالكامل`,
+      body: last ? 'أُعطيت كل أدوية هذا اليوم، وهو آخر أيام الجرعة: تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.'
+        : `أُعطيت كل أدوية اليوم ${day}. يتبقى في هذه الجرعة ${count(remaining.length, 'day')}: ${remaining.join('، ')}.`,
+      okText: 'تأكيد' });
+    if (!ok) return;
+    try {
+      const r = await rpc('complete_cycle_day', { p_cycle: cid, p_day: day });
+      toast(r === 'cycle' ? 'سُجّلت الجرعة مُعطاة بالكامل' : `سُجّل اكتمال إعطاء اليوم ${day}`); reload();
+    } catch (e) { toast(e.message, true); }
+  }));
+  return btn;
 }
 
 function vitalsText(v = {}) {

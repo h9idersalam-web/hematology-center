@@ -19,7 +19,8 @@ const RULES = {
   doctorEdit: ['specialist', 'senior_resident'],
   requestEdit: ['clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'],
   decide: ['specialist', 'senior_resident', 'chief_clinical_pharmacist'],   // التفصيل في can_decide_request
-  completeCycle: ['specialist', 'senior_resident', 'chief_clinical_pharmacist', 'nurse'],   // الممرض بعد اكتمال الإعطاء فقط (الملف 41)
+  completeCycle: ['specialist', 'senior_resident', 'chief_clinical_pharmacist'],   // إغلاق الجرعة كلها دفعة واحدة
+  completeDay: ['nurse', 'specialist', 'senior_resident', 'chief_clinical_pharmacist'],   // «تم إعطاء الجرعة بالكامل» لكل يوم (الملف 41)
   upload: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist', 'nurse'],
   labs: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'nurse'],
   prepare: ['mixing_pharmacist'],
