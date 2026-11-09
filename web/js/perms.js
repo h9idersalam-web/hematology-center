@@ -41,3 +41,10 @@ export function can(action) {
   if (action === 'toggleDeputy') return p.base_role === 'chief_clinical_pharmacist' || (p.is_admin && p.role === 'chief_clinical_pharmacist');
   return (RULES[action] || []).includes(p.role);
 }
+
+// طبيب الاختصاص يرى مرضاه فقط (المريض الذي هو طبيبه المختص): قائمة المرضى، وجلسات اليوم والمتأخرة والمواعيد،
+// والجرعات بانتظار اعتماده، وطلبات التعديل. عدد مرضى المركز الكلي يبقى ظاهراً للجميع.
+// المدير يرى الجميع حتى وهو يعمل بدور طبيب الاختصاص (يقرّر عن الأطباء الذين لم ينضموا بعد).
+export const onlyMine = () => state.profile?.role === 'specialist' && !state.profile.is_admin;
+// يضيف شرط «مرضاي» لاستعلام على cycles فيه treatments!inner(patients!inner(...))
+export const mineCycles = (x) => (onlyMine() ? x.eq('treatments.patients.specialist_id', state.profile.id) : x);

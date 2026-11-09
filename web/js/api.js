@@ -48,8 +48,8 @@ export async function q(promise) {
   return data;
 }
 
-export async function countOf(table, build) {
-  let query = sb.from(table).select('id', { count: 'exact', head: true });
+export async function countOf(table, build, select = 'id') {
+  let query = sb.from(table).select(select, { count: 'exact', head: true });
   if (build) query = build(query);
   const { count, error } = await query;
   if (error) throw new Error(errMsg(error));

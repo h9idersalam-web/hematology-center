@@ -2,7 +2,7 @@
 import { sb, q, countOf, rpc } from '../api.js';
 import { h, mount, icon, roleLabel, ROLES, roleName, ROLE_GROUPS, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil, toast, busy } from '../ui.js';
 import { state, logout, loadProfile } from '../app.js';
-import { can } from '../perms.js';
+import { can, onlyMine, mineCycles } from '../perms.js';
 import { APP_NAME } from '../config.js';
 import { soundAsked, enableSound, disableSound } from '../notify.js';
 import { installButton } from '../install.js';
@@ -12,6 +12,8 @@ function greeting() {
   return hr < 12 ? 'صباح الخير' : 'مساء الخير';
 }
 
+// استعلام العدّ على الدورات مع طبيب المريض (لتصفية «مرضاي»)
+const MINE_SEL = 'id, treatments!inner(patients!inner(specialist_id))';
 const CAN_APPROVE = ['specialist', 'senior_resident', 'chief_clinical_pharmacist'];
 const SEES_REQUESTS = ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'];
 
@@ -67,17 +69,17 @@ export async function render(root) {
   // الأرقام
   try {
     const [todayN, overdueN, reqN, patientsN] = await Promise.all([
-      countOf('cycles', (x) => x.eq('planned_date', today).in('status', ['planned', 'held'])),
-      countOf('cycles', (x) => x.lt('planned_date', today).eq('status', 'planned')),
-      SEES_REQUESTS.includes(p.role) ? countOf('change_requests', (x) => x.eq('status', 'pending')) : Promise.resolve(null),
-      countOf('patients', (x) => x.is('archived_at', null)),
+      countOf('cycles', (x) => mineCycles(x.eq('planned_date', today).in('status', ['planned', 'held'])), MINE_SEL),
+      countOf('cycles', (x) => mineCycles(x.lt('planned_date', today).eq('status', 'planned')), MINE_SEL),
+      SEES_REQUESTS.includes(p.role) ? countOf('change_requests', (x) => (onlyMine() ? x.eq('patients.specialist_id', p.id) : x).eq('status', 'pending'), 'id, patients!inner(specialist_id)') : Promise.resolve(null),
+      countOf('patients', (x) => x.is('archived_at', null)),   // عدد مرضى المركز الكلي يبقى للجميع
     ]);
     statsBox.replaceChildren(
       stat('brand', todayN, 'جلسة اليوم', '#/appointments'),
       stat('warn', overdueN, 'جلسات متأخرة', '#/appointments'),
       reqN === null ? stat('info', '—', 'طلبات التعديل', null)
         : stat('info', reqN, CAN_APPROVE.includes(p.role) ? 'بانتظار موافقتك' : 'طلبات تعديل معلّقة', '#/requests'),
-      stat('plain', patientsN, 'مريضاً مسجّلاً', '#/patients'));
+      stat('plain', patientsN, onlyMine() ? 'مريضاً في المركز' : 'مريضاً مسجّلاً', '#/patients'));
     if (overdueN > 0) {
       alertBox.replaceChildren(h('a', { href: '#/appointments', class: 'notice warn', style: 'text-decoration: none; align-items: center' },
         icon('warn', 22), h('span', { style: 'flex: 1; font-weight: 600', text: `${overdueN} جلسة تجاوزت موعدها` }),
@@ -89,9 +91,9 @@ export async function render(root) {
 
   // جلسات اليوم
   try {
-    const rows = await q(sb.from('cycles')
-      .select('id, cycle_no, status, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name))')
-      .eq('planned_date', today).in('status', ['planned', 'held']).eq('treatments.status', 'active')
+    const rows = await q(mineCycles(sb.from('cycles')
+      .select('id, cycle_no, status, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name, specialist_id))')
+      .eq('planned_date', today).in('status', ['planned', 'held']).eq('treatments.status', 'active'))
       .order('cycle_no').limit(30));
     todayBox.replaceChildren(...(rows.length ? rows.map(cycleRow) : [empty('لا توجد جلسات مجدولة اليوم', 'calendar')]));
   } catch (e) {
@@ -321,8 +323,8 @@ async function renderB(root) {
 
   // البطاقة الطافية: الجرعات بانتظار اعتماد الطبيب (أو جلسات اليوم لبقية الأدوار)
   try {
-    const rows = await q(sb.from('cycles').select('id, planned_date, treatments!inner(status, patients!inner(full_name))')
-      .lte('planned_date', today).eq('status', 'planned').is('doctor_approved_at', null).eq('treatments.status', 'active').order('planned_date').limit(50));
+    const rows = await q(mineCycles(sb.from('cycles').select('id, planned_date, treatments!inner(status, patients!inner(full_name, specialist_id))')
+      .lte('planned_date', today).eq('status', 'planned').is('doctor_approved_at', null).eq('treatments.status', 'active')).order('planned_date').limit(50));
     const names = [...new Set(rows.map((r) => shortName(r.treatments.patients.full_name.replace(/^د\.\s*/, ''))))];
     const title = doctor ? 'جرعات بانتظار اعتمادك' : 'جرعات بانتظار اعتماد الطبيب';
     const drop = h('span', { class: 'hb-drop' }); drop.innerHTML = IV_BAG; drop.append(h('b', { text: rows.length }));
@@ -335,21 +337,21 @@ async function renderB(root) {
   // شريط الأرقام
   try {
     const [todayN, overdueN, reqN, patientsN] = await Promise.all([
-      countOf('cycles', (x) => x.eq('planned_date', today).in('status', ['planned', 'held'])),
-      countOf('cycles', (x) => x.lt('planned_date', today).eq('status', 'planned')),
-      SEES_REQUESTS.includes(p.role) ? countOf('change_requests', (x) => x.eq('status', 'pending')) : Promise.resolve(null),
-      countOf('patients', (x) => x.is('archived_at', null)),
+      countOf('cycles', (x) => mineCycles(x.eq('planned_date', today).in('status', ['planned', 'held'])), MINE_SEL),
+      countOf('cycles', (x) => mineCycles(x.lt('planned_date', today).eq('status', 'planned')), MINE_SEL),
+      SEES_REQUESTS.includes(p.role) ? countOf('change_requests', (x) => (onlyMine() ? x.eq('patients.specialist_id', p.id) : x).eq('status', 'pending'), 'id, patients!inner(specialist_id)') : Promise.resolve(null),
+      countOf('patients', (x) => x.is('archived_at', null)),   // عدد مرضى المركز الكلي يبقى للجميع
     ]);
     const cell = (n, l, href) => h(href ? 'a' : 'div', { class: 'hb-stat', href }, h('b', { text: n ?? '—' }), h('span', { text: l }));
     statsBox.replaceChildren(cell(todayN, 'جلسات اليوم', '#/appointments'), cell(overdueN, overdueN === 1 ? 'جلسة متأخرة' : 'جلسات متأخرة', '#/appointments'),
-      cell(reqN, 'طلبات تعديل', reqN === null ? null : '#/requests'), cell(patientsN, 'مريضاً', '#/patients'));
+      cell(reqN, 'طلبات تعديل', reqN === null ? null : '#/requests'), cell(patientsN, onlyMine() ? 'في المركز' : 'مريضاً', '#/patients'));
   } catch (e) { statsBox.replaceChildren(); }
 
   // جلسات اليوم
   try {
-    const rows = await q(sb.from('cycles')
-      .select('id, cycle_no, status, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name))')
-      .eq('planned_date', today).in('status', ['planned', 'held']).eq('treatments.status', 'active').order('cycle_no').limit(30));
+    const rows = await q(mineCycles(sb.from('cycles')
+      .select('id, cycle_no, status, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name, specialist_id))')
+      .eq('planned_date', today).in('status', ['planned', 'held']).eq('treatments.status', 'active')).order('cycle_no').limit(30));
     listBox.replaceChildren(...(rows.length ? rows.map((c) => {
       const t = c.treatments, pt = t.patients;
       const pill = c.status === 'held' ? h('span', { class: 'pill warn', text: 'موقوفة' })

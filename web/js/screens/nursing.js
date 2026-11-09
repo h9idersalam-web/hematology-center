@@ -1,7 +1,7 @@
 // التمريض: جرعات اليوم لكل مريض، وتسجيل الإعطاء مع العلامات الحيوية والتفاعلات
 import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDay, fmtTime, todayISO, addDaysISO, initials, count, field, confirmDialog } from '../ui.js';
-import { can } from '../perms.js';
+import { can, mineCycles } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
 import { NKDA } from './patient-form.js';
 
@@ -18,8 +18,8 @@ export async function list(root) {
   box.replaceChildren(h('div', { class: 'card' }, h('div', { class: 'empty' }, h('span', { class: 'spinner' }))));
 
   const today = todayISO();
-  const cycles = await q(sb.from('cycles')
-    .select('id, cycle_no, planned_date, doctor_approved_at, treatments!inner(status, protocol_name, total_cycles, patients!inner(id, full_name, file_no, allergies, archived_at)), cycle_doses(id, drug_name, days, is_mixed, archived_at), mixing_orders(day, status)')
+  const cycles = await q(mineCycles(sb.from('cycles')
+    .select('id, cycle_no, planned_date, doctor_approved_at, treatments!inner(status, protocol_name, total_cycles, patients!inner(id, full_name, file_no, allergies, archived_at, specialist_id)), cycle_doses(id, drug_name, days, is_mixed, archived_at), mixing_orders(day, status)'))
     .in('status', ['planned', 'held']).eq('treatments.status', 'active').is('treatments.patients.archived_at', null)
     .gte('planned_date', addDaysISO(today, -60)).lte('planned_date', today).order('planned_date'));
   const ids = cycles.map((c) => c.id);

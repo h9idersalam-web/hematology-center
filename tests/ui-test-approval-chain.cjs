@@ -37,7 +37,12 @@ const B = 'http://localhost:8788/';
   const mix = await login('mix@test.iq');
 
   // ===== 1. خطة تنتظر الموافقة: للطبيبة المختصة بالمريض فقط
-  await openPatient(ali, 'حسن رعد');
+  // طبيب الاختصاص يرى مرضاه فقط في القائمة؛ يفتح مريض غيره برابط مباشر فقط
+  await nav(ali, B + '#/patients?f=all'); await ali.waitForSelector('main');
+  await ali.waitForTimeout(1500);
+  ok('other specialist does not list her patients', (await ali.locator('main .row', { hasText: 'حسن رعد' }).count()) === 0);
+  await openPatient(sara, 'حسن رعد');
+  await nav(ali, sara.url()); await ali.waitForSelector('text=خطة العلاج الحالية');
   ok('other specialist sees no approve button', (await ali.getByRole('button', { name: 'الموافقة على الخطة' }).count()) === 0
      && (await ali.locator('text=للطبيب المختص بالمريض').count()) === 1);
   await openPatient(sara, 'حسن رعد');

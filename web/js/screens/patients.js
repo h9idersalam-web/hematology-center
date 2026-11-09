@@ -1,7 +1,9 @@
 // قائمة المرضى: البحث بالاسم أو رقم الملف أو الهاتف، والتصفية حسب حالة العلاج
 import { sb, q } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, empty, notice, initials, arNorm, ageText, SEX, fmtDate, daysUntil, count } from '../ui.js';
-import { can } from '../perms.js';
+import { can, onlyMine } from '../perms.js';
+import { state } from '../app.js';
+import { countOf } from '../api.js';
 
 const FILTERS = [
   ['active', 'في العلاج'],
@@ -64,6 +66,7 @@ export async function render(root, params) {
     try {
       let x = sb.from('patient_overview')
         .select('id, file_no, full_name, birth_date, sex, allergies, specialist_name, archived_at, protocol_name, treatment_status, total_cycles, next_cycle_no, next_date, next_status, last_cycle_no', { count: 'exact' });
+      if (onlyMine()) x = x.eq('specialist_id', state.profile.id);   // طبيب الاختصاص: مرضاه فقط
       if (filter === 'archived') x = x.not('archived_at', 'is', null);
       else x = x.is('archived_at', null);
       if (filter === 'active') x = x.in('treatment_status', ['active', 'pending_approval']);
@@ -74,7 +77,8 @@ export async function render(root, params) {
       const { data, error, count: total } = await x.limit(limit);
       if (my !== seq) return;
       if (error) throw new Error(error.message);
-      meta.textContent = count(total ?? data.length, 'patient');
+      meta.textContent = count(total ?? data.length, 'patient') + (onlyMine() ? ' من مرضاك' : '');
+      if (onlyMine()) countOf('patients', (y) => y.is('archived_at', null)).then((n) => { if (my === seq) meta.textContent += ` · ${n} في المركز`; }).catch(() => {});
       list.replaceChildren(...(data.length ? data.map(row)
         : [empty(term ? 'لا يوجد مريض بهذا البحث. جرّب جزءاً من الاسم أو رقم الملف.' : emptyText(), term ? 'search' : 'users')]));
       if (total > data.length) {

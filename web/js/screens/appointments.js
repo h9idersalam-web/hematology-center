@@ -1,7 +1,7 @@
 // المواعيد: جلسات اليوم والأسبوع، والمتأخرة، والقادمة خلال شهر
 import { sb, q } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, empty, notice, initials, fmtDay, todayISO, addDaysISO, daysUntil, count } from '../ui.js';
-import { can } from '../perms.js';
+import { can, mineCycles } from '../perms.js';
 import { postponeDialog } from './postpone.js';
 
 const VIEWS = [
@@ -35,10 +35,11 @@ export async function render(root, params) {
     const today = todayISO();
     try {
       let x = sb.from('cycles')
-        .select('id, cycle_no, planned_date, status, postpone_reason, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name, file_no, allergies, archived_at))')
+        .select('id, cycle_no, planned_date, status, postpone_reason, doctor_approved_at, treatments!inner(protocol_name, total_cycles, status, patients!inner(id, full_name, file_no, allergies, archived_at, specialist_id))')
         .in('status', ['planned', 'held'])
         .in('treatments.status', ['active', 'pending_approval'])
         .is('treatments.patients.archived_at', null);
+      x = mineCycles(x);   // طبيب الاختصاص: جلسات مرضاه فقط
       if (view === 'today') x = x.eq('planned_date', today);
       else if (view === 'week') x = x.gte('planned_date', today).lte('planned_date', addDaysISO(today, 6));
       else if (view === 'month') x = x.gte('planned_date', today).lte('planned_date', addDaysISO(today, 30));
