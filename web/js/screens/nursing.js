@@ -103,11 +103,11 @@ export async function administer(root, params) {
   });
 
   const closeBtn = live && allGiven && day === lastDay && can('completeCycle')
-    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), `إغلاق الجرعة ${c.cycle_no}`) : null;
+    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), 'تم إعطاء الجرعة بالكامل') : null;
   closeBtn?.addEventListener('click', () => busy(closeBtn, async () => {
-    const ok = await confirmDialog({ title: `إغلاق الجرعة ${c.cycle_no}`, body: 'أُعطيت كل الجرعات الدوائية في هذه الجرعة. تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.', okText: 'إغلاق' });
+    const ok = await confirmDialog({ title: `تم إعطاء الجرعة ${c.cycle_no} بالكامل`, body: 'أُعطيت كل الجرعات الدوائية في هذه الجرعة. تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.', okText: 'تأكيد' });
     if (!ok) return;
-    try { await rpc('complete_cycle', { p_cycle: cid }); toast('أُغلقت الجرعة'); reload(); } catch (e) { toast(e.message, true); }
+    try { await rpc('complete_cycle', { p_cycle: cid }); toast('سُجّلت الجرعة مُعطاة بالكامل'); reload(); } catch (e) { toast(e.message, true); }
   }));
 
   const daysNav = allDays.length > 1 ? h('div', { class: 'segmented', style: 'grid-auto-columns: minmax(44px, 1fr); overflow-x: auto' },
@@ -184,11 +184,11 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
   });
 
   const closeBtn = live && allGiven && day === lastDay && can('completeCycle')
-    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), `إغلاق الجرعة ${c.cycle_no}`) : null;
+    ? h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2), 'تم إعطاء الجرعة بالكامل') : null;
   closeBtn?.addEventListener('click', () => busy(closeBtn, async () => {
-    const ok = await confirmDialog({ title: `إغلاق الجرعة ${c.cycle_no}`, body: 'أُعطيت كل الجرعات الدوائية في هذه الجرعة. تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.', okText: 'إغلاق' });
+    const ok = await confirmDialog({ title: `تم إعطاء الجرعة ${c.cycle_no} بالكامل`, body: 'أُعطيت كل الجرعات الدوائية في هذه الجرعة. تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.', okText: 'تأكيد' });
     if (!ok) return;
-    try { await rpc('complete_cycle', { p_cycle: cid }); toast('أُغلقت الجرعة'); reload(); } catch (e) { toast(e.message, true); }
+    try { await rpc('complete_cycle', { p_cycle: cid }); toast('سُجّلت الجرعة مُعطاة بالكامل'); reload(); } catch (e) { toast(e.message, true); }
   }));
 
   // الإبلاغ عن تفاعل: لدواء أُعطي (يُضاف إلى سجله)، أو لدواء جاهز لم يُسجَّل بعد (يُسجَّل إعطاؤه مع التفاعل)

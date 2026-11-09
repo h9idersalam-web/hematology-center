@@ -2,7 +2,7 @@
 import { sb, q, rpc } from '../api.js';
 import { terms } from '../terms.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, fmtDay, fmtTime, toast, confirmDialog, busy, daysUntil, count, ROLES } from '../ui.js';
-import { go } from '../app.js';
+import { go, state } from '../app.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num, instrLine, loadMixState, mixNote } from '../dose.js';
 import { NKDA } from './patient-form.js';
@@ -48,9 +48,10 @@ export async function render(root, params) {
   if (live && can('postpone')) {
     actions.push(actionBtn('secondary', 'clock', 'تأجيل الجرعة', async () => { if (await postponeDialog({ ...c, patient_name: p.full_name })) reload(); }));
   }
-  if (live && can('completeCycle') && c.doctor_approved_at && daysUntil(c.planned_date) <= 0) {
-    actions.push(actionBtn('secondary', 'check', 'إغلاق الجرعة', async () => {
-      const ok = await confirmDialog({ title: `إغلاق الجرعة ${c.cycle_no}`, body: 'تُسجَّل الجرعة مُعطاة ولا يمكن تعديل جرعاتها الدوائية بعد ذلك، ويُغلق ما لم يُرسل من طلبات المزج. أغلقها بعد اكتمال الإعطاء.', okText: 'إغلاق' });
+  // الممرض يغلقها من شاشة الإعطاء بعد اكتمال كل الأدوية؛ هنا للطبيب والمقيم الأقدم ومسؤول الصيادلة
+  if (live && can('completeCycle') && state.profile.role !== 'nurse' && c.doctor_approved_at && daysUntil(c.planned_date) <= 0) {
+    actions.push(actionBtn('secondary', 'check', 'تم إعطاء الجرعة بالكامل', async () => {
+      const ok = await confirmDialog({ title: `تم إعطاء الجرعة ${c.cycle_no} بالكامل`, body: 'تُسجَّل الجرعة مُعطاة ولا يمكن تعديل جرعاتها الدوائية بعد ذلك، ويُغلق ما لم يُرسل من طلبات المزج. أكّدها بعد اكتمال الإعطاء.', okText: 'تأكيد' });
       if (ok) { await rpc('complete_cycle', { p_cycle: id }); toast('سُجّلت الجرعة مُعطاة'); reload(); }
     }));
   }

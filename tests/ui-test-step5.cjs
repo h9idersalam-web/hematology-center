@@ -167,11 +167,10 @@ const B = 'http://localhost:8788/';
   await mix.waitForSelector('.pill >> text=أُرسل كاملاً');
   const cid = ruq.split('id=')[1];
   for (let day = 1; day <= 5; day++) await giveAll(nurse, `${B}#/administer?cycle=${cid}&day=${day}`, day);
-  ok('nurse cannot close cycle', (await nurse.getByRole('button', { name: 'إغلاق الجرعة 1' }).count()) === 0);
-  const chief = await login('admin@test.iq');
-  await nav(chief, `${B}#/administer?cycle=${cid}&day=5`); await chief.waitForSelector('main .row');
-  ok('chief sees close button on last day', await chief.getByRole('button', { name: 'إغلاق الجرعة 1' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
-  await chief.getByRole('button', { name: 'إغلاق الجرعة 1' }).click(); await confirm(chief, 'إغلاق');
+  // الممرض يؤكد «تم إعطاء الجرعة بالكامل» بعد اكتمال كل الأدوية في كل الأيام (الملف 41)
+  ok('nurse sees full-given button on last day', await nurse.getByRole('button', { name: 'تم إعطاء الجرعة بالكامل' }).waitFor({ timeout: 8000 }).then(() => true, () => false));
+  await nurse.getByRole('button', { name: 'تم إعطاء الجرعة بالكامل' }).click(); await confirm(nurse, 'تأكيد');
+  const chief = nurse;
   await chief.waitForTimeout(800);
   await nav(sara, ruq); await sara.waitForSelector('text=الجرعات الدوائية');
   ok('cycle closed as given', (await sara.locator('.pill', { hasText: 'أُعطيت' }).count()) >= 1);
