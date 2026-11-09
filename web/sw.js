@@ -9,7 +9,7 @@ const SHELL = [
   'js/screens/notifications.js', 'js/screens/admin.js',
   'js/screens/patients.js', 'js/screens/patient.js', 'js/screens/patient-form.js',
   'js/screens/appointments.js', 'js/screens/postpone.js',
-  'js/screens/protocols.js', 'js/screens/protocol.js', 'js/screens/protocol-form.js', 'js/screens/plan-form.js',
+  'js/screens/protocols.js', 'js/screens/protocol.js', 'js/screens/protocol-form.js', 'js/screens/plan-edit.js', 'js/screens/plan-form.js',
   'js/screens/cycle.js', 'js/screens/cycle-edit.js', 'js/screens/requests.js', 'js/screens/request.js',
   'js/screens/files.js', 'js/screens/labs.js', 'js/screens/lab-alert.js', 'js/screens/mixing.js', 'js/screens/nursing.js', 'js/screens/pharmacy.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',

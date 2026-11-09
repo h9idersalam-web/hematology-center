@@ -53,3 +53,6 @@ export const realChief = () => state.profile?.role === 'chief_clinical_pharmacis
 export const onlyMine = () => state.profile?.role === 'specialist' && !state.profile.is_admin;
 // يضيف شرط «مرضاي» لاستعلام على cycles فيه treatments!inner(patients!inner(...))
 export const mineCycles = (x) => (onlyMine() ? x.eq('treatments.patients.specialist_id', state.profile.id) : x);
+
+// تعديل خطة العلاج بعد إدخالها (الملف 42): المدير، وطبيب الاختصاص، والمقيم الأقدم، ومسؤول الصيادلة الأصلي
+export const canEditPlan = () => { const p = state.profile; return !!p && (p.is_admin || ['specialist', 'senior_resident'].includes(p.role) || realChief()); };

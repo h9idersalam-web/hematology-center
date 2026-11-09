@@ -3,7 +3,7 @@ import { sb, q, rpc, countOf } from '../api.js';
 import { statusLabel } from '../diagnoses.js';
 import { h, mount, icon, topbar, bottomNav, notice, empty, fmtDate, fmtDay, daysUntil, ageText, bsa, SEX, toast, confirmDialog, initials, count, busy } from '../ui.js';
 import { go, state } from '../app.js';
-import { can } from '../perms.js';
+import { can, canEditPlan } from '../perms.js';
 import { NKDA } from './patient-form.js';
 import { postponeDialog } from './postpone.js';
 import { fileTile } from './files.js';
@@ -187,6 +187,8 @@ function cycleRow(c, isNext, p, reload) {
 function planActions(p, t, reload) {
   if (p.archived_at) return null;
   const out = [];
+  // تعديل الخطة: التشخيص والحالة والدرجة والبروتوكول ورقم الجرعة (الملف 42)
+  if (canEditPlan()) out.push(h('a', { class: 'btn secondary block', href: '#/plan-edit?tid=' + t.id }, icon('edit', 22), 'تعديل الخطة'));
   // الموافقة على الخطة ورفضها للطبيب المختص بهذا المريض حصراً
   // طبيب المريض لم ينضم بعد: يقرّر المدير وهو يعمل بدور طبيب الاختصاص (الملف 36)
   const mineToDecide = can('approvePlan') && ((state.profile.role === 'chief_clinical_pharmacist' && !state.profile.acting) || p.specialist_id === state.profile.id || (!p.specialist_id && p.pending_specialist_id && state.profile.is_admin));

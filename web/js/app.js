@@ -18,6 +18,7 @@ import * as protocols from './screens/protocols.js';
 import * as protocol from './screens/protocol.js';
 import * as protocolForm from './screens/protocol-form.js';
 import * as planForm from './screens/plan-form.js';
+import * as planEdit from './screens/plan-edit.js';
 import * as cycle from './screens/cycle.js';
 import * as cycleEdit from './screens/cycle-edit.js';
 import * as requests from './screens/requests.js';
@@ -49,6 +50,7 @@ const ROUTES = {
   '/protocol': { screen: protocol.render },
   '/protocol-new': { screen: protocolForm.render },
   '/plan-new': { screen: planForm.render },
+  '/plan-edit': { screen: planEdit.render },
   '/cycle': { screen: cycle.render },
   '/cycle-edit': { screen: cycleEdit.render },
   '/requests': { screen: requests.render },
