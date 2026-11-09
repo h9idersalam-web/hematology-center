@@ -64,7 +64,10 @@ export async function render(root, params) {
       previous.length ? previousCard(previous) : null,
       filesCard(p, labsN, filesN, recentFiles),
       can('archivePatient') && !p.archived_at
-        ? h('button', { class: 'btn danger block', type: 'button', onclick: () => archive(p) }, icon('archive', 22), 'أرشفة الملف') : null),
+        ? h('button', { class: 'btn danger block', type: 'button', onclick: () => archive(p) }, icon('archive', 22), 'أرشفة الملف') : null,
+      // حذف نهائي لمريض أُدخل بالخطأ: لمدير البرنامج حصراً (الملف 45)
+      state.profile.is_admin ? h('button', { class: 'link-btn', type: 'button', style: 'color: var(--brand-dark); align-self: center', onclick: (e) => deletePatient(p, e.currentTarget) },
+        icon('trash', 20), 'حذف المريض نهائياً (أُدخل بالخطأ)') : null),
     bottomNav('patients')));
 }
 
@@ -337,4 +340,36 @@ function nextPhaseCard(p, latest, list, reload) {
         field(opts.length > 1 ? 'المرحلة التالية (اختر أحد البديلين)' : 'المرحلة التالية', sel), field('تاريخ Cycle 1', date), btn)
         : h('p', { class: 'hint ltr', style: 'text-align: right', text: 'التالية: ' + opts.map((x) => x.name).join(' / ') }),
       can('createPlan') ? h('a', { class: 'link-btn', href: '#/plan-new?patient=' + p.id, text: 'أو إنشاء خطة ببروتوكول آخر' }) : null));
+}
+
+// حذف نهائي (الملف 45): سبب إلزامي، وتأكيد بكتابة رقم الملف؛ تُحذف ملفاته من التخزين بعد ذلك
+function deletePatient(p, btn) {
+  const dlg = h('dialog', null);
+  const close = () => { dlg.close(); dlg.remove(); };
+  const reason = h('textarea', { class: 'input', rows: 2, maxlength: 500, placeholder: 'مثال: سُجّل مرتين، أو أُدخل لمريض خطأ' });
+  const fileNo = h('input', { class: 'input ltr', style: 'text-align: right', placeholder: p.file_no, autocomplete: 'off' });
+  const err = h('div');
+  const ok = h('button', { type: 'button', class: 'btn danger block' }, icon('trash', 22), 'حذف نهائي');
+  ok.addEventListener('click', () => busy(ok, async () => {
+    err.replaceChildren();
+    if (!reason.value.trim()) return err.replaceChildren(notice('err', 'warn', h('p', { text: 'اكتب سبب الحذف' })));
+    if (fileNo.value.trim().toUpperCase() !== String(p.file_no).toUpperCase()) return err.replaceChildren(notice('err', 'warn', h('p', { text: 'اكتب رقم الملف ' + p.file_no + ' للتأكيد' })));
+    try {
+      const r = await rpc('admin_delete_patient', { p_patient: p.id, p_reason: reason.value.trim() });
+      let note = '';
+      try {
+        const dir = 'patients/' + p.id;
+        const { data: list } = await sb.storage.from('patient-files').list(dir, { limit: 1000 });
+        const paths = [...new Set([...(list || []).map((f) => dir + '/' + f.name), ...((r && r.files) || [])].filter(Boolean))];
+        if (paths.length) { const { error } = await sb.storage.from('patient-files').remove(paths); if (error) throw error; }
+      } catch { note = '، وتعذّر حذف بعض ملفاته من التخزين'; }
+      close(); toast('حُذف المريض نهائياً' + note, !!note); go('/patients');
+    } catch (x) { err.replaceChildren(notice('err', 'warn', h('p', { text: x.message }))); }
+  }));
+  dlg.append(h('div', { class: 'dlg' }, h('h2', { text: 'حذف ' + p.full_name + ' نهائياً' }),
+    notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'لا يمكن التراجع من التطبيق.' }),
+      h('p', { text: 'يُحذف المريض وكل خططه وجرعاته الدوائية وسجل إعطائه وطلبات المزج والتعديل والتحاليل والمرفقات والإشعارات. استعمله فقط لمريض أُدخل بالخطأ؛ للمريض الحقيقي استعمل الأرشفة.' })),
+    field('سبب الحذف', reason), field('اكتب رقم الملف للتأكيد: ' + p.file_no, fileNo), err, ok,
+    h('button', { type: 'button', class: 'link-btn', text: 'إلغاء', onclick: close })));
+  document.body.append(dlg); dlg.addEventListener('cancel', close); dlg.showModal(); reason.focus();
 }
