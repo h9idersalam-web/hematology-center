@@ -187,6 +187,10 @@ export function arNorm(s) {
     .replace(/[أإآٱةىؤئ]/g, (c) => to[from.indexOf(c)]).toLowerCase();
 }
 
+// مراحل البروتوكول (الملف 44)
+export const PHASES = { induction: 'Induction', consolidation: 'Consolidation', interim_maintenance: 'Interim Maintenance',
+  intensification: 'Intensification', maintenance: 'Maintenance', other: 'Other' };
+
 // المعدود العربي: 1 يوم، يومان، 3 أيام، 11 يوماً
 const NOUNS = {
   day: ['يوم', 'يومان', 'أيام', 'يوماً'],

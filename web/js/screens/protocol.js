@@ -1,6 +1,6 @@
 // تفاصيل بروتوكول: الأدوية وجرعاتها وأيامها، ومثال حساب، والاعتماد والأرشفة
 import { sb, q, rpc } from '../api.js';
-import { h, mount, icon, topbar, bottomNav, notice, fmtDate, toast, confirmDialog, count, busy } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, notice, fmtDate, toast, confirmDialog, count, busy, field, PHASES } from '../ui.js';
 import { go } from '../app.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, calcDose, daysText, num, instrLine, withCycles } from '../dose.js';
@@ -90,9 +90,13 @@ export async function render(root, params) {
       h('section', { class: 'card' },
         h('div', { class: 'facts' },
           h('div', { class: 'fact' }, h('span', { class: 'l', text: 'نوع العلاج' }), h('span', { class: 'v', text: KIND[p.kind] })),
-          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'المدة بين الجرعات' }), h('span', { class: 'v', text: count(p.cycle_length_days, 'day') })),
-          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'عدد الجرعات' }), h('span', { class: 'v', text: String(p.total_cycles) })),
-          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'أضافه' }), h('span', { class: 'v', text: p.author?.full_name || 'المكتبة الأولية' }))),
+          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'المدة بين الـCycles' }), h('span', { class: 'v', text: count(p.cycle_length_days, 'day') })),
+          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'عدد الـCycles' }), h('span', { class: 'v', text: String(p.total_cycles) })),
+          h('div', { class: 'fact' }, h('span', { class: 'l', text: 'أضافه' }), h('span', { class: 'v', text: p.author?.full_name || 'المكتبة الأولية' })),
+          h('div', { class: 'fact wide' }, h('span', { class: 'l', text: 'المرحلة' }),
+            h('span', { class: 'v', style: 'display: flex; gap: 8px; align-items: center; justify-content: space-between' },
+              h('span', { class: 'ltr', text: p.regimen ? `${p.regimen} · Phase ${p.phase_order}${p.phase ? ' · ' + PHASES[p.phase] : ''}` : (p.phase ? PHASES[p.phase] : 'بروتوكول مستقل') }),
+              can('manageProtocol') ? h('button', { type: 'button', class: 'icon-btn boxed', 'aria-label': 'تعديل المرحلة', title: 'تعديل المرحلة', onclick: () => phaseDialog(p, () => render(root, params)) }, icon('edit', 20)) : null))),
         p.notes ? h('div', { class: 'notice info' }, icon('info', 20), h('p', { text: p.notes })) : null),
       fileSection(p, () => render(root, params)),
       h('section', { class: 'section' },
@@ -151,4 +155,25 @@ function drugRow(d) {
       h('span', { style: 'font-size: 12px; color: var(--muted-2)', text: 'مثال' }),
       h('b', { class: 'ltr', style: 'font-size: 16px', text: `${num(ex.final)} ${ex.finalUnit}` }),
       ex.capped ? h('span', { style: 'font-size: 12px; color: var(--warn)', text: 'بالسقف' }) : null));
+}
+
+// المجموعة والمرحلة وترتيبها (الملف 44): لطبيب الاختصاص ومسؤول الصيادلة ومدير البرنامج
+function phaseDialog(p, done) {
+  const dlg = h('dialog', null);
+  const close = () => { dlg.close(); dlg.remove(); };
+  const reg = h('input', { class: 'input ltr', style: 'text-align: right', maxlength: 60, value: p.regimen || '', placeholder: 'UKALL14' });
+  const ph = h('select', { class: 'input ltr', style: 'text-align: right' }, h('option', { value: '', text: '—' }),
+    Object.entries(PHASES).map(([k, v]) => h('option', { value: k, selected: k === p.phase, text: v })));
+  const ord = h('input', { class: 'input ltr', type: 'number', min: 1, max: 50, value: p.phase_order || '', style: 'text-align: right' });
+  const err = h('div');
+  const save = h('button', { type: 'button', class: 'btn primary block', text: 'حفظ' });
+  save.addEventListener('click', () => busy(save, async () => {
+    try { await rpc('set_protocol_phase', { p_id: p.id, p_regimen: reg.value, p_phase: ph.value || null, p_order: ord.value ? Number(ord.value) : null }); close(); toast('حُفظت المرحلة'); done(); }
+    catch (x) { err.replaceChildren(notice('err', 'warn', h('p', { text: x.message }))); }
+  }));
+  dlg.append(h('div', { class: 'dlg' }, h('h2', { text: 'المرحلة' }),
+    h('p', { class: 'hint', text: 'بروتوكولات المجموعة الواحدة (مثل UKALL14) تُرتَّب بالرقم، وبعد انتهاء مرحلة يظهر في ملف المريض زر للانتقال إلى التالية. رقمان متساويان = بديلان للمرحلة نفسها.' }),
+    field('المجموعة (اتركها فارغة لبروتوكول مستقل)', reg), field('نوع المرحلة', ph), field('ترتيبها في المجموعة', ord), err, save,
+    h('button', { type: 'button', class: 'link-btn', text: 'إلغاء', onclick: close })));
+  document.body.append(dlg); dlg.addEventListener('cancel', close); dlg.showModal();
 }

@@ -1,6 +1,6 @@
 // مكتبة البروتوكولات: المعتمدة، والتي تنتظر اعتماد طبيب الاختصاص، والمؤرشفة
 import { sb, q } from '../api.js';
-import { h, mount, icon, topbar, bottomNav, empty, notice, arNorm, count } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, empty, notice, arNorm, count, PHASES } from '../ui.js';
 import { can } from '../perms.js';
 
 const KIND = { iv: 'وريدي', oral: 'فموي', mixed: 'مختلط' };
@@ -26,7 +26,7 @@ export async function render(root, params) {
 
   let all = [];
   try {
-    all = await q(sb.from('protocols').select('id, name, disease, kind, cycle_length_days, total_cycles, approved_at, archived_at, protocol_drugs(id)').order('name'));
+    all = await q(sb.from('protocols').select('id, name, disease, kind, cycle_length_days, total_cycles, approved_at, archived_at, regimen, phase, phase_order, protocol_drugs(id)').order('name'));
   } catch (e) { list.replaceChildren(notice('err', 'warn', h('p', { text: e.message }))); return; }
 
   const groups = {
@@ -63,6 +63,7 @@ function row(p) {
     h('span', { class: 'proto-badge', text: p.name.slice(0, 2).toUpperCase() }),
     h('span', { class: 'grow' },
       h('span', { class: 't', style: 'display: flex; gap: 8px; align-items: center' }, h('span', { class: 'ltr', text: p.name })),
+      p.phase ? h('span', { class: 's ltr', style: 'text-align: right; font-weight: 600', text: [p.regimen && `${p.regimen} · Phase ${p.phase_order}`, PHASES[p.phase]].filter(Boolean).join(' · ') }) : null,
       h('span', { class: 's', text: p.disease }),
       h('span', { class: 's', text: `${KIND[p.kind]} · كل ${count(p.cycle_length_days, 'day')} · ${count(p.total_cycles, 'cycle')} · ${count(p.protocol_drugs.length, 'drug')}` })),
     p.archived_at ? h('span', { class: 'pill muted', text: 'مؤرشف' })

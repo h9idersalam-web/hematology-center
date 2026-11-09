@@ -1,6 +1,6 @@
 // إنشاء خطة علاج: اختيار بروتوكول معتمد، ومعاينة الجرعات المحسوبة للمريض، ثم الحفظ
 import { sb, q, rpc } from '../api.js';
-import { h, mount, icon, topbar, field, notice, toast, busy, confirmDialog, bsa, fmtDate, todayISO, addDaysISO, count } from '../ui.js';
+import { h, mount, icon, topbar, field, notice, toast, busy, confirmDialog, bsa, fmtDate, todayISO, addDaysISO, count, PHASES } from '../ui.js';
 import { go, state } from '../app.js';
 import { can } from '../perms.js';
 import { ROUTE_AR, OUT_UNITS, UNITS, calcDose, daysText, num, instrLine, withCycles } from '../dose.js';
@@ -18,7 +18,7 @@ export async function render(root, params) {
 
   const [p, protocols, current] = await Promise.all([
     q(sb.from('patients').select('id, full_name, file_no, height_cm, weight_kg, allergies, archived_at').eq('id', pid).maybeSingle()),
-    q(sb.from('protocols').select('id, name, disease, kind, cycle_length_days, total_cycles, notes, file_path, protocol_drugs(*)')
+    q(sb.from('protocols').select('id, name, disease, kind, cycle_length_days, total_cycles, notes, file_path, regimen, phase, phase_order, protocol_drugs(*)')
       .not('approved_at', 'is', null).is('archived_at', null).order('name')),
     q(sb.from('treatments').select('id').eq('patient_id', pid).in('status', ['active', 'pending_approval'])),
   ]);
@@ -91,7 +91,7 @@ export async function render(root, params) {
       onclick: () => { if (chosen !== pr) overrides.clear(); chosen = pr; drawCurCycle(); drawDx(); if (!statusBox.dataset.touched) { dStatus = guessStatus(pr); drawStatus(); } drawPicker(); drawPreview(); drawSchedule(); submit.disabled = false; },
     }, h('span', { class: 'radio' }),
       h('span', null, h('span', { class: 'ot ltr', style: 'text-align: right', text: pr.name }),
-        h('span', { class: 'od', text: `${pr.disease} · كل ${count(pr.cycle_length_days, 'day')} · ${count(pr.total_cycles, 'cycle')}` })))));
+        h('span', { class: 'od', text: `${pr.phase ? PHASES[pr.phase] + ' · ' : ''}${pr.disease} · كل ${count(pr.cycle_length_days, 'day')} · ${count(pr.total_cycles, 'cycle')}` })))));
   }
 
   function drawPreview() {

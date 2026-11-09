@@ -1,7 +1,7 @@
 // ملف المريض: البيانات، والحساسية، وخطة العلاج ودوراتها، والخطط السابقة
 import { sb, q, rpc, countOf } from '../api.js';
 import { statusLabel } from '../diagnoses.js';
-import { h, mount, icon, topbar, bottomNav, notice, empty, fmtDate, fmtDay, daysUntil, ageText, bsa, SEX, toast, confirmDialog, initials, count, busy } from '../ui.js';
+import { h, mount, icon, topbar, bottomNav, notice, empty, fmtDate, fmtDay, daysUntil, ageText, bsa, SEX, toast, confirmDialog, initials, count, busy, field, todayISO, PHASES } from '../ui.js';
 import { go, state } from '../app.js';
 import { can, canEditPlan } from '../perms.js';
 import { NKDA } from './patient-form.js';
@@ -25,7 +25,7 @@ export async function render(root, params) {
 
   const [p, treatments, labsN, filesN] = await Promise.all([
     q(sb.from('patient_overview').select('*').eq('id', id).maybeSingle()),
-    q(sb.from('treatments').select('id, protocol_name, diagnosis, icd10, stage, disease_status, status, stop_reason, start_date, bsa, height_cm, weight_kg, total_cycles, cycle_length_days, created_at')
+    q(sb.from('treatments').select('id, protocol_id, protocols(regimen, phase, phase_order), protocol_name, diagnosis, icd10, stage, disease_status, status, stop_reason, start_date, bsa, height_cm, weight_kg, total_cycles, cycle_length_days, created_at')
       .eq('patient_id', id).order('created_at', { ascending: false })),
     countOf('lab_results', (x) => x.eq('patient_id', id)).catch(() => 0),
     countOf('attachments', (x) => x.eq('patient_id', id)).catch(() => 0),
@@ -40,6 +40,12 @@ export async function render(root, params) {
         .eq('treatment_id', current.id).order('cycle_no'))
     : [];
 
+  // مراحل المجموعة (الملف 44): مسار المريض في UKALL14 وأمثاله، والمرحلة التالية بعد انتهاء الحالية
+  const latest = current || treatments.find((t) => t.status === 'completed') || null;
+  const regimen = latest?.protocols?.regimen || null;
+  const regProtocols = regimen ? await q(sb.from('protocols').select('id, name, phase, phase_order, approved_at')
+    .eq('regimen', regimen).is('archived_at', null).order('phase_order').order('name')).catch(() => []) : [];
+
   const editable = can('editPatient') && !p.archived_at;
   const editBtn = editable
     ? h('a', { class: 'icon-btn boxed', href: '#/patient-edit?id=' + id, 'aria-label': 'تعديل بيانات المريض' }, icon('edit', 22)) : null;
@@ -52,7 +58,9 @@ export async function render(root, params) {
         h('p', { text: 'السبب: ' + (p.archive_reason || '—') })) : null,
       allergyBanner(p, editable),
       infoCard(p),
-      current ? treatmentCard(p, current, cycles, () => render(root, params)) : noPlanCard(p),
+      regimen ? phaseTrack(regimen, regProtocols, treatments, current) : null,
+      current ? treatmentCard(p, current, cycles, () => render(root, params))
+        : (nextPhaseCard(p, latest, regProtocols, () => render(root, params)) || noPlanCard(p)),
       previous.length ? previousCard(previous) : null,
       filesCard(p, labsN, filesN, recentFiles),
       can('archivePatient') && !p.archived_at
@@ -142,7 +150,9 @@ function treatmentCard(p, t, cycles, reload) {
         canEditPlan() && !p.archived_at ? h('a', { class: 'icon-btn boxed', href: '#/plan-edit?tid=' + t.id, 'aria-label': 'تعديل الخطة', title: 'تعديل الخطة' }, icon('edit', 20)) : null)),
     h('div', { class: 'card' },
       h('div', { style: 'display: flex; justify-content: space-between; align-items: center; gap: 8px' },
-        h('span', { class: 'tag', style: 'font-size: 16px; padding: 3px 10px', text: t.protocol_name }),
+        h('span', { style: 'display: flex; gap: 6px; align-items: center; flex-wrap: wrap' },
+          h('span', { class: 'tag', style: 'font-size: 16px; padding: 3px 10px', text: t.protocol_name }),
+          t.protocols?.phase ? h('span', { class: 'pill info', text: PHASES[t.protocols.phase] }) : null),
         h('span', { style: 'font-size: 14px; color: var(--muted-2)', text: 'كل ' + count(t.cycle_length_days, 'day') })),
       h('div', { class: 'facts' },
         fact('التشخيص', t.diagnosis, { wide: true }),
@@ -284,4 +294,47 @@ function cycleDrops(cycles, total) {
     box.append(d);
   }
   return box;
+}
+
+// مسار المراحل: المنتهية ✓، والحالية، والقادمة (البديلان بالترتيب نفسه يظهران معاً)
+function phaseTrack(regimen, list, treatments, current) {
+  if (!list.length) return null;
+  const done = new Set(treatments.filter((t) => t.status === 'completed').map((t) => t.protocol_id));
+  return h('section', { class: 'card', style: 'gap: 8px', 'aria-label': 'مراحل ' + regimen },
+    h('b', { class: 'ltr', style: 'text-align: right', text: regimen + ' · Phases' }),
+    h('div', { class: 'phase-track' }, list.map((pr) => {
+      const st = current?.protocol_id === pr.id ? 'now' : done.has(pr.id) ? 'done' : 'todo';
+      return h('span', { class: 'phase-chip ' + st, title: pr.name },
+        h('span', { class: 'n', text: st === 'done' ? '✓' : String(pr.phase_order) }),
+        h('span', { class: 'ltr', text: pr.name.replace(regimen, '').replace(/^[\s:·-]+/, '') || PHASES[pr.phase] || pr.name }),
+        st === 'now' ? h('span', { class: 'pill brand', text: 'الآن' }) : null);
+    })));
+}
+
+// بعد انتهاء مرحلة: الانتقال إلى المرحلة التالية بضغطة (بالتشخيص والحالة والدرجة نفسها)
+function nextPhaseCard(p, latest, list, reload) {
+  if (!latest || latest.status !== 'completed' || !latest.protocols?.regimen || p.archived_at) return null;
+  const curOrder = latest.protocols.phase_order;
+  const later = list.filter((x) => x.phase_order > curOrder);
+  if (!later.length) return null;
+  const nextOrder = later[0].phase_order;
+  const opts = later.filter((x) => x.phase_order === nextOrder);
+  const sel = h('select', { class: 'input ltr', style: 'text-align: right' }, opts.map((x) => h('option', { value: x.id, text: x.name + (x.approved_at ? '' : ' (غير معتمد بعد)') })));
+  const date = h('input', { class: 'input', type: 'date', value: todayISO() });
+  const btn = h('button', { type: 'button', class: 'btn primary block' }, icon('check', 22, '#fff', 2.2), 'بدء المرحلة التالية');
+  btn.addEventListener('click', () => busy(btn, async () => {
+    const pr = opts.find((x) => x.id === sel.value);
+    if (!pr.approved_at) return toast(`المرحلة التالية (${pr.name}) غير معتمدة بعد: يعتمدها طبيب الاختصاص أو مسؤول الصيادلة من مكتبة البروتوكولات`, true);
+    if (!await confirmDialog({ title: 'بدء ' + pr.name, okText: 'بدء', body: `خطة جديدة من Cycle 1 بتاريخ ${fmtDate(date.value)}، بالتشخيص والحالة والدرجة نفسها.` })) return;
+    try { await rpc('next_phase_plan', { p_patient: p.id, p_protocol: pr.id, p_start: date.value }); toast('بدأت المرحلة التالية'); reload(); }
+    catch (e) { toast(e.message, true); }
+  }));
+  return h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', { text: 'المرحلة التالية' })),
+    h('div', { class: 'card', style: 'gap: 10px' },
+      notice('ok', 'check', h('p', { class: 'ltr', style: 'text-align: right', text: 'انتهت: ' + latest.protocol_name })),
+      can('createPlan') ? h('div', { style: 'display: flex; flex-direction: column; gap: 10px' },
+        field(opts.length > 1 ? 'المرحلة التالية (اختر أحد البديلين)' : 'المرحلة التالية', sel), field('تاريخ Cycle 1', date), btn)
+        : h('p', { class: 'hint ltr', style: 'text-align: right', text: 'التالية: ' + opts.map((x) => x.name).join(' / ') }),
+      can('createPlan') ? h('a', { class: 'link-btn', href: '#/plan-new?patient=' + p.id, text: 'أو إنشاء خطة ببروتوكول آخر' }) : null));
 }

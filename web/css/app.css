@@ -414,3 +414,13 @@ details[open] > summary::before { transform: rotate(-90deg); }
 .pf-form .input:focus { box-shadow: 0 0 0 3px var(--brand-soft); outline: none; }
 .pf-form .input:disabled { border-color: var(--field) !important; }
 .pf-form .choice { border: 1.5px solid var(--brand); }
+
+/* مسار مراحل البروتوكول (الملف 44) */
+.phase-track { display: flex; flex-wrap: wrap; gap: 6px; }
+.phase-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px; background: var(--chip, #EBEDF0); color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.phase-chip .n { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #fff; font-size: 11px; color: var(--muted); }
+.phase-chip.done { background: #E3F3EA; color: #0F7A4A; }
+.phase-chip.done .n { background: #0F7A4A; color: #fff; }
+.phase-chip.now { background: var(--brand-soft); color: var(--brand-dark); }
+.phase-chip.now .n { background: var(--brand); color: #fff; }
+.phase-chip .pill { font-size: 10.5px; padding: 1px 6px; }
