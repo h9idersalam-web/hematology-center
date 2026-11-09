@@ -104,6 +104,7 @@ export function accountState(p = state.profile) {
 }
 
 export async function logout() {
+  await notifier.dropPush();
   notifier.stop();
   await sb.auth.signOut();
   state.session = null; state.profile = null;

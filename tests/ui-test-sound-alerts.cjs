@@ -38,12 +38,12 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   const checkNow = () => sara.evaluate(async () => { await (await import('./js/notify.js')).checkNow(); });
   const notify = (kind, title, body) => psql(`insert into notifications(user_id, kind, title, body, link_type, link_id) select '${uid}', '${kind}', '${title}', '${body}', 'patient', id from patients limit 1`);
 
-  ok('enable card shown once', await sara.locator('text=فعّل التنبيه بالصوت').waitFor({ timeout: 5000 }).then(() => true, () => false));
+  ok('enable card shown once', await sara.locator('text=فعّل الإشعارات لتصلك').waitFor({ timeout: 5000 }).then(() => true, () => false));
   await sara.screenshot({ path: `${OUT}/snd-01-card.png` });
   await sara.getByRole('button', { name: 'تفعيل', exact: true }).click();
   await sara.waitForTimeout(500);
   ok('test chime on enable', (await tones()) >= 2);
-  ok('card gone after enabling', (await sara.locator('text=فعّل التنبيه بالصوت').count()) === 0);
+  ok('card gone after enabling', (await sara.locator('text=فعّل الإشعارات لتصلك').count()) === 0);
 
   // الإشعارات القديمة لا تُصدر صوتاً
   const t0 = await tones(); await checkNow();
@@ -72,10 +72,10 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   ok('no repeat for same notification', (await tones()) === t2);
 
   // الإيقاف من شاشة الإشعارات
-  await sara.goto(B + '#/notifications'); await sara.waitForSelector('text=التنبيه بالصوت: مفعّل');
+  await sara.goto(B + '#/notifications'); await sara.waitForSelector('text=إشعارات هذا الهاتف: مفعّلة');
   await sara.screenshot({ path: `${OUT}/snd-02-toggle.png` });
   await sara.getByRole('button', { name: 'إيقاف', exact: true }).click();
-  await sara.waitForSelector('text=التنبيه بالصوت: متوقف');
+  await sara.waitForSelector('text=إشعارات هذا الهاتف: متوقفة');
   const t3 = await tones(); notify('info', 'بعد الإيقاف', 'نص'); await checkNow(); await sara.waitForTimeout(300);
   ok('disabled: no sound', (await tones()) === t3);
 
@@ -83,7 +83,7 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   const cp = await login('cp@test.iq');
   await cp.getByRole('button', { name: 'لاحقاً' }).click();
   await cp.reload(); await cp.waitForSelector('text=جلسات اليوم');
-  ok('"later" hides card for good', (await cp.locator('text=فعّل التنبيه بالصوت').count()) === 0);
+  ok('"later" hides card for good', (await cp.locator('text=فعّل الإشعارات لتصلك').count()) === 0);
 
   checks.forEach((c) => console.log(c));
   console.log('ERRORS:', errors.length ? '\n' + errors.join('\n') : 'none');

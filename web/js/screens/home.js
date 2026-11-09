@@ -110,12 +110,13 @@ function soundCard() {
   if (soundAsked()) return null;
   const box = h('div', { class: 'notice info', style: 'align-items: center; flex-wrap: wrap' },
     icon('bell', 22),
-    h('span', { style: 'flex: 1; min-width: 180px', text: 'فعّل التنبيه بالصوت لتسمع نغمة عند وصول إشعار جديد أثناء فتح التطبيق.' }),
+    h('span', { style: 'flex: 1; min-width: 180px', text: 'فعّل الإشعارات لتصلك على شاشة الهاتف حتى والتطبيق مغلق: جرعة بانتظارك، تفاعل دوائي، تحليل خارج الحد الطبيعي.' }),
     h('span', { style: 'display: flex; gap: 6px' },
       h('button', { type: 'button', class: 'btn sm primary', text: 'تفعيل', onclick: async () => {
-        const perm = await enableSound();
-        toast(perm === 'denied' ? 'فُعّل الصوت، لكن إشعارات الهاتف ممنوعة من إعدادات المتصفح' : 'فُعّل التنبيه بالصوت');
+        const p = enableSound();   // يبدأ داخل ضغطة المستخدم (شرط الصوت والإذن)
         box.remove();
+        const perm = await p;
+        toast(perm === 'denied' ? 'إشعارات الهاتف ممنوعة من إعدادات المتصفح' : 'فُعّلت الإشعارات على هذا الجهاز');
       } }),
       h('button', { type: 'button', class: 'btn sm secondary', text: 'لاحقاً', onclick: () => { disableSound(); box.remove(); } })));
   return box;

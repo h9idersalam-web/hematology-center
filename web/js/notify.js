@@ -2,9 +2,9 @@
 //   - يفحص الإشعارات الجديدة كل دقيقة، وفوراً عند العودة إلى التطبيق
 //   - إشعار جديد: نغمة، واهتزاز (أندرويد)، وإشعار على شاشة الهاتف يفتح الشاشة المعنية عند الضغط
 //   - التنبيهات والموافقات المطلوبة بنغمة أقوى مكررة
-//   - لا يعمل والتطبيق مغلق تماماً: ذلك يحتاج خدمة إرسال (الخيار ب)
+//   - والتطبيق مغلق: إشعارات Push (الملف 40 ودالة الخادم send-push)، تُفعَّل مع التنبيه بالصوت
 // الإعداد خاص بكل جهاز (localStorage)، والهاتف يشترط إذن المستخدم للصوت والإشعارات.
-import { sb, q } from './api.js';
+import { sb, q, rpc } from './api.js';
 import { terms } from './terms.js';
 
 const KEY = 'hc-sound-alerts';
@@ -62,7 +62,45 @@ export function chime(urgent = false) {
   try { navigator.vibrate?.(urgent ? [200, 100, 200, 100, 300] : [200]); } catch { /* غير مدعوم */ }
 }
 
-// تفعيل من زر يضغطه المستخدم: يطلب إذن الإشعارات ويُسمعه النغمة للتجربة
+// ------------------------------------------------------------------ Push والتطبيق مغلق (الملف 40)
+export const canPush = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+// آيفون: الإشعارات تعمل فقط بعد تثبيت التطبيق على الشاشة الرئيسية
+export const isIosBrowser = () => /iphone|ipad|ipod/i.test(navigator.userAgent) && !(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
+let pushOn = false;   // لهذا الجهاز اشتراك مسجّل: الإشعار يصل من الخادم، فلا يُكرَّر من الفحص الدوري
+const b64 = (s) => { const p = '='.repeat((4 - s.length % 4) % 4); const r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, (c) => c.charCodeAt(0)); };
+
+// يسجّل اشتراك هذا الجهاز باسم المستخدم الحالي (بعد إذن الإشعارات). يعيد true إن نجح.
+export async function syncPush() {
+  if (!canPush() || Notification.permission !== 'granted') { pushOn = false; return false; }
+  try {
+    const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((_, rej) => setTimeout(() => rej(new Error('sw not ready')), 8000))]);
+    let key = await rpc('push_public_key');
+    if (!key) { const { data } = await sb.functions.invoke('send-push', { body: { action: 'init' } }); key = data?.publicKey; }
+    if (!key) return false;
+    let sub = await reg.pushManager.getSubscription();
+    // مفتاح مختلف (أُعيد توليده): اشتراك جديد
+    if (sub && sub.options?.applicationServerKey) {
+      const cur = new Uint8Array(sub.options.applicationServerKey); const want = b64(key);
+      if (cur.length !== want.length || cur.some((v, i) => v !== want[i])) { await sub.unsubscribe(); sub = null; }
+    }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(key) });
+    const j = sub.toJSON();
+    await rpc('push_subscribe', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_ua: navigator.userAgent });
+    pushOn = true;
+    return true;
+  } catch (e) { console.warn('push', e); pushOn = false; return false; }
+}
+// عند تسجيل الخروج: لا تصل إشعارات هذا الحساب لهذا الجهاز
+export async function dropPush() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager?.getSubscription();
+    if (sub) await rpc('push_unsubscribe', { p_endpoint: sub.endpoint });
+  } catch { /* بلا اتصال: يُستبدل الاشتراك عند الدخول التالي */ }
+  pushOn = false;
+}
+
+// تفعيل من زر يضغطه المستخدم: يطلب إذن الإشعارات ويُسمعه النغمة للتجربة، ويسجّل الجهاز لإشعارات Push
 export async function enableSound() {
   store.set(true);
   audio(); chime(false);
@@ -71,8 +109,10 @@ export async function enableSound() {
     try { perm = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission; } catch { perm = 'denied'; }
   }
   start();
+  if (perm === 'granted') await Promise.race([syncPush(), new Promise((r) => setTimeout(r, 4000))]);
   return perm;
 }
+export const pushActive = () => pushOn;
 export function disableSound() { store.set(false); }
 
 async function systemNotify(n) {
@@ -115,7 +155,7 @@ async function check() {
     for (const n of fresh) since = Math.max(since, Date.parse(n.created_at));
     if (fresh.length && store.get()) {
       chime(fresh.some((n) => URGENT.has(n.kind)));
-      for (const n of fresh.slice(0, 3)) systemNotify(n);
+      if (!pushOn) for (const n of fresh.slice(0, 3)) systemNotify(n);   // مع Push يصل الإشعار من الخادم
     }
   } catch { /* انقطاع مؤقت: يُعاد في الفحص التالي */ } finally { running = false; }
 }
@@ -124,6 +164,7 @@ async function check() {
 export function start() {
   if (timer) return;
   since = null;
+  syncPush();   // الإذن ممنوح سابقاً: يُجدَّد اشتراك الجهاز باسم المستخدم الحالي بصمت
   check();
   timer = setInterval(check, POLL_MS);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });

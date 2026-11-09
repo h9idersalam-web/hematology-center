@@ -1,6 +1,6 @@
 // يحفظ ملفات واجهة التطبيق فقط ليفتح بسرعة.
 // لا يحفظ أي بيانات مرضى: كل طلبات قاعدة البيانات تذهب إلى الخادم مباشرة.
-const VERSION = 'v46-2026-11-09-chief-original-only';
+const VERSION = 'v47-2026-11-09-web-push';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'vendor/supabase-2.118.0.js',
@@ -38,6 +38,18 @@ self.addEventListener('fetch', (e) => {
       return res;
     })
     .catch(() => caches.match(e.request).then((r) => r || caches.match('index.html'))));
+});
+
+// إشعار Push والتطبيق مغلق (الملف 40): يصل من دالة الخادم send-push
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'مركز أمراض الدم', {
+    body: d.body || '', tag: d.tag || undefined, renotify: !!d.tag,
+    icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', lang: 'ar', dir: 'rtl',
+    data: { url: d.url || './' }, requireInteraction: !!d.urgent,
+    vibrate: d.urgent ? [200, 100, 200, 100, 300] : [200],
+  }));
 });
 
 // الضغط على إشعار الهاتف: يفتح التطبيق على الشاشة المعنية

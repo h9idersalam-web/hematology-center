@@ -1,7 +1,7 @@
 // الإشعارات: طلبات الموافقة والتنبيهات الذكية وردود الأطباء
 import { sb, q, rpc } from '../api.js';
 import { terms } from '../terms.js';
-import { hrefOf, soundEnabled, enableSound, disableSound, canSystemNotify } from '../notify.js';
+import { hrefOf, soundEnabled, enableSound, disableSound, canSystemNotify, canPush, isIosBrowser, pushActive, syncPush, dropPush } from '../notify.js';
 import { h, mount, icon, topbar, empty, relTime, toast } from '../ui.js';
 
 const KIND = {
@@ -26,21 +26,29 @@ export async function render(root, params) {
     const on = soundEnabled();
     const btn = h('button', { type: 'button', class: 'btn sm ' + (on ? 'secondary' : 'primary'), text: on ? 'إيقاف' : 'تفعيل' });
     btn.addEventListener('click', async () => {
-      if (on) { disableSound(); toast('أُوقف التنبيه بالصوت على هذا الجهاز'); }
+      if (on) { disableSound(); await dropPush(); toast('أُوقفت الإشعارات على هذا الجهاز'); }
       else {
         const perm = await enableSound();
-        toast(perm === 'denied' ? 'فُعّل الصوت، لكن إشعارات الهاتف ممنوعة من إعدادات المتصفح' : 'فُعّل التنبيه بالصوت على هذا الجهاز');
+        toast(perm === 'denied' ? 'إشعارات الهاتف ممنوعة من إعدادات المتصفح: اسمح بها ثم فعّل من جديد'
+          : pushActive() ? 'فُعّلت: تصلك الإشعارات حتى والتطبيق مغلق' : 'فُعّل التنبيه بالصوت أثناء فتح التطبيق');
       }
       drawSound();
     });
+    const push = on && pushActive();
     soundBox.replaceChildren(h('div', { class: 'card', style: 'flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px' },
       h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
-        h('b', { text: 'التنبيه بالصوت' + (on ? ': مفعّل' : ': متوقف') }),
+        h('b', { text: 'إشعارات هذا الهاتف' + (on ? ': مفعّلة' : ': متوقفة') }),
         h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: on
-          ? 'نغمة واهتزاز' + (canSystemNotify() && Notification.permission === 'granted' ? ' وإشعار على شاشة الهاتف' : '') + ' عند كل إشعار جديد، ما دام التطبيق مفتوحاً.'
-          : 'فعّله لتسمع نغمة عند وصول إشعار جديد أثناء فتح التطبيق.' })),
+          ? (push ? 'تصلك على شاشة الهاتف حتى والتطبيق مغلق، مع نغمة واهتزاز أثناء فتحه.'
+            : 'نغمة واهتزاز' + (canSystemNotify() && Notification.permission === 'granted' ? ' وإشعار على شاشة الهاتف' : '') + ' ما دام التطبيق مفتوحاً.')
+          : 'فعّلها لتصلك الإشعارات على شاشة الهاتف حتى والتطبيق مغلق.' }),
+        isIosBrowser() ? h('span', { style: 'font-size: 13px; color: var(--brand-dark); font-weight: 600', text: 'على آيفون: ثبّت التطبيق أولاً من Safari (مشاركة ← إضافة إلى الشاشة الرئيسية) ثم افتحه من أيقونته، فتعمل الإشعارات والتطبيق مغلق.' })
+          : on && !push && canSystemNotify() && Notification.permission === 'denied' ? h('span', { style: 'font-size: 13px; color: var(--brand-dark)', text: 'الإشعارات ممنوعة لهذا التطبيق من إعدادات الهاتف أو المتصفح.' })
+          : on && !push && !canPush() ? h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: 'هذا المتصفح لا يدعم الإشعارات والتطبيق مغلق.' }) : null),
       btn));
   };
+  // الاشتراك يُجدَّد في الخلفية؛ تُعاد الكتابة حين يتأكد
+  if (soundEnabled() && !pushActive()) syncPush().then((ok) => { if (ok) drawSound(); });
   drawSound();
 
   const markAll = h('button', { class: 'link-btn', style: 'padding: 0 12px', text: 'قراءة الكل', onclick: async () => {
