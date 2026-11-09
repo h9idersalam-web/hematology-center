@@ -39,8 +39,12 @@ export function can(action) {
   if ((action === 'manageProtocol' || action === 'editInventory') && p.is_admin) return true;
   // تفعيل صلاحيات الرديف: لمسؤول الصيادلة الأصلي فقط، لا للرديف نفسه
   if (action === 'toggleDeputy') return p.base_role === 'chief_clinical_pharmacist' || (p.is_admin && p.role === 'chief_clinical_pharmacist');
+  // اعتمادات مسؤول الصيادلة (الملف 38) لمسؤول الصيادلة الأصلي وحده، لا للرديف المفعّل (الملف 39)
+  if (p.acting && ['approvePlan', 'approveProtocol', 'approveCycle'].includes(action)) return false;
   return (RULES[action] || []).includes(p.role);
 }
+// مسؤول الصيادلة الأصلي (أو المدير بدوره)، لا الرديف المفعّل
+export const realChief = () => state.profile?.role === 'chief_clinical_pharmacist' && !state.profile.acting;
 
 // طبيب الاختصاص يرى مرضاه فقط (المريض الذي هو طبيبه المختص): قائمة المرضى، وجلسات اليوم والمتأخرة والمواعيد،
 // والجرعات بانتظار اعتماده، وطلبات التعديل. عدد مرضى المركز الكلي يبقى ظاهراً للجميع.

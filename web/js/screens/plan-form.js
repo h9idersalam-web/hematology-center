@@ -75,7 +75,7 @@ export async function render(root, params) {
   const start = h('input', { class: 'input', type: 'date', value: todayISO(), min: addDaysISO(todayISO(), -365), max: addDaysISO(todayISO(), 180) });
   const schedule = h('p', { class: 'hint' });
   const err = h('div');
-  const pending = false;   // كل من ينشئ الخطة (الطبيب والمقيم الأقدم ومسؤول الصيادلة) تبدأ خطته مباشرة (الملف 38)
+  const pending = !!state.profile.acting;   // الرديف المفعّل وحده تنتظر خطته موافقة الطبيب؛ البقية تبدأ خططهم مباشرة (الملفان 38 و39)
   const submit = h('button', { class: 'btn primary block', type: 'submit', disabled: true, text: pending ? 'حفظ وإرسال للطبيب المختص' : 'إنشاء الخطة' });
 
   function drawPicker() {

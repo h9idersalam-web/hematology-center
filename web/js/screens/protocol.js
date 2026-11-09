@@ -104,7 +104,7 @@ export async function render(root, params) {
 }
 
 function fileSection(p, reload) {
-  const isSpecialist = ['specialist', 'chief_clinical_pharmacist'].includes(state.profile.role);   // من يعتمد البروتوكول (الملف 38)
+  const isSpecialist = state.profile.role === 'specialist' || (state.profile.role === 'chief_clinical_pharmacist' && !state.profile.acting);   // من يعتمد البروتوكول (الملفان 38 و39)
   // استبدال ملف بروتوكول معتمد: طبيب الاختصاص ومسؤول الصيادلة ومدير البرنامج
   const manager = can('manageProtocol');
   const canAttach = (can('createProtocol') || manager) && !p.archived_at && (!p.file_path || !p.approved_at || manager);
