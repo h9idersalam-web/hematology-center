@@ -98,6 +98,5 @@ exception when others then
   return new;
 end $$;
 revoke all on function public._push_on_notification() from public, anon, authenticated;
-drop trigger if exists push_on_notification on public.notifications;
-create trigger push_on_notification after insert on public.notifications
+create or replace trigger push_on_notification after insert on public.notifications
   for each row execute function public._push_on_notification();

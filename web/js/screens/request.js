@@ -73,11 +73,11 @@ export async function render(root, params) {
   rejectBtn.addEventListener('click', () => decide(rejectBtn, true));
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: 'طلب تعديل', sub: `${p.full_name} · الجرعة ${r.cycles?.cycle_no ?? '—'}`, back: '#/requests' }),
+    topbar({ title: 'طلب تعديل', sub: `${p.full_name} · Cycle ${r.cycles?.cycle_no ?? '—'}`, back: '#/requests' }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
-          h('b', { text: `${r.treatments?.protocol_name} · الجرعة ${r.cycles?.cycle_no}` }),
+          h('b', { text: `${r.treatments?.protocol_name} · Cycle ${r.cycles?.cycle_no}` }),
           h('span', { style: 'font-size: 14px; color: var(--muted-2)', text: r.cycles ? fmtDay(r.cycles.planned_date) : '' })),
         h('span', { class: 'pill ' + stK, text: stL })),
       p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { text: 'حساسية دوائية: ' + p.allergies })) : null,

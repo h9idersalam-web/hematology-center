@@ -11,7 +11,8 @@ const OUT = { '§1': 'الجرعات الدوائية', '§2': 'جرعاتها �
 
 export function terms(s) {
   if (!s || typeof s !== 'string' || !/[؀-ۿ]/.test(s)) return s;
-  let t = s.replace(/خارج المرجع/g, 'خارج الحد الطبيعي');
+  // رقم الدورة بالإنكليزية: «الدورة 3» ← «Cycle 3» (بقرار صاحب المشروع)
+  let t = s.replace(/(?:ال)?دورة\s*(\d+)/g, 'Cycle $1').replace(/خارج المرجع/g, 'خارج الحد الطبيعي');
   for (const [re, ph] of DOSE) t = t.replace(re, ph);
   t = t.replace(/دورات/g, 'جرعات').replace(/دورة/g, 'جرعة').replace(/دورت/g, 'جرعت');
   return t.replace(/§\d/g, (m) => OUT[m]);

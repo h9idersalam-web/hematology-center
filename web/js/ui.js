@@ -200,6 +200,8 @@ const NOUNS = {
   request: ['طلب', 'طلبان', 'طلبات', 'طلباً'],
 };
 export function count(n, noun) {
+  // الدورات بالإنكليزية (بقرار صاحب المشروع): 1 cycle، 6 cycles
+  if (noun === 'cycle') return `${n} ${Math.abs(n) === 1 ? 'cycle' : 'cycles'}`;
   const [one, two, few, many] = NOUNS[noun];
   const m = Math.abs(n) % 100;
   if (n === 2) return two;

@@ -75,7 +75,7 @@ const B = 'http://localhost:8788/';
 
   // ===== 3. اعتماد دورة اليوم لعلي: تصل إلى المزج، ثم طلب المزج للجرعة فقط
   await openPatient(sara, 'علي حسين');
-  await sara.locator('a[aria-label^="الجرعة 3،"]').click(); await sara.waitForSelector('text=الجرعات الدوائية');
+  await sara.locator('a[aria-label^="Cycle 3،"]').click(); await sara.waitForSelector('text=الجرعات الدوائية');
   const cycleUrl = sara.url();
   await sara.getByRole('button', { name: 'اعتماد الجرعة' }).click(); await confirm(sara, 'اعتماد');
   await sara.locator('.pill', { hasText: 'وصل قسم المزج' }).waitFor();

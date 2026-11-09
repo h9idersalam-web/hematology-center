@@ -82,7 +82,7 @@ export async function entry(root, params) {
       // الإشعار للطبيب المختص لتحاليل يوم دورة لم تُعتمد بعد فقط (الملف 19)
       const cyc = out ? await rpc('lab_alert_cycle', { p_patient: pid, p_test_date: date.value }).catch(() => null) : null;
       toast(!out ? 'حُفظت النتائج'
-        : cyc ? `حُفظت النتائج، و${out} خارج الحد الطبيعي أُبلغ بها الطبيب المختص قبل الجرعة ${cyc}`
+        : cyc ? `حُفظت النتائج، و${out} خارج الحد الطبيعي أُبلغ بها الطبيب المختص قبل Cycle ${cyc}`
         : `حُفظت النتائج، و${out} خارج الحد الطبيعي`);
       go('/labs?patient=' + pid);
     } catch (e) { err.replaceChildren(notice('err', 'warn', h('p', { text: e.message }))); }

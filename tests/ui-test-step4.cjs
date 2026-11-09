@@ -94,7 +94,7 @@ const B = 'http://localhost:8788/';
   ok('dates: English digits + weekday', /\d{4}\/\d{1,2}\/\d{1,2} - (الأحد|الاثنين|الثلاثاء|الأربعاء|الخميس|الجمعة|السبت)/.test(await sara.locator('main').textContent()) && !/(تشرين|كانون|شباط|آذار|نيسان|أيار|حزيران|تموز|أيلول)/.test(await sara.locator('main').textContent()));
   { const pt = await sara.locator('main').textContent(); ok('patient shows status + grade + diagnosis (English)', pt.includes('Initial treatment') && pt.includes('Grade 3') && pt.includes('DLBCL — Diffuse large B-cell lymphoma') && !pt.includes('علاج أولي') && !pt.includes('C83.3')); }
   const pid = sara.url().split('id=')[1];
-  await sara.locator('a[aria-label^="الجرعة 1،"]').click();
+  await sara.locator('a[aria-label^="Cycle 1،"]').click();
   await sara.waitForSelector('text=الجرعات الدوائية');
   const cyc = await sara.locator('main').textContent();
   ok('DB doses match preview (799, 1598, 107, 2)', ['799', '1598', '107'].every((x) => cyc.includes(x)) && cyc.includes('بالسقف (المحسوب 3)'));

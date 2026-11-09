@@ -73,6 +73,13 @@ export async function render(root, params) {
   }
   dxSel.addEventListener('change', onDx);
   const start = h('input', { class: 'input', type: 'date', value: todayISO(), min: addDaysISO(todayISO(), -365), max: addDaysISO(todayISO(), 180) });
+  // الـCycle الحالي للمريض (الملف 43): ما قبله يُسجَّل مُعطى، والجدول يُحسب من تاريخ الـCycle الحالي
+  const curCycle = h('select', { class: 'input ltr', style: 'text-align: right' }, h('option', { value: 1, text: 'Cycle 1' }));
+  const drawCurCycle = () => {
+    const n = chosen?.total_cycles || 1; const keep = Math.min(Number(curCycle.value) || 1, n);
+    curCycle.replaceChildren(...Array.from({ length: n }, (_, i) => h('option', { value: i + 1, selected: i + 1 === keep, text: `Cycle ${i + 1} of ${n}` })));
+  };
+  curCycle.addEventListener('change', () => drawSchedule());
   const schedule = h('p', { class: 'hint' });
   const err = h('div');
   const pending = !!state.profile.acting;   // الرديف المفعّل وحده تنتظر خطته موافقة الطبيب؛ البقية تبدأ خططهم مباشرة (الملفان 38 و39)
@@ -81,7 +88,7 @@ export async function render(root, params) {
   function drawPicker() {
     picker.replaceChildren(...protocols.map((pr) => h('button', {
       type: 'button', class: 'option', 'aria-pressed': chosen === pr ? 'true' : 'false',
-      onclick: () => { if (chosen !== pr) overrides.clear(); chosen = pr; drawDx(); if (!statusBox.dataset.touched) { dStatus = guessStatus(pr); drawStatus(); } drawPicker(); drawPreview(); drawSchedule(); submit.disabled = false; },
+      onclick: () => { if (chosen !== pr) overrides.clear(); chosen = pr; drawCurCycle(); drawDx(); if (!statusBox.dataset.touched) { dStatus = guessStatus(pr); drawStatus(); } drawPicker(); drawPreview(); drawSchedule(); submit.disabled = false; },
     }, h('span', { class: 'radio' }),
       h('span', null, h('span', { class: 'ot ltr', style: 'text-align: right', text: pr.name }),
         h('span', { class: 'od', text: `${pr.disease} · كل ${count(pr.cycle_length_days, 'day')} · ${count(pr.total_cycles, 'cycle')}` })))));
@@ -138,9 +145,12 @@ export async function render(root, params) {
   }
   function drawSchedule() {
     if (!chosen || !start.value) return (schedule.textContent = '');
-    const last = addDaysISO(start.value, (chosen.total_cycles - 1) * chosen.cycle_length_days);
+    const cur = Number(curCycle.value) || 1;
+    const left = chosen.total_cycles - cur + 1;
+    const last = addDaysISO(start.value, (left - 1) * chosen.cycle_length_days);
     const past = start.value < todayISO() ? Math.ceil((new Date(todayISO()) - new Date(start.value)) / 86400000 / chosen.cycle_length_days) : 0;
-    schedule.textContent = `${count(chosen.total_cycles, 'cycle')} من ${fmtDate(start.value)} إلى ${fmtDate(last)}.` +
+    schedule.textContent = (cur > 1 ? `Cycle 1 إلى ${cur - 1} تُسجَّل مُعطاة سابقاً. ` : '') +
+      `Cycle ${cur} إلى ${chosen.total_cycles} (${count(left, 'cycle')}) من ${fmtDate(start.value)} إلى ${fmtDate(last)}، كل ${count(chosen.cycle_length_days, 'day')}.` +
       (past ? ` البدء في تاريخ ماضٍ: ستظهر الجرعات التي مضى موعدها متأخرة حتى تُسجَّل أو تُؤجَّل.` : '');
   }
   start.addEventListener('input', drawSchedule);
@@ -159,7 +169,8 @@ export async function render(root, params) {
       field('التشخيص', dxSel, 'القائمة حسب البروتوكول المختار'), dxFull, diagnosis,
       h('div', { class: 'field' }, h('span', { class: 'label', text: 'حالة المرض' }), statusBox),
       field('درجة المرض', stage),
-      field('تاريخ الجرعة الأولى', start), schedule),
+      field('الـCycle الحالي للمريض', curCycle, 'إذا أخذ المريض Cycles سابقة (مثلاً في مستشفى آخر) اختر الـCycle الذي يبدأ به الآن.'),
+      field('تاريخ الـCycle الحالي', start), schedule),
     pending ? notice('info', 'info', h('p', { text: 'تُرسل الخطة للطبيب المختص بالمريض، ولا تُفعَّل قبل موافقته.' })) : null,
     err, submit);
 
@@ -174,7 +185,7 @@ export async function render(root, params) {
       if (!dxText) return fail(dxSel.value === OTHER ? 'اكتب التشخيص' : 'اختر التشخيص');
       if (!dStatus) return fail('اختر حالة المرض: Initial treatment أو Relapse أو Maintenance');
       const code = dxItem ? dxItem.icd : null;   // يُحفظ تلقائياً ولا يظهر
-      if (!start.value) return fail('اختر تاريخ الجرعة الأولى');
+      if (!start.value) return fail('اختر تاريخ الـCycle الحالي');
       const edits = [...overrides.entries()];
       const bad = edits.find(([, o]) => !(Number(o.value) > 0));
       if (bad) return fail('جرعة غير صحيحة لـ ' + bad[1].name);
@@ -183,7 +194,7 @@ export async function render(root, params) {
       try {
         const args = { p_patient: pid, p_protocol: chosen.id, p_diagnosis: dxText,
           p_icd10: code || null, p_stage: stage.value || null, p_start: start.value, p_disease_status: dStatus };
-        await rpc('create_plan', { ...args, p_doses: edits.length ? Object.fromEntries(edits.map(([id, o]) => [id, Number(o.value)])) : null });
+        await rpc('create_plan_at', { ...args, p_doses: edits.length ? Object.fromEntries(edits.map(([id, o]) => [id, Number(o.value)])) : null, p_first_cycle: Number(curCycle.value) || 1 });
         toast(pending ? 'أُرسلت الخطة للطبيب المختص للموافقة' : 'أُنشئت خطة العلاج');
         go('/patient?id=' + pid);
       } catch (e2) { fail(e2.message); }

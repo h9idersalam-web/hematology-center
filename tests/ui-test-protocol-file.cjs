@@ -58,21 +58,22 @@ const B = 'http://localhost:8788/';
   await sara.waitForTimeout(1500);
   ok('specialist replaced', (await sara.locator('#toast').textContent()).includes('أُرفق الملف'));
 
-  // 3. بروتوكول جديد بملفه من النموذج
-  await nav(chief, B + '#/protocol-new'); await chief.waitForSelector('text=بيانات البروتوكول');
-  await chief.getByLabel('الاسم المختصر').fill('CVP');
-  await chief.getByLabel('المرض').fill('لمفوما لاهودجكينية منخفضة الدرجة');
-  await chief.getByLabel('المدة بين الجرعات (يوم)').fill('21');
-  await chief.getByLabel('عدد الجرعات').fill('8');
-  await chief.getByLabel('ملف البروتوكول المرجعي (اختياري)').setInputFiles(FIX + '/protocol.pdf');
-  const d1 = chief.locator('.card', { hasText: 'الدواء 1' });
+  // 3. بروتوكول جديد بملفه من النموذج (يضيفه الصيدلي السريري فيبقى غير معتمد؛ مسؤول الصيادلة يعتمد ما يضيفه منذ الملف 38)
+  const cpA = await login('cp@test.iq');
+  await nav(cpA, B + '#/protocol-new'); await cpA.waitForSelector('text=بيانات البروتوكول');
+  await cpA.getByLabel('الاسم المختصر').fill('CVP');
+  await cpA.getByLabel('المرض').fill('لمفوما لاهودجكينية منخفضة الدرجة');
+  await cpA.getByLabel('المدة بين الجرعات (يوم)').fill('21');
+  await cpA.getByLabel('عدد الجرعات').fill('8');
+  await cpA.getByLabel('ملف البروتوكول المرجعي (اختياري)').setInputFiles(FIX + '/protocol.pdf');
+  const d1 = cpA.locator('.card', { hasText: 'الدواء 1' });
   await d1.getByLabel('اسم الدواء (بالإنجليزية)').fill('Cyclophosphamide');
   await d1.getByLabel('الجرعة الدوائية', { exact: true }).fill('750');
-  await chief.getByRole('button', { name: 'حفظ وإرسال للاعتماد' }).click();
-  await chief.waitForSelector('text=غير معتمد: لا يُستخدم');
-  ok('new protocol has file', (await chief.getByRole('button', { name: 'فتح ملف البروتوكول' }).count()) === 1);
-  ok('unapproved: author may still replace', (await chief.locator('label[for="proto-file"]').count()) === 1);
-  await shot(chief, 'new-protocol-file');
+  await cpA.getByRole('button', { name: 'حفظ وإرسال للاعتماد' }).click();
+  await cpA.waitForSelector('text=غير معتمد: لا يُستخدم');
+  ok('new protocol has file', (await cpA.getByRole('button', { name: 'فتح ملف البروتوكول' }).count()) === 1);
+  ok('unapproved: author may still replace', (await cpA.locator('label[for="proto-file"]').count()) === 1);
+  await shot(cpA, 'new-protocol-file');
 
   // 4. الرابط يظهر عند إنشاء الخطة وفي شاشة الدورة
   await nav(sara, B + '#/patients?f=none'); await sara.waitForSelector('main .row');
@@ -83,7 +84,7 @@ const B = 'http://localhost:8788/';
   await shot(sara, 'plan-file-link', false);
   await sara.locator('#dx-sel').selectOption('HL'); await sara.getByRole('radio', { name: /Initial treatment/ }).click();
   await sara.getByRole('button', { name: 'إنشاء الخطة' }).click(); await sara.waitForSelector('text=خطة العلاج الحالية');
-  await sara.locator('a[aria-label^="الجرعة 1،"]').click(); await sara.waitForSelector('text=الجرعات الدوائية');
+  await sara.locator('a[aria-label^="Cycle 1،"]').click(); await sara.waitForSelector('text=الجرعات الدوائية');
   ok('cycle screen links protocol file', await opensPdf(sara, 'ملف البروتوكول ABVD'));
 
   // 5. الطبيب الدوري يفتح ولا يرفق

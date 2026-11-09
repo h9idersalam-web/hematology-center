@@ -1,4 +1,5 @@
-// تعديل خطة العلاج بعد إدخالها (الملف 42): التشخيص، وحالة المرض، ودرجة المرض، والبروتوكول، ورقم الجرعة الحالية.
+// تعديل خطة العلاج بعد إدخالها (الملفان 42 و43): التشخيص، وحالة المرض، ودرجة المرض، والبروتوكول، والـCycle الحالي،
+// والمدة بين الـCycles، وعدد الـCycles.
 // للمدير وطبيب الاختصاص والمقيم الأقدم ومسؤول الصيادلة السريريين الأصلي.
 import { sb, q, rpc } from '../api.js';
 import { h, mount, topbar, field, notice, toast, busy, confirmDialog, fmtDate, todayISO, addDaysISO, count } from '../ui.js';
@@ -12,7 +13,7 @@ export async function render(root, params) {
   if (!canEditPlan()) return shell(notice('info', 'lock', h('p', { text: 'تعديل الخطة للمدير وطبيب الاختصاص والمقيم الأقدم ومسؤول الصيادلة السريريين.' })));
   shell(h('div', { class: 'empty' }, h('span', { class: 'spinner' })));
 
-  const t = await q(sb.from('treatments').select('id, patient_id, protocol_id, protocol_name, diagnosis, icd10, stage, disease_status, status, total_cycles, patients(full_name, file_no)').eq('id', tid).maybeSingle());
+  const t = await q(sb.from('treatments').select('id, patient_id, protocol_id, protocol_name, diagnosis, icd10, stage, disease_status, status, total_cycles, cycle_length_days, patients(full_name, file_no)').eq('id', tid).maybeSingle());
   if (!t) throw new Error('الخطة غير موجودة');
   const back = '#/patient?id=' + t.patient_id;
   if (!['active', 'pending_approval'].includes(t.status)) return shell(notice('warn', 'warn', h('p', { text: 'هذه الخطة ليست قائمة.' })));
@@ -32,7 +33,7 @@ export async function render(root, params) {
   const cycleSel = h('select', { class: 'input' });
   const drawCycles = () => {
     const n = chosen().total_cycles; const keep = Number(cycleSel.value) || cur?.cycle_no || 1;
-    cycleSel.replaceChildren(...Array.from({ length: n }, (_, i) => h('option', { value: i + 1, selected: i + 1 === Math.min(keep, n), text: `الجرعة ${i + 1} من ${n}` })));
+    cycleSel.replaceChildren(...Array.from({ length: n }, (_, i) => h('option', { value: i + 1, selected: i + 1 === Math.min(keep, n), text: `Cycle ${i + 1} of ${n}` })));
   };
   drawCycles();
   const start = h('input', { class: 'input', type: 'date', value: cur?.planned_date || todayISO(), min: addDaysISO(todayISO(), -365), max: addDaysISO(todayISO(), 365) });
@@ -65,10 +66,13 @@ export async function render(root, params) {
   const stage = h('select', { class: 'input' }, h('option', { value: '', text: 'غير محددة' }),
     [...new Set([...GRADES, ...(t.stage && !GRADES.includes(t.stage) ? [t.stage] : [])])].map((g) => h('option', { value: g, selected: g === t.stage, text: g })));
 
-  const reason = h('textarea', { class: 'input', rows: 2, maxlength: 500, placeholder: 'مثال: أخذ المريض الجرعتين الأولى والثانية في مستشفى آخر' });
+  // المدة بين الـCycles وعددها (الملف 43)
+  const lenIn = h('input', { class: 'input ltr', type: 'number', min: 1, max: 365, inputmode: 'numeric', value: t.cycle_length_days, style: 'text-align: right' });
+  const totalIn = h('input', { class: 'input ltr', type: 'number', min: 1, max: 120, inputmode: 'numeric', value: t.total_cycles, style: 'text-align: right' });
+  const reason = h('textarea', { class: 'input', rows: 2, maxlength: 500, placeholder: 'مثال: أخذ المريض Cycle 1 و2 في مستشفى آخر' });
   const restructBox = h('div', { class: 'card', hidden: true },
-    notice('warn', 'warn', h('p', { text: 'تغيير البروتوكول أو رقم الجرعة يوقف الخطة الحالية (تبقى في «خطط سابقة») وينشئ خطة جديدة تبدأ من الجرعة المختارة بجرعات دوائية محسوبة من جديد. أي تعديل يدوي على جرعات الخطة الحالية لا يُنقل.' })),
-    field('تاريخ الجرعة المختارة', start), field('سبب التغيير (إلزامي)', reason));
+    notice('warn', 'warn', h('p', { text: 'تغيير البروتوكول أو الـCycle الحالي يوقف الخطة الحالية (تبقى في «خطط سابقة») وينشئ خطة جديدة تبدأ من الـCycle المختار بجرعات دوائية محسوبة من جديد، وما قبله يُسجَّل مُعطى. أي تعديل يدوي على جرعات الخطة الحالية لا يُنقل.' })),
+    field('تاريخ الـCycle المختار', start), field('سبب التغيير (إلزامي)', reason));
   const restructured = () => protoSel.value !== t.protocol_id || Number(cycleSel.value) !== (cur?.cycle_no ?? -1);
   const onChange = () => { restructBox.hidden = !restructured(); };
   protoSel.addEventListener('change', () => { drawCycles(); drawDx(); onChange(); });
@@ -83,11 +87,16 @@ export async function render(root, params) {
     const dxText = dxSel.value === OTHER ? dxOther.value.trim() : (dxItem ? dxItem.label : dxSel.dataset.cur);
     if (!dxText) return fail('اختر التشخيص');
     const re = restructured();
-    if (re && !reason.value.trim()) return fail('اكتب سبب تغيير البروتوكول أو رقم الجرعة');
+    if (re && !reason.value.trim()) return fail('اكتب سبب تغيير البروتوكول أو الـCycle الحالي');
     if (re && !await confirmDialog({ title: 'إنشاء الخطة من جديد', okText: 'تأكيد',
-      body: `${chosen().name} ابتداءً من الجرعة ${cycleSel.value} بتاريخ ${fmtDate(start.value)}. تُوقف الخطة الحالية وتبقى في السجل.` })) return;
+      body: `${chosen().name} ابتداءً من Cycle ${cycleSel.value} بتاريخ ${fmtDate(start.value)}. تُوقف الخطة الحالية وتبقى في السجل.` })) return;
+    const len = Number(lenIn.value), total = Number(totalIn.value);
+    if (!(len >= 1 && len <= 365)) return fail('المدة بين الـCycles بين 1 و365 يوماً');
+    if (!(total >= 1 && total <= 120)) return fail('عدد الـCycles بين 1 و120');
+    if (total < t.total_cycles && !re && !await confirmDialog({ title: 'تقليل عدد الـCycles', okText: 'تأكيد', danger: true,
+      body: `من ${t.total_cycles} إلى ${total}: تُلغى Cycle ${total + 1} وما بعدها إن لم تُعطَ.` })) return;
     try {
-      const nt = await rpc('edit_plan', { p_tid: tid, p_diagnosis: dxText, p_icd10: dxItem ? dxItem.icd : (dxSel.value === OTHER ? null : t.icd10),
+      const nt = await rpc('update_plan', { p_cycle_length: len === t.cycle_length_days ? null : len, p_total_cycles: total === t.total_cycles ? null : total, p_tid: tid, p_diagnosis: dxText, p_icd10: dxItem ? dxItem.icd : (dxSel.value === OTHER ? null : t.icd10),
         p_stage: stage.value || null, p_disease_status: dStatus, p_protocol: protoSel.value, p_cycle_no: re ? Number(cycleSel.value) : (cur?.cycle_no ?? null),
         p_start: re ? start.value : null, p_reason: re ? reason.value.trim() : null });
       toast(re ? 'أُنشئت الخطة من جديد بالتعديل' : 'حُفظ تعديل الخطة');
@@ -99,8 +108,11 @@ export async function render(root, params) {
   mount(root, h('div', { class: 'screen' },
     topbar({ title: 'تعديل خطة العلاج', sub: `${t.patients.full_name} · ${t.patients.file_no}`, back }),
     h('main', { class: 'main' },
-      h('div', { class: 'card' }, h('h2', { text: 'البروتوكول والجرعة الحالية' }),
-        field('البروتوكول', protoSel), field('رقم الجرعة الحالية داخل البروتوكول', cycleSel, cur ? `الجرعة القادمة الآن: ${cur.cycle_no} بتاريخ ${fmtDate(cur.planned_date)}` : null)),
+      h('div', { class: 'card' }, h('h2', { text: 'البروتوكول والـCycle الحالي' }),
+        field('البروتوكول', protoSel), field('الـCycle الحالي داخل البروتوكول', cycleSel, cur ? `القادم الآن: Cycle ${cur.cycle_no} بتاريخ ${fmtDate(cur.planned_date)}` : null)),
+      h('div', { class: 'card' }, h('h2', { text: 'المدة وعدد الـCycles' }),
+        h('div', { class: 'grid-2' }, field('المدة بين الـCycles (يوم)', lenIn), field('عدد الـCycles', totalIn)),
+        h('p', { class: 'hint', text: 'تغيير المدة يبقي موعد الـCycle القادم ويعيد جدولة ما بعده. زيادة العدد تضيف Cycles بجرعات محسوبة، وتقليله يلغي الأخيرة التي لم تُعطَ.' })),
       restructBox,
       h('div', { class: 'card' }, h('h2', { text: 'التشخيص' }),
         field('التشخيص', dxSel), dxOther,

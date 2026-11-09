@@ -72,7 +72,7 @@ export function guessStatus(protocol) {
   const text = `${protocol?.disease || ''} ${protocol?.name || ''}`;
   if (/صيانة|maintenance/i.test(text)) return 'maintenance';
   if (/منتكس|مقاوم|إنقاذ|relaps|refractory|خط ثانٍ|علاج سابق/i.test(text) && !/علاج أولي أو منتكسة/.test(text)) return 'relapse';
-  if (/حديث التشخيص|خط أول|تحريض/.test(text)) return 'initial';
+  if (/حديث التشخيص|خط أول|تحريض|induction/i.test(text)) return 'initial';
   return null;
 }
 

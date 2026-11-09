@@ -126,7 +126,7 @@ function row(p) {
       h('span', { class: 's', style: 'display: flex; gap: 8px; align-items: center; flex-wrap: wrap' },
         h('span', { class: 'tag', text: p.file_no }),
         p.protocol_name && p.treatment_status === 'active'
-          ? h('span', { text: `${p.protocol_name} · الجرعة ${p.next_cycle_no ?? p.total_cycles} من ${p.total_cycles}` })
+          ? h('span', { text: `${p.protocol_name} · Cycle ${p.next_cycle_no ?? p.total_cycles} of ${p.total_cycles}` })
           : h('span', { text: bits || '—' }))),
     status);
 }

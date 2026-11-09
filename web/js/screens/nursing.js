@@ -53,7 +53,7 @@ function dueRow({ c, day, doses, done, ready, mixing }) {
       h('span', { class: 't', style: 'display: flex; gap: 6px; align-items: center' }, h('span', { text: p.full_name }),
         p.allergies && p.allergies !== NKDA ? h('span', { style: 'color: var(--brand); display: flex', title: 'حساسية' }, icon('alert', 16, 'currentColor', 2.2)) : null),
       h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
-        h('span', { class: 'tag', text: c.treatments.protocol_name }), h('span', { text: `الجرعة ${c.cycle_no} · اليوم ${day}` })),
+        h('span', { class: 'tag', text: c.treatments.protocol_name }), h('span', { text: `Cycle ${c.cycle_no} · اليوم ${day}` })),
       h('span', { class: 's', text: `أُعطي ${done} من ${count(doses.length, 'drug')}` })),
     pill);
 }
@@ -111,7 +111,7 @@ export async function administer(root, params) {
     allDays.sort((a, b) => a - b).map((n) => h('a', { href: `#/administer?cycle=${cid}&day=${n}`, 'aria-current': n === day ? 'page' : null, 'aria-label': 'اليوم ' + n + (doneDays.has(n) ? '، اكتمل إعطاؤه' : ''), text: n + (doneDays.has(n) ? ' ✓' : '') }))) : null;
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: p.full_name, sub: `${c.treatments.protocol_name} · الجرعة ${c.cycle_no} · اليوم ${day}`, back: '#/nursing' }),
+    topbar({ title: p.full_name, sub: `${c.treatments.protocol_name} · Cycle ${c.cycle_no} · اليوم ${day}`, back: '#/nursing' }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column' }, h('span', { class: 'tag', style: 'align-self: flex-start', text: p.file_no }),
@@ -229,7 +229,7 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
       can('administer') && live ? h('button', { type: 'button', class: 'adb-react', onclick: reactionDialog }, icon('warn', 22, 'currentColor', 2), h('span', { text: 'الإبلاغ عن تفاعل دوائي' })) : null,
       can('administer') && live ? h('p', { class: 'adb-note', text: 'أي تفاعل تسجّله يصل فوراً إلى الطبيب والصيادلة' }) : null,
       closeBtn,
-      h('a', { href: '#/cycle?id=' + cid, class: 'link-btn', text: 'تفاصيل الجرعة ' + c.cycle_no })),
+      h('a', { href: '#/cycle?id=' + cid, class: 'link-btn', text: 'تفاصيل Cycle ' + c.cycle_no })),
     bottomNav('home')));
 }
 
@@ -247,9 +247,9 @@ function dayCompletion({ c, cid, day, live, allGiven, completions, doneDays, all
   btn.addEventListener('click', () => busy(btn, async () => {
     const last = !remaining.length;
     const ok = await confirmDialog({
-      title: allDays.length > 1 ? `تم إعطاء الجرعة ${c.cycle_no} بالكامل لليوم ${day}` : `تم إعطاء الجرعة ${c.cycle_no} بالكامل`,
+      title: allDays.length > 1 ? `Cycle ${c.cycle_no} · تم إعطاء الجرعة بالكامل لليوم ${day}` : `Cycle ${c.cycle_no} · تم إعطاء الجرعة بالكامل`,
       body: last ? 'أُعطيت كل أدوية هذا اليوم، وهو آخر أيام الجرعة: تُسجَّل الجرعة مُعطاة وتصبح الجرعة التالية هي القادمة.'
-        : `أُعطيت كل أدوية اليوم ${day}. يتبقى في هذه الجرعة ${count(remaining.length, 'day')}: ${remaining.join('، ')}.`,
+        : `أُعطيت كل أدوية اليوم ${day}. يتبقى في Cycle ${c.cycle_no} ${count(remaining.length, 'day')}: ${remaining.join('، ')}.`,
       okText: 'تأكيد' });
     if (!ok) return;
     try {

@@ -16,15 +16,16 @@ create table if not exists public.cycle_day_completions (
   unique (cycle_id, day)
 );
 alter table public.cycle_day_completions enable row level security;
-drop policy if exists cycle_day_completions_read on public.cycle_day_completions;
-create policy cycle_day_completions_read on public.cycle_day_completions for select to authenticated using (public.is_active_user());
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'cycle_day_completions' and policyname = 'cycle_day_completions_read') then
+    create policy cycle_day_completions_read on public.cycle_day_completions for select to authenticated using (public.is_active_user());
+  end if;
+end $$;
 revoke all on public.cycle_day_completions from anon, public;
 grant select on public.cycle_day_completions to authenticated;
-drop trigger if exists audit_cycle_day_completions on public.cycle_day_completions;
-create trigger audit_cycle_day_completions after insert or update or delete on public.cycle_day_completions
+create or replace trigger audit_cycle_day_completions after insert or update or delete on public.cycle_day_completions
   for each row execute function public.audit_trigger();
-drop trigger if exists no_delete_cycle_day_completions on public.cycle_day_completions;
-create trigger no_delete_cycle_day_completions before delete on public.cycle_day_completions
+create or replace trigger no_delete_cycle_day_completions before delete on public.cycle_day_completions
   for each row execute function public.forbid_delete();
 
 -- يعيد 'day' إن اكتمل هذا اليوم فقط، و'cycle' إن كان آخر يوم فأُغلقت الجرعة كلها

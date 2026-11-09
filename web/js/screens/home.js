@@ -138,7 +138,7 @@ async function renderChartTasks(box) {
         h('span', { class: 'grow' }, h('span', { class: 't', text: c.treatments.patients.full_name }),
           h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
             h('span', { class: 'tag', text: c.treatments.protocol_name }),
-            h('span', { text: `الجرعة ${c.cycle_no} · ${fmtDate(c.planned_date, { day: 'numeric', month: 'short' })}` }))),
+            h('span', { text: `Cycle ${c.cycle_no} · ${fmtDate(c.planned_date, { day: 'numeric', month: 'short' })}` }))),
         h('span', { class: 'pill warn', text: 'أرفق الصورة' }))))));
   } catch (e) { box.replaceChildren(); }
 }
@@ -212,7 +212,7 @@ function cycleRow(c) {
     h('span', { class: 'grow' },
       h('span', { class: 't', text: pt.full_name }),
       h('span', { class: 's', style: 'display: flex; gap: 8px; align-items: center' },
-        h('span', { class: 'tag', text: t.protocol_name }), h('span', { text: `الجرعة ${c.cycle_no} من ${t.total_cycles}` }))),
+        h('span', { class: 'tag', text: t.protocol_name }), h('span', { text: `Cycle ${c.cycle_no} of ${t.total_cycles}` }))),
     pill);
 }
 
@@ -359,7 +359,7 @@ async function renderB(root) {
         : c.doctor_approved_at ? h('span', { class: 'pill info', text: 'في المزج' }) : h('span', { class: 'pill muted', text: 'بانتظار الطبيب' });
       return h('a', { class: 'hb-row', href: '#/cycle?id=' + c.id },
         h('span', { class: 'hb-av', text: initials(pt.full_name) }),
-        h('span', { class: 'grow' }, h('b', { text: pt.full_name }), h('span', null, h('span', { class: 'ltr', text: t.protocol_name }), ` · الجرعة ${c.cycle_no} من ${t.total_cycles}`)),
+        h('span', { class: 'grow' }, h('b', { text: pt.full_name }), h('span', null, h('span', { class: 'ltr', text: t.protocol_name }), ` · Cycle ${c.cycle_no} of ${t.total_cycles}`)),
         pill);
     }) : [empty('لا توجد جلسات مجدولة اليوم', 'calendar')]));
   } catch (e) { listBox.replaceChildren(h('p', { text: e.message })); }

@@ -127,17 +127,19 @@ function treatmentCard(p, t, cycles, reload) {
     const d = daysUntil(next.planned_date);
     const when = d < 0 ? 'متأخرة ' + count(-d, 'day') : d === 0 ? 'اليوم' : d === 1 ? 'غداً' : 'بعد ' + count(d, 'day');
     return h('div', { class: 'tile' + (d < 0 ? ' warn' : d === 0 ? ' brand' : '') },
-      h('span', { class: 'l', text: `الجلسة القادمة · الجرعة ${next.cycle_no}` }),
+      h('span', { class: 'l', text: `الجلسة القادمة · Cycle ${next.cycle_no}` }),
       h('span', { class: 'v', text: fmtDay(next.planned_date) }),
       h('span', { class: 's', text: when + (next.status === 'held' ? ' · موقوفة' : '') }));
   })() : h('div', { class: 'tile' }, h('span', { class: 'l', text: 'الجلسة القادمة' }), h('span', { class: 'v', text: '—' }));
 
   const lastTile = h('div', { class: 'tile' },
-    h('span', { class: 'l', text: last ? `الجلسة السابقة · الجرعة ${last.cycle_no}` : 'الجلسة السابقة' }),
+    h('span', { class: 'l', text: last ? `الجلسة السابقة · Cycle ${last.cycle_no}` : 'الجلسة السابقة' }),
     h('span', { class: 'v', text: last ? fmtDay(last.planned_date) : 'لم تبدأ بعد' }));
 
   return h('section', { class: 'section' },
-    h('div', { class: 'section-head' }, h('h2', { text: 'خطة العلاج الحالية' }), h('span', { class: 'pill ' + stKind, text: stLabel })),
+    h('div', { class: 'section-head' }, h('h2', { text: 'خطة العلاج الحالية' }),
+      h('span', { style: 'display: flex; gap: 8px; align-items: center' }, h('span', { class: 'pill ' + stKind, text: stLabel }),
+        canEditPlan() && !p.archived_at ? h('a', { class: 'icon-btn boxed', href: '#/plan-edit?tid=' + t.id, 'aria-label': 'تعديل الخطة', title: 'تعديل الخطة' }, icon('edit', 20)) : null)),
     h('div', { class: 'card' },
       h('div', { style: 'display: flex; justify-content: space-between; align-items: center; gap: 8px' },
         h('span', { class: 'tag', style: 'font-size: 16px; padding: 3px 10px', text: t.protocol_name }),
@@ -171,7 +173,7 @@ function cycleRow(c, isNext, p, reload) {
     readiness = c.doctor_approved_at ? 'معتمدة ووصلت إلى المزج' : 'بانتظار اعتماد الطبيب';
   }
   return h('div', { class: 'row', style: isNext ? 'background: #FFFBFB' : null },
-    h('a', { href: '#/cycle?id=' + c.id, 'aria-label': `الجرعة ${c.cycle_no}، ${fmtDay(c.planned_date)}`, style: 'display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; text-decoration: none; color: inherit' },
+    h('a', { href: '#/cycle?id=' + c.id, 'aria-label': `Cycle ${c.cycle_no}، ${fmtDay(c.planned_date)}`, style: 'display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; text-decoration: none; color: inherit' },
       h('span', { class: 'cyc-no' + (c.status === 'given' ? ' done' : isNext ? ' next' : ''), text: c.cycle_no }),
       h('span', { class: 'grow' },
         h('span', { class: 't', style: 'font-size: 15px', text: fmtDay(c.planned_date) }),
@@ -179,7 +181,7 @@ function cycleRow(c, isNext, p, reload) {
         readiness ? h('span', { class: 's', text: readiness }) : null),
       late ? h('span', { class: 'pill warn', text: 'متأخرة' }) : h('span', { class: 'pill ' + kind, text: label })),
     isNext && can('postpone') && !p.archived_at
-      ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': `تأجيل الجرعة ${c.cycle_no}`, title: 'تأجيل',
+      ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': `تأجيل Cycle ${c.cycle_no}`, title: 'تأجيل',
           onclick: async () => { if (await postponeDialog({ ...c, patient_name: p.full_name })) reload(); } }, icon('clock', 22))
       : null);
 }

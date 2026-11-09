@@ -63,7 +63,7 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   await checkNow(); await sara.waitForTimeout(400);
   ok('urgent alert: 4 tones', (await tones()) - t1 === 4);
   const last = (await shown()).slice(-1)[0];
-  ok('alert uses new terms', last.t === 'تحليل خارج الحد الطبيعي' && last.o.body.includes('قبل الجرعة 2'));
+  ok('alert uses new terms', last.t === 'تحليل خارج الحد الطبيعي' && last.o.body.includes('قبل Cycle 2'));
   ok('alert opens lab alert screen', last.o.data.url.includes('#/lab-alert?patient='));
   ok('urgent stays on screen', last.o.requireInteraction === true);
 

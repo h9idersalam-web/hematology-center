@@ -44,7 +44,7 @@ const psql = (sql) => execFileSync('psql', ['-h', '/var/lib/pgtest', '-p', '5499
   ok('non-cycle-day toast: no doctor notified', !(await nurse.locator('#toast').textContent()).includes('أُبلغ'));
   // يوم الدورة 3 (اليوم) وهي لم تُعتمد: إشعار
   await enter(d(0), { 'WBC (×10⁹/L)': '1.6', 'ANC (×10⁹/L)': '0.4', 'Hb (g/dL)': '13.6', 'PLT (×10⁹/L)': '38' });
-  ok('cycle-day toast: doctor notified', (await nurse.locator('#toast').textContent()).includes('قبل الجرعة 3'));
+  ok('cycle-day toast: doctor notified', (await nurse.locator('#toast').textContent()).includes('قبل Cycle 3'));
 
   const sara = await login('sara@test.iq');
   await sara.goto(B + '#/notifications'); await sara.waitForSelector('main .row');

@@ -39,7 +39,7 @@ export async function render(root, params) {
   const actions = [];
   if (live && can('approveCycle') && !c.doctor_approved_at && c.status === 'planned') {
     actions.push(actionBtn('ok', 'check', 'اعتماد الجرعة', async () => {
-      const ok = await confirmDialog({ title: `اعتماد الجرعة ${c.cycle_no}`, body: 'تؤكد أن الجرعات الدوائية مناسبة لحالة المريض الحالية وتحاليله. تصل الجرعة إلى قسم المزج فور اعتمادها.', okText: 'اعتماد' });
+      const ok = await confirmDialog({ title: `اعتماد Cycle ${c.cycle_no}`, body: 'تؤكد أن الجرعات الدوائية مناسبة لحالة المريض الحالية وتحاليله. تصل الجرعة إلى قسم المزج فور اعتمادها.', okText: 'اعتماد' });
       if (ok) { await rpc('approve_cycle', { p_cycle: id }); toast('اعتُمدت الجرعة ووصلت إلى المزج'); reload(); }
     }));
   }
@@ -52,13 +52,13 @@ export async function render(root, params) {
   // التأكيد المعتاد «تم إعطاء الجرعة بالكامل» يوماً بيوم من شاشة الإعطاء (الملف 41)
   if (live && can('completeCycle') && c.doctor_approved_at && daysUntil(c.planned_date) <= 0) {
     actions.push(actionBtn('secondary', 'check', 'إغلاق الجرعة', async () => {
-      const ok = await confirmDialog({ title: `إغلاق الجرعة ${c.cycle_no}`, body: 'تُسجَّل الجرعة مُعطاة ولا يمكن تعديل جرعاتها الدوائية بعد ذلك، ويُغلق ما لم يُرسل من طلبات المزج. للتأكيد المعتاد يوماً بيوم استخدم «تم إعطاء الجرعة بالكامل» في شاشة الإعطاء.', okText: 'إغلاق' });
+      const ok = await confirmDialog({ title: `إغلاق Cycle ${c.cycle_no}`, body: 'تُسجَّل الجرعة مُعطاة ولا يمكن تعديل جرعاتها الدوائية بعد ذلك، ويُغلق ما لم يُرسل من طلبات المزج. للتأكيد المعتاد يوماً بيوم استخدم «تم إعطاء الجرعة بالكامل» في شاشة الإعطاء.', okText: 'إغلاق' });
       if (ok) { await rpc('complete_cycle', { p_cycle: id }); toast('سُجّلت الجرعة مُعطاة'); reload(); }
     }));
   }
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: `الجرعة ${c.cycle_no} من ${t.total_cycles}`, sub: `${p.full_name} · ${t.protocol_name}`, back: '#/patient?id=' + p.id }),
+    topbar({ title: `Cycle ${c.cycle_no} of ${t.total_cycles}`, sub: `${p.full_name} · ${t.protocol_name}`, back: '#/patient?id=' + p.id }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; align-items: center; justify-content: space-between' },
         h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
@@ -163,7 +163,7 @@ function chartCard(c, p, open, reload) {
     if (!input.files[0]) return;
     status.textContent = 'جارٍ الرفع…';
     try {
-      const aid = await uploadAttachment(p.id, input.files[0], { kind: 'chart', title: `طبلة الجرعة ${c.cycle_no}` });
+      const aid = await uploadAttachment(p.id, input.files[0], { kind: 'chart', title: `طبلة Cycle ${c.cycle_no}` });
       await rpc('set_cycle_chart', { p_cycle: c.id, p_attachment: aid });
       toast('أُرسلت صورة الطبلة إلى المزج'); reload();
     } catch (e) { status.textContent = e.message; }

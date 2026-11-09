@@ -117,7 +117,7 @@ export async function render(root, params) {
   }));
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: doctor ? 'تعديل الجرعة' : 'اقتراح تعديل', sub: `${t.patients.full_name} · ${t.protocol_name} · الجرعة ${c.cycle_no}`, back }),
+    topbar({ title: doctor ? 'تعديل الجرعة' : 'اقتراح تعديل', sub: `${t.patients.full_name} · ${t.protocol_name} · Cycle ${c.cycle_no}`, back }),
     h('main', { class: 'main' },
       notice(doctor ? 'info' : 'warn', 'info', h('p', { text: doctor
         ? 'تُطبَّق تعديلاتك فوراً وتُسجَّل باسمك.' + (state.profile.role === 'senior_resident' ? ' ويُبلَّغ الطبيب المختص بها.' : '')

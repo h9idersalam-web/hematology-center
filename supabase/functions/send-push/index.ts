@@ -26,7 +26,7 @@ const OUT: Record<string, string> = { "§1": "الجرعات الدوائية", 
   "§5": "لجرعة الدوائية", "§6": "جرعته الدوائية", "§7": "جرعتان دوائيتان", "§8": "جرعة دوائية" };
 function terms(s: string | null): string {
   if (!s || !/[؀-ۿ]/.test(s)) return s || "";
-  let t = s.replace(/خارج المرجع/g, "خارج الحد الطبيعي");
+  let t = s.replace(/(?:ال)?دورة\s*(\d+)/g, "Cycle $1").replace(/خارج المرجع/g, "خارج الحد الطبيعي");
   for (const [re, ph] of DOSE) t = t.replace(re, ph);
   t = t.replace(/دورات/g, "جرعات").replace(/دورة/g, "جرعة").replace(/دورت/g, "جرعت");
   return t.replace(/§\d/g, (m) => OUT[m]);

@@ -28,7 +28,7 @@ const B = 'http://localhost:8788/';
   const shot = async (page, name, full = true) => { await page.waitForTimeout(600); await page.screenshot({ path: `${OUT}/s5-${String(++n).padStart(2, '0')}-${name}.png`, fullPage: full }); };
   const confirm = (page, label) => page.locator('dialog').getByRole('button', { name: label, exact: true }).click();
   const openPatient = async (page, name) => { await nav(page, B + '#/patients?f=all'); await page.waitForSelector('main .row'); await page.locator('main .row', { hasText: name }).click(); await page.waitForSelector('text=خطة العلاج الحالية'); };
-  const cycleUrlOf = async (page, name, no) => { await openPatient(page, name); await page.locator(`a[aria-label^="الجرعة ${no}،"]`).click(); await page.waitForSelector('text=الجرعات الدوائية'); return page.url(); };
+  const cycleUrlOf = async (page, name, no) => { await openPatient(page, name); await page.locator(`a[aria-label^="Cycle ${no}،"]`).click(); await page.waitForSelector('text=الجرعات الدوائية'); return page.url(); };
 
   const sara = await login('sara@test.iq');
   const cp = await login('cp@test.iq');

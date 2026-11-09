@@ -40,12 +40,12 @@ const B = 'http://localhost:8788/';
   await page.getByRole('button', { name: /حفظ/ }).click();
   ok('cycles beyond total rejected', (await page.locator('text=الجرعات غير صحيحة أو تتجاوز عدد الجرعات (3)').count()) === 1);
   await cyc.fill('1');
-  ok('cycles hint shows الجرعة 1 فقط', (await page.locator('text=الجرعة 1 فقط').count()) >= 1);
+  ok('cycles hint shows Cycle 1 فقط', (await page.locator('text=Cycle 1 فقط').count()) >= 1);
   await shot('form');
   await page.getByRole('button', { name: /حفظ/ }).click();
   await page.waitForURL(/#\/protocol\?id=/);
   await page.waitForSelector('text=Carfilzomib');
-  ok('protocol view shows cycles', (await page.locator('text=الجرعة 1 فقط').count()) >= 1);
+  ok('protocol view shows cycles', (await page.locator('text=Cycle 1 فقط').count()) >= 1);
   await shot('protocol-view');
 
   if (SEED) {
@@ -56,7 +56,7 @@ const B = 'http://localhost:8788/';
     await shot('pending-list');
     await page.locator('main .row', { hasText: 'KRd' }).first().click();
     await page.waitForSelector('text=Carfilzomib');
-    ok('KRd shows cycle ranges', (await page.locator('text=الجرعات 2 إلى 12').count()) >= 1 && (await page.locator('text=الجرعات 13 إلى 20').count()) >= 1);
+    ok('KRd shows cycle ranges', (await page.locator('text=Cycles 2–12').count()) >= 1 && (await page.locator('text=Cycles 13–20').count()) >= 1);
     ok('KRd unapproved', (await page.locator('text=/بانتظار|غير معتمد/').count()) >= 1);
     await shot('krd');
   }

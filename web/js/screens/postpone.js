@@ -31,13 +31,13 @@ export function postponeDialog(cycle) {
       ok.disabled = true;
       try {
         await rpc('postpone_cycle', { p_cycle: cycle.id, p_new_date: date.value, p_reason: reason.value.trim() });
-        toast(`أُجّلت الجرعة ${cycle.cycle_no} إلى ${fmtDate(date.value)}`);
+        toast(`أُجّلت Cycle ${cycle.cycle_no} إلى ${fmtDate(date.value)}`);
         done(true);
       } catch (e) { ok.disabled = false; err.replaceChildren(notice('err', 'warn', h('p', { text: e.message }))); }
     });
 
     dlg.append(h('div', { class: 'dlg' },
-      h('h2', { text: `تأجيل الجرعة ${cycle.cycle_no}` }),
+      h('h2', { text: `تأجيل Cycle ${cycle.cycle_no}` }),
       h('p', { style: 'color: var(--muted)', text: `${cycle.patient_name ? cycle.patient_name + ' · ' : ''}الموعد الحالي ${fmtDate(cycle.planned_date)}` }),
       field('الموعد الجديد', date), shift,
       field('سبب التأجيل', reason), chips, err,

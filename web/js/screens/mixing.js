@@ -101,7 +101,7 @@ function orderRow(o) {
         h('span', { class: 't', style: 'display: flex; gap: 6px; align-items: center' }, h('span', { text: o.patients.full_name }),
           hasAllergy ? h('span', { style: 'color: var(--brand); display: flex', title: 'حساسية' }, icon('alert', 16, 'currentColor', 2.2)) : null),
         h('span', { class: 's', style: 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center' },
-          h('span', { class: 'tag', text: o.cycles.treatments.protocol_name }), h('span', { text: `الجرعة ${o.cycles.cycle_no} · اليوم ${o.day}` })),
+          h('span', { class: 'tag', text: o.cycles.treatments.protocol_name }), h('span', { text: `Cycle ${o.cycles.cycle_no} · اليوم ${o.day}` })),
         h('span', { class: 's', text: o.status === 'held' ? (terms(o.hold_reason) || 'معلّق')
           : `${fmtDate(dueDate(o), { weekday: 'short', day: 'numeric', month: 'short' })} · ${prep} من ${count(o.mixing_items.length, 'drug')} محضَّرة${o.cycles.chart_attachment_id ? ' · وصلت صورة الطبلة' : ''}` })),
       h('span', { class: 'pill ' + k, text: l })),
@@ -166,7 +166,7 @@ export async function order(root, params) {
   }));
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: p.full_name, sub: `${t.protocol_name} · الجرعة ${o.cycles.cycle_no} · اليوم ${o.day}`, back: '#/mixing?d=' + dueDate(o) }),
+    topbar({ title: p.full_name, sub: `${t.protocol_name} · Cycle ${o.cycles.cycle_no} · اليوم ${o.day}`, back: '#/mixing?d=' + dueDate(o) }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column; gap: 2px' },
@@ -250,7 +250,7 @@ export async function listB(root, params) {
     return h('div', { class: 'mxb-head' },
       h('span', { class: 'avatar', text: initials(o.patients.full_name) }),
       h('span', { class: 'grow' }, h('b', { text: o.patients.full_name }),
-        h('span', null, h('span', { class: 'ltr', text: o.cycles.treatments.protocol_name }), ` · الجرعة ${o.cycles.cycle_no} · اليوم ${o.day}`)),
+        h('span', null, h('span', { class: 'ltr', text: o.cycles.treatments.protocol_name }), ` · Cycle ${o.cycles.cycle_no} · اليوم ${o.day}`)),
       h('span', { class: 'pill ' + (o.status === 'incoming' ? 'brand-solid' : k), text: l }));
   };
   function cardClosed(o) {

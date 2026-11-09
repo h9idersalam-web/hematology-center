@@ -45,9 +45,9 @@ export function daysText(s) {
 export function cyclesText(s) {
   if (!s) return '';
   const d = daysList(s);
-  if (d.length === 1) return `الجرعة ${d[0]} فقط`;
-  if (/^\d+-\d+$/.test(String(s).replace(/\s/g, ''))) return `الجرعات ${d[0]} إلى ${d[d.length - 1]}`;
-  return 'الجرعات ' + d.join('، ');
+  if (d.length === 1) return `Cycle ${d[0]} فقط`;
+  if (/^\d+-\d+$/.test(String(s).replace(/\s/g, ''))) return `Cycles ${d[0]}–${d[d.length - 1]}`;
+  return 'Cycles ' + d.join(', ');
 }
 export const withCycles = (d) => (d.cycles ? ' · ' + cyclesText(d.cycles) : '');
 

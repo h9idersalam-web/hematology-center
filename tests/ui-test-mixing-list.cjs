@@ -31,7 +31,7 @@ const iso = (n) => { const d = new Date(); d.setDate(d.getDate() + n); d.setMinu
   for (const [name, no] of [['علي حسين', 3], ['زينب', 2], ['رقية', 1]]) {
     await sara.goto(B + '#/patients?f=all'); await sara.waitForSelector('main .row');
     await sara.locator('main .row', { hasText: name }).click(); await sara.waitForSelector('text=خطة العلاج الحالية');
-    await sara.locator(`a[aria-label^="الجرعة ${no}،"]`).click(); await sara.waitForSelector('text=الجرعات الدوائية');
+    await sara.locator(`a[aria-label^="Cycle ${no}،"]`).click(); await sara.waitForSelector('text=الجرعات الدوائية');
     await sara.getByRole('button', { name: 'اعتماد الجرعة' }).click(); await confirm(sara, 'اعتماد');
     await sara.locator('.pill', { hasText: 'وصل قسم المزج' }).first().waitFor();
   }
@@ -53,7 +53,7 @@ const iso = (n) => { const d = new Date(); d.setDate(d.getDate() + n); d.setMinu
   await mix.getByLabel('تاريخ الإعطاء').fill(iso(14));
   await mix.waitForTimeout(300);
   const d14 = await names();
-  ok('chosen date (+14): ABVD day 15 only', d14.length === 1 && d14[0].includes('زينب') && (await mix.locator('text=الجرعة 2 · اليوم 15').count()) === 1);
+  ok('chosen date (+14): ABVD day 15 only', d14.length === 1 && d14[0].includes('زينب') && (await mix.locator('text=Cycle 2 · اليوم 15').count()) === 1);
   ok('url keeps chosen date', mix.url().includes('d=' + iso(14)));
   await shot(mix, 'chosen-date');
 
