@@ -27,7 +27,11 @@ export async function render(root, params) {
   const protoSel = h('select', { class: 'input ltr', style: 'text-align: right' },
     protocols.map((pr) => h('option', { value: pr.id, selected: pr.id === t.protocol_id, text: `${pr.name} · ${count(pr.total_cycles, 'cycle')}` })));
   if (!protocols.some((pr) => pr.id === t.protocol_id)) protoSel.prepend(h('option', { value: t.protocol_id, selected: true, text: t.protocol_name + ' (الحالي)' }));
-  const chosen = () => protocols.find((pr) => pr.id === protoSel.value) || { id: t.protocol_id, name: t.protocol_name, total_cycles: t.total_cycles };
+  const chosen = () => protocols.find((pr) => pr.id === protoSel.value) || { id: t.protocol_id, name: t.protocol_name, total_cycles: t.total_cycles, cycle_length_days: t.cycle_length_days };
+  // القيم الأساسية: بروتوكول جديد ← عدد الـCycles والمدة منه تلقائياً؛ البروتوكول نفسه ← قيم الخطة الحالية
+  const base = () => (protoSel.value !== t.protocol_id
+    ? { len: chosen().cycle_length_days, total: chosen().total_cycles }
+    : { len: t.cycle_length_days, total: t.total_cycles });
 
   // رقم الجرعة الحالية داخل البروتوكول
   const cycleSel = h('select', { class: 'input' });
@@ -74,9 +78,25 @@ export async function render(root, params) {
     notice('warn', 'warn', h('p', { text: 'تغيير البروتوكول أو الـCycle الحالي يوقف الخطة الحالية (تبقى في «خطط سابقة») وينشئ خطة جديدة تبدأ من الـCycle المختار بجرعات دوائية محسوبة من جديد، وما قبله يُسجَّل مُعطى. أي تعديل يدوي على جرعات الخطة الحالية لا يُنقل.' })),
     field('تاريخ الـCycle المختار', start), field('سبب التغيير (إلزامي)', reason));
   const restructured = () => protoSel.value !== t.protocol_id || Number(cycleSel.value) !== (cur?.cycle_no ?? -1);
-  const onChange = () => { restructBox.hidden = !restructured(); };
-  protoSel.addEventListener('change', () => { drawCycles(); drawDx(); onChange(); });
+  // معاينة الجدول بعد الحفظ (الـCycle الحالي، والعدد، والمدة، والتاريخ)
+  const preview = h('p', { class: 'hint', 'aria-live': 'polite', style: 'font-weight: 600; color: var(--ink-2)' });
+  const drawPreview = () => {
+    const re = restructured();
+    const first = re ? Number(cycleSel.value) : cur?.cycle_no;
+    const date = re ? start.value : cur?.planned_date;
+    const len = Number(lenIn.value), total = Number(totalIn.value);
+    if (!first || !date || !(len >= 1) || !(total >= 1) || first > total) return (preview.textContent = '');
+    const last = addDaysISO(date, (total - first) * len);
+    preview.textContent = `الجدول بعد الحفظ: Cycle ${first} إلى ${total} (${count(total - first + 1, 'cycle')}) من ${fmtDate(date)} إلى ${fmtDate(last)}، كل ${count(len, 'day')}.`;
+  };
+  const onChange = () => { restructBox.hidden = !restructured(); drawPreview(); };
+  protoSel.addEventListener('change', () => {
+    drawCycles(); drawDx();
+    const b = base(); lenIn.value = b.len; totalIn.value = b.total;   // عدد الـCycles والمدة من البروتوكول الجديد تلقائياً
+    onChange();
+  });
   cycleSel.addEventListener('change', onChange);
+  for (const el of [lenIn, totalIn, start]) el.addEventListener('input', drawPreview);
 
   const err = h('div');
   const save = h('button', { type: 'button', class: 'btn primary block', text: 'حفظ التعديل' });
@@ -93,10 +113,11 @@ export async function render(root, params) {
     const len = Number(lenIn.value), total = Number(totalIn.value);
     if (!(len >= 1 && len <= 365)) return fail('المدة بين الـCycles بين 1 و365 يوماً');
     if (!(total >= 1 && total <= 120)) return fail('عدد الـCycles بين 1 و120');
-    if (total < t.total_cycles && !re && !await confirmDialog({ title: 'تقليل عدد الـCycles', okText: 'تأكيد', danger: true,
-      body: `من ${t.total_cycles} إلى ${total}: تُلغى Cycle ${total + 1} وما بعدها إن لم تُعطَ.` })) return;
+    const b = base();
+    if (total < b.total && !re && !await confirmDialog({ title: 'تقليل عدد الـCycles', okText: 'تأكيد', danger: true,
+      body: `من ${b.total} إلى ${total}: تُلغى Cycle ${total + 1} وما بعدها إن لم تُعطَ.` })) return;
     try {
-      const nt = await rpc('update_plan', { p_cycle_length: len === t.cycle_length_days ? null : len, p_total_cycles: total === t.total_cycles ? null : total, p_tid: tid, p_diagnosis: dxText, p_icd10: dxItem ? dxItem.icd : (dxSel.value === OTHER ? null : t.icd10),
+      const nt = await rpc('update_plan', { p_cycle_length: len === b.len ? null : len, p_total_cycles: total === b.total ? null : total, p_tid: tid, p_diagnosis: dxText, p_icd10: dxItem ? dxItem.icd : (dxSel.value === OTHER ? null : t.icd10),
         p_stage: stage.value || null, p_disease_status: dStatus, p_protocol: protoSel.value, p_cycle_no: re ? Number(cycleSel.value) : (cur?.cycle_no ?? null),
         p_start: re ? start.value : null, p_reason: re ? reason.value.trim() : null });
       toast(re ? 'أُنشئت الخطة من جديد بالتعديل' : 'حُفظ تعديل الخطة');
@@ -112,7 +133,8 @@ export async function render(root, params) {
         field('البروتوكول', protoSel), field('الـCycle الحالي داخل البروتوكول', cycleSel, cur ? `القادم الآن: Cycle ${cur.cycle_no} بتاريخ ${fmtDate(cur.planned_date)}` : null)),
       h('div', { class: 'card' }, h('h2', { text: 'المدة وعدد الـCycles' }),
         h('div', { class: 'grid-2' }, field('المدة بين الـCycles (يوم)', lenIn), field('عدد الـCycles', totalIn)),
-        h('p', { class: 'hint', text: 'تغيير المدة يبقي موعد الـCycle القادم ويعيد جدولة ما بعده. زيادة العدد تضيف Cycles بجرعات محسوبة، وتقليله يلغي الأخيرة التي لم تُعطَ.' })),
+        h('p', { class: 'hint', text: 'عند تغيير البروتوكول يُملأ العدد والمدة منه تلقائياً، وتُحسب التواريخ من تاريخ الـCycle المختار. تغيير المدة يبقي موعد الـCycle القادم ويعيد جدولة ما بعده. زيادة العدد تضيف Cycles بجرعات محسوبة، وتقليله يلغي الأخيرة التي لم تُعطَ.' }),
+        preview),
       restructBox,
       h('div', { class: 'card' }, h('h2', { text: 'التشخيص' }),
         field('التشخيص', dxSel), dxOther,
@@ -120,4 +142,5 @@ export async function render(root, params) {
         field('درجة المرض', stage)),
       err, save,
       h('a', { class: 'link-btn', href: back, text: 'إلغاء' }))));
+  drawPreview();
 }
