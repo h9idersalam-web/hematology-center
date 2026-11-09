@@ -32,4 +32,6 @@ begin
   -- خطة من مسؤول الصيادلة: تنتظر موافقة الطبيبة
   perform set_config('request.jwt.claim.sub', chief::text, true);
   perform create_treatment(p3, (select id from protocols where name = 'VRd'), 'الورم النقوي المتعدد', 'C90.0', 'ISS II', current_date + 2);
+  -- خطة قديمة بانتظار موافقة الطبيب (قبل الملف 38 كانت خطط مسؤول الصيادلة تنتظر؛ الآن تبدأ مباشرة)
+  update treatments set status = 'pending_approval', approved_by = null where patient_id = p3;
 end $$;

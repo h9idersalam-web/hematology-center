@@ -45,6 +45,8 @@ const B = 'http://localhost:8788/';
   await nav(ali, sara.url()); await ali.waitForSelector('text=خطة العلاج الحالية');
   ok('other specialist sees no approve button', (await ali.getByRole('button', { name: 'الموافقة على الخطة' }).count()) === 0
      && (await ali.locator('text=للطبيب المختص بالمريض').count()) === 1);
+  await nav(chief, sara.url()); await chief.waitForSelector('text=خطة العلاج الحالية');
+  ok('chief pharmacist can also approve plans (file 38)', (await chief.getByRole('button', { name: 'الموافقة على الخطة' }).count()) === 1);
   await openPatient(sara, 'حسن رعد');
   ok('patient specialist sees approve and reject', (await sara.getByRole('button', { name: 'الموافقة على الخطة' }).count()) === 1
      && (await sara.getByRole('button', { name: 'رفض الخطة' }).count()) === 1);

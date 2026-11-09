@@ -9,6 +9,8 @@ set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 select register_patient('زينب عبد الأمير', '1999-01-01', 'female', 160, 59, null, null, '00000000-0000-0000-0000-000000000002') as pt \gset
 select create_treatment(:'pt', (select id from protocols where name='ABVD'), 'لمفوما هودجكن', 'C81.9', 'II', current_date) as tid \gset
 select 'E1 status: ' || status || ' bsa ' || bsa from treatments where id = :'tid';
+-- منذ الملف 38 تبدأ خطة مسؤول الصيادلة مباشرة؛ تُعاد معلّقة هنا لاختبار موافقة المختص على الخطط المعلّقة القديمة
+reset role; update treatments set status = 'pending_approval', approved_by = null where id = :'tid'; set role authenticated;
 select 'E1b ABVD doses: ' || string_agg(drug_name||' '||final_dose||final_unit, ', ' order by sort) from cycle_doses cd join cycles c on c.id=cd.cycle_id where c.treatment_id=:'tid' and c.cycle_no=1;
 set request.jwt.claim.sub = '00000000-0000-0000-0000-000000000002';
 select approve_treatment(:'tid');

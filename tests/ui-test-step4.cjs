@@ -29,34 +29,35 @@ const B = 'http://localhost:8788/';
   const confirm = async (page, label) => { await page.locator('dialog').getByRole('button', { name: label, exact: true }).click(); };
   const toastText = async (page) => { await page.waitForTimeout(300); return page.locator('#toast').textContent(); };
 
-  // ===== A. مسؤول الصيادلة يضيف بروتوكولاً (يبقى غير معتمد)
-  const chief = await login('admin@test.iq');
-  await chief.goto(B + '#/protocols'); await chief.waitForSelector('main .row');
-  ok('approved tab lists 3 protocols', (await chief.locator('main .row').count()) === 3);
-  await shot(chief, 'protocols');
-  await chief.goto(B + '#/protocol-new'); await chief.waitForSelector('text=بيانات البروتوكول');
-  await chief.getByLabel('الاسم المختصر').fill('BR-T');
-  await chief.getByLabel('المرض').fill('لمفوما الخلايا الصغيرة');
-  await chief.getByLabel('المدة بين الجرعات (يوم)').fill('28');
-  await chief.getByLabel('عدد الجرعات').fill('6');
-  const d1 = chief.locator('.card', { hasText: 'الدواء 1' });
+  // ===== A. الصيدلي السريري يضيف بروتوكولاً (يبقى غير معتمد). مسؤول الصيادلة صار يعتمد بنفسه (الملف 38)
+  const chief = await login('admin@test.iq');   // مسؤول الصيادلة ومدير البرنامج
+  const author = await login('cp@test.iq');
+  await author.goto(B + '#/protocols'); await author.waitForSelector('main .row');
+  ok('approved tab lists 3 protocols', (await author.locator('main .row').count()) === 3);
+  await shot(author, 'protocols');
+  await author.goto(B + '#/protocol-new'); await author.waitForSelector('text=بيانات البروتوكول');
+  await author.getByLabel('الاسم المختصر').fill('BR-T');
+  await author.getByLabel('المرض').fill('لمفوما الخلايا الصغيرة');
+  await author.getByLabel('المدة بين الجرعات (يوم)').fill('28');
+  await author.getByLabel('عدد الجرعات').fill('6');
+  const d1 = author.locator('.card', { hasText: 'الدواء 1' });
   await d1.getByLabel('اسم الدواء (بالإنجليزية)').fill('Rituximab');
   await d1.getByLabel('الجرعة الدوائية', { exact: true }).fill('375');
-  await chief.getByRole('button', { name: 'إضافة دواء' }).click();
-  const d2 = chief.locator('.card', { hasText: 'الدواء 2' });
+  await author.getByRole('button', { name: 'إضافة دواء' }).click();
+  const d2 = author.locator('.card', { hasText: 'الدواء 2' });
   await d2.getByLabel('اسم الدواء (بالإنجليزية)').fill('Bendamustine');
   await d2.getByLabel('الجرعة الدوائية', { exact: true }).fill('90');
   await d2.getByLabel('أيام الإعطاء داخل الجرعة').fill('1-40');
-  await chief.getByRole('button', { name: 'حفظ وإرسال للاعتماد' }).click();
-  await chief.waitForSelector('text=أيام الإعطاء غير صحيحة');
+  await author.getByRole('button', { name: 'حفظ وإرسال للاعتماد' }).click();
+  await author.waitForSelector('text=أيام الإعطاء غير صحيحة');
   ok('days beyond cycle length rejected', true);
   await d2.getByLabel('أيام الإعطاء داخل الجرعة').fill('1-2');
   ok('live example shown', (await d2.locator('text=مثال لمريض 1.8 م² و70 كغ: 162 ملغ').count()) === 1);
-  await shot(chief, 'protocol-form');
-  await chief.getByRole('button', { name: 'حفظ وإرسال للاعتماد' }).click();
-  await chief.waitForSelector('text=غير معتمد: لا يُستخدم لأي مريض قبل اعتماده');
+  await shot(author, 'protocol-form');
+  await author.getByRole('button', { name: 'حفظ وإرسال للاعتماد' }).click();
+  await author.waitForSelector('text=غير معتمد: لا يُستخدم لأي مريض قبل اعتماده');
   ok('new protocol pending', true);
-  await shot(chief, 'protocol-pending');
+  await shot(author, 'protocol-pending');
 
   // ===== B. طبيبة الاختصاص تعتمده
   const sara = await login('sara@test.iq');
@@ -160,20 +161,18 @@ const B = 'http://localhost:8788/';
   await sr.waitForSelector('text=عُدّلت من 1598');
   ok('senior resident edit applied (1278)', (await sr.locator('main').textContent()).includes('1278'));
 
-  // ===== G. خطة من مسؤول الصيادلة تنتظر الموافقة، ثم الإيقاف
+  // ===== G. خطة من مسؤول الصيادلة تبدأ مباشرة (الملف 38)، ثم الإيقاف
   await chief.goto(B + '#/patients?f=none'); await chief.waitForSelector('main .row');
   await chief.locator('main .row', { hasText: 'أمير' }).click();
   await chief.getByRole('link', { name: 'إنشاء خطة علاج' }).click();
   await chief.getByRole('button', { name: /ABVD/ }).click();
   await chief.locator('#dx-sel').selectOption('HL'); await chief.getByRole('radio', { name: /Relapse/ }).click();
-  await chief.getByRole('button', { name: 'حفظ وإرسال للطبيب المختص' }).click();
-  await chief.waitForSelector('text=بانتظار موافقة الطبيب المختص');
-  ok('chief plan pending', true);
+  await chief.getByRole('button', { name: 'إنشاء الخطة' }).click();
+  await chief.waitForSelector('.pill >> text=فعّالة');
+  ok('chief plan starts active (file 38)', true);
   const amirUrl = chief.url();
-  await sara.goto(amirUrl); await sara.waitForSelector('text=الموافقة على الخطة');
-  await sara.getByRole('button', { name: 'الموافقة على الخطة' }).click(); await confirm(sara, 'موافقة');
-  await sara.waitForSelector('.pill >> text=فعّالة');
-  ok('specialist approved plan', true);
+  await sara.goto(amirUrl); await sara.waitForSelector('.pill >> text=فعّالة');
+  ok('specialist sees active plan', true);
   await sara.getByRole('button', { name: 'إيقاف الخطة' }).click();
   await sara.locator('dialog textarea').fill('رغبة المريض');
   await confirm(sara, 'إيقاف الخطة');

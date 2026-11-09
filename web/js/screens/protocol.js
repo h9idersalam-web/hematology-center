@@ -49,7 +49,7 @@ export async function render(root, params) {
   const restoreBtn = p.archived_at && state.profile.is_admin
     ? h('button', { class: 'btn secondary block', type: 'button', onclick: async (e) => {
         const btn = e.currentTarget;
-        const ok = await confirmDialog({ title: 'إعادة ' + p.name, body: 'يخرج من الأرشيف ويعود «غير معتمد» في قائمة «بانتظار الاعتماد». لا يُستخدم لأي مريض حتى يعتمده طبيب الاختصاص من جديد.', okText: 'إعادة إلى غير معتمد' });
+        const ok = await confirmDialog({ title: 'إعادة ' + p.name, body: 'يخرج من الأرشيف ويعود «غير معتمد» في قائمة «بانتظار الاعتماد». لا يُستخدم لأي مريض حتى يُعتمد من جديد.', okText: 'إعادة إلى غير معتمد' });
         if (!ok) return;
         busy(btn, async () => {
           try { await rpc('restore_protocol', { p_id: p.id }); toast('أُعيد البروتوكول إلى غير معتمد'); go('/protocol?id=' + p.id + '&r=' + Date.now()); }
@@ -104,7 +104,7 @@ export async function render(root, params) {
 }
 
 function fileSection(p, reload) {
-  const isSpecialist = state.profile.role === 'specialist';
+  const isSpecialist = ['specialist', 'chief_clinical_pharmacist'].includes(state.profile.role);   // من يعتمد البروتوكول (الملف 38)
   // استبدال ملف بروتوكول معتمد: طبيب الاختصاص ومسؤول الصيادلة ومدير البرنامج
   const manager = can('manageProtocol');
   const canAttach = (can('createProtocol') || manager) && !p.archived_at && (!p.file_path || !p.approved_at || manager);

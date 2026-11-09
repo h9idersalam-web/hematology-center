@@ -15,7 +15,7 @@ export async function render(root) {
       h('main', { class: 'main' }, notice('info', 'lock', h('p', { text: 'إضافة البروتوكولات للأطباء (عدا الدوري) والصيادلة السريريين.' })))));
     return;
   }
-  const isSpecialist = state.profile.role === 'specialist';
+  const isSpecialist = ['specialist', 'chief_clinical_pharmacist'].includes(state.profile.role);   // من يعتمد البروتوكول (الملف 38)
   const name = h('input', { class: 'input ltr', style: 'text-align: right', placeholder: 'مثال: R-CHOP-21', maxlength: 60, autocomplete: 'off' });
   const disease = h('input', { class: 'input', placeholder: 'مثال: لمفوما الخلايا البائية الكبيرة المنتشرة', maxlength: 160 });
   const len = h('input', { class: 'input ltr', type: 'number', inputmode: 'numeric', min: 1, max: 120, style: 'text-align: right', placeholder: '21' });
@@ -48,8 +48,8 @@ export async function render(root) {
     drugsBox,
     h('button', { type: 'button', class: 'btn secondary block', onclick: addDrug }, icon('plus', 22), 'إضافة دواء'),
     notice(isSpecialist ? 'info' : 'warn', 'info', h('p', { text: isSpecialist
-      ? 'لأنك طبيب اختصاص، يُعتمد البروتوكول عند حفظه. راجع كل جرعة دوائية وسقف قبل الحفظ.'
-      : 'سيُرسل إشعار لأطباء الاختصاص، ولا يُستخدم البروتوكول لأي مريض قبل اعتماده.' })),
+      ? 'لأن لك صلاحية الاعتماد، يُعتمد البروتوكول عند حفظه. راجع كل جرعة دوائية وسقف قبل الحفظ.'
+      : 'سيُرسل إشعار لأطباء الاختصاص، ولا يُستخدم البروتوكول لأي مريض قبل اعتماده من طبيب الاختصاص أو مسؤول الصيادلة السريريين.' })),
     err, submit);
 
   form.addEventListener('submit', (e) => {

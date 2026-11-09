@@ -91,7 +91,9 @@ select 'P2b ' || t.err('update removes specialist', format($q$select update_pati
 set request.jwt.claim.sub = :'CHIEF';
 select create_treatment(:'pt', (select id from protocols where name = 'ABVD'), 'لمفوما هودجكن', null, null, current_date) as tid \gset
 select create_treatment(:'pt2', (select id from protocols where name = 'ABVD'), 'لمفوما هودجكن', null, null, current_date) as tid2 \gset
-select 'P2c plan from chief pending: ' || status from treatments where id = :'tid';
+select 'P2c plan from chief starts active (file 38): ' || status from treatments where id = :'tid';
+-- تُعاد معلّقة لاختبار قرار الطبيب المختص على الخطط المعلّقة القديمة
+reset role; update treatments set status = 'pending_approval', approved_by = null where id in (:'tid', :'tid2'); set role authenticated;
 set request.jwt.claim.sub = :'SPB';
 select 'P2d ' || t.err('other specialist approves', format('select approve_treatment(%L)', :'tid'));
 set request.jwt.claim.sub = :'SR';
@@ -298,7 +300,7 @@ select 'P13h active deputy role: ' || my_role();
 select postpone_cycle(:'c2', current_date + 36, 'تأجيل من الرديف');
 select 'P13i deputy postponed: ' || (planned_date = current_date + 36) from cycles where id = :'c2';
 select create_treatment(:'pt2', (select id from protocols where name = 'R-CHOP-21'), 'DLBCL', null, null, current_date) as tid3 \gset
-select 'P13j deputy creates plan (pending): ' || status from treatments where id = :'tid3';
+select 'P13j deputy (acting chief) creates plan, active since file 38: ' || status from treatments where id = :'tid3';
 select 'P13k ' || t.err('active deputy activates other', format('select chief_set_deputy_active(%L, true)', :'DEP'));
 set request.jwt.claim.sub = :'CP';
 select submit_change_request(:'c2', jsonb_build_array(jsonb_build_object('kind', 'dose', 'target_dose_id',

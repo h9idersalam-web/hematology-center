@@ -8,13 +8,13 @@ const RULES = {
   archivePatient: ['specialist'],
   postpone: ['specialist', 'senior_resident', 'chief_clinical_pharmacist'],
   createProtocol: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist'],
-  approveProtocol: ['specialist'],
+  approveProtocol: ['specialist', 'chief_clinical_pharmacist'],
   // أرشفة البروتوكول واستبدال ملفه المعتمد: ومعهم مدير البرنامج (is_admin) أياً كان دوره
   manageProtocol: ['specialist', 'chief_clinical_pharmacist'],
   createPlan: ['specialist', 'senior_resident', 'chief_clinical_pharmacist'],
-  approvePlan: ['specialist'],          // والطبيب المختص بالمريض حصراً، يُتحقق منه في الشاشة
+  approvePlan: ['specialist', 'chief_clinical_pharmacist'],   // الطبيب المختص بالمريض، أو مسؤول الصيادلة لأي مريض (الملف 38)
   stopPlan: ['specialist', 'senior_resident'],
-  approveCycle: ['specialist', 'senior_resident'],
+  approveCycle: ['specialist', 'senior_resident', 'chief_clinical_pharmacist'],
   chart: ['clinical_pharmacist', 'chief_clinical_pharmacist'],
   doctorEdit: ['specialist', 'senior_resident'],
   requestEdit: ['clinical_pharmacist', 'chief_clinical_pharmacist', 'mixing_pharmacist'],
