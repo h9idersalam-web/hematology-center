@@ -17,6 +17,6 @@ create table storage.objects (id uuid primary key default gen_random_uuid(), buc
 create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
 alter table storage.objects enable row level security;
 grant usage on schema storage to authenticated;
-grant select, insert on storage.objects to authenticated;
+grant select, insert, delete on storage.objects to authenticated;
 grant usage on schema public to authenticated, anon;
 alter database postgres set search_path = public, extensions;

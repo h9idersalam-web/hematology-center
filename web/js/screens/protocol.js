@@ -67,7 +67,18 @@ export async function render(root, params) {
         if (reason === null) return;
         if (!reason.trim()) return toast('اكتب سبب الحذف', true);
         busy(btn, async () => {
-          try { await rpc('admin_delete_protocol', { p_id: p.id, p_reason: reason }); toast('حُذف البروتوكول نهائياً'); go('/protocols' + (p.archived_at ? '?t=archived' : '')); }
+          try {
+            await rpc('admin_delete_protocol', { p_id: p.id, p_reason: reason });
+            // ملفاته في التخزين (كل نسخه في protocols/<id>/) تُحذف أيضاً حتى لا تشغل مساحة
+            let filesNote = '';
+            try {
+              const dir = 'protocols/' + p.id;
+              const { data: list } = await sb.storage.from('patient-files').list(dir, { limit: 100 });
+              const paths = [...new Set([...(list || []).map((f) => dir + '/' + f.name), p.file_path].filter(Boolean))];
+              if (paths.length) { const { error } = await sb.storage.from('patient-files').remove(paths); if (error) throw error; }
+            } catch { filesNote = '، وتعذّر حذف ملفه من التخزين'; }
+            toast('حُذف البروتوكول نهائياً' + filesNote, !!filesNote); go('/protocols' + (p.archived_at ? '?t=archived' : ''));
+          }
           catch (x) { toast(x.message, true); }
         });
       } }, icon('trash', 20), 'حذف البروتوكول نهائياً') : null;

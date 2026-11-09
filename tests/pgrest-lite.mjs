@@ -347,6 +347,18 @@ const signs = {};
 async function storage(req, res, url, raw, json) {
   const uid = uidOf(req);
   let m;
+  // سرد ملفات مجلد، وحذف ملفات (بسياسات RLS نفسها)
+  if (req.method === 'POST' && (m = url.pathname.match(/^\/storage\/v1\/object\/list\/([\w-]+)$/))) {
+    const bucket = decodeURIComponent(m[1]); const prefix = (json.prefix || '').replace(/\/$/, '');
+    const r = await asUser(uid, (c) => c.query('select name from storage.objects where bucket_id = $1 and name like $2', [bucket, prefix + '/%']));
+    return send(res, 200, r.rows.map((x) => ({ name: x.name.slice(prefix.length + 1), id: crypto.randomUUID() })).filter((x) => !x.name.includes('/')));
+  }
+  if (req.method === 'DELETE' && (m = url.pathname.match(/^\/storage\/v1\/object\/([\w-]+)$/))) {
+    const bucket = decodeURIComponent(m[1]); const names = json.prefixes || [];
+    const r = await asUser(uid, (c) => c.query('delete from storage.objects where bucket_id = $1 and name = any($2) returning name', [bucket, names]));
+    for (const x of r.rows) { try { fs.unlinkSync(path.join(STORE, bucket, x.name)); } catch {} }
+    return send(res, 200, r.rows.map((x) => ({ name: x.name })));
+  }
   if (req.method === 'POST' && (m = url.pathname.match(/^\/storage\/v1\/object\/sign\/([\w-]+)\/(.+)$/))) {
     const [, bucket, name] = m.map(decodeURIComponent);
     const found = await asUser(uid, (c) => c.query('select 1 from storage.objects where bucket_id = $1 and name = $2', [bucket, name]));

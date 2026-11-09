@@ -38,3 +38,10 @@ begin
 end $$;
 revoke all on function public.admin_delete_protocol(uuid, text) from public, anon;
 grant execute on function public.admin_delete_protocol(uuid, text) to authenticated;
+
+-- ملفات البروتوكول المحذوف تُحذف من التخزين أيضاً (من الواجهة بعد نجاح الحذف، بواجهة Storage):
+-- يُسمح للمدير بحذف ملفات protocols/<id>/ فقط إذا لم يعد البروتوكول موجوداً.
+drop policy if exists "admin removes deleted protocol files" on storage.objects;
+create policy "admin removes deleted protocol files" on storage.objects for delete to authenticated
+  using (bucket_id = 'patient-files' and public.is_admin() and name like 'protocols/%'
+         and not exists (select 1 from public.protocols p where p.id::text = split_part(name, '/', 2)));
