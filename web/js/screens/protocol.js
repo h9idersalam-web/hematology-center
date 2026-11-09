@@ -57,6 +57,21 @@ export async function render(root, params) {
         });
       } }, icon('refresh', 22), 'إعادة إلى غير معتمد') : null;
 
+  // مدير البرنامج يحذف البروتوكول نهائياً (الملف 37): يُرفض إن استُخدم في خطة علاج، ويُحفظ نصه في سجل التعديلات
+  const deleteBtn = state.profile.is_admin
+    ? h('button', { class: 'link-btn', type: 'button', style: 'color: var(--brand-dark); align-self: center', onclick: async (e) => {
+        const btn = e.currentTarget;
+        const reason = await confirmDialog({ title: 'حذف ' + p.name + ' نهائياً', danger: true, okText: 'حذف نهائي',
+          body: 'يختفي البروتوكول من التطبيق كله، حتى من المؤرشفة، ولا يمكن التراجع من التطبيق. يُحفظ نصه في سجل التعديلات فقط. لا يُحذف إن استُخدم في أي خطة علاج.',
+          input: { label: 'سبب الحذف', placeholder: 'مثال: أُضيف بالخطأ، نسخة مكررة' } });
+        if (reason === null) return;
+        if (!reason.trim()) return toast('اكتب سبب الحذف', true);
+        busy(btn, async () => {
+          try { await rpc('admin_delete_protocol', { p_id: p.id, p_reason: reason }); toast('حُذف البروتوكول نهائياً'); go('/protocols' + (p.archived_at ? '?t=archived' : '')); }
+          catch (x) { toast(x.message, true); }
+        });
+      } }, icon('trash', 20), 'حذف البروتوكول نهائياً') : null;
+
   mount(root, h('div', { class: 'screen' },
     topbar({ title: p.name, sub: p.disease, back: '#/protocols' }),
     h('main', { class: 'main with-nav' },
@@ -73,7 +88,7 @@ export async function render(root, params) {
         h('div', { class: 'section-head' }, h('h2', { text: 'الأدوية' }), h('span', { class: 'meta', text: count(drugs.length, 'drug') })),
         h('div', { class: 'card flush' }, drugs.map(drugRow)),
         h('p', { class: 'hint', text: `عمود «مثال» محسوب لمريض مساحة جسمه ${EX.bsa} م² ووزنه ${EX.weight} كغ، للتوضيح فقط.` })),
-      approveBtn, archiveBtn, restoreBtn),
+      approveBtn, archiveBtn, restoreBtn, deleteBtn),
     bottomNav('protocols')));
 }
 
