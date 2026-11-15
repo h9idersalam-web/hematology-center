@@ -38,14 +38,14 @@ const B = 'http://localhost:8788/';
   ok('mixing screen opens while on', await admin.waitForSelector('.topbar >> text=قسم المزج', { timeout: 8000 }).then(() => true, () => false));
   await admin.goto(B + '#/admin?tab=sections');
   await admin.waitForSelector('article[aria-label="قسم المزج الكيميائي"]');
-  ok('both sections running', (await admin.locator('article .pill', { hasText: 'يعمل' }).count()) === 2);
-  for (const label of ['قسم المزج الكيميائي', 'قسم التمريض']) {
+  ok('three switches running', (await admin.locator('article .pill', { hasText: 'يعمل' }).count()) === 3);
+  for (const label of ['قسم المزج الكيميائي', 'قسم التمريض', 'صورة الطبلة']) {
     const card = admin.locator(`article[aria-label="${label}"]`);
     await card.getByRole('button', { name: 'إيقاف القسم مؤقتاً' }).click();
     await confirm(admin, 'إيقاف القسم');
     await admin.locator(`article[aria-label="${label}"] .pill`, { hasText: 'موقوف' }).waitFor();
   }
-  ok('both sections off', (await admin.locator('article .pill', { hasText: 'موقوف' }).count()) === 2);
+  ok('all three off', (await admin.locator('article .pill', { hasText: 'موقوف' }).count()) === 3);
   ok('active mixing user flagged', await has(admin, 'بدور «صيدلي المزج الكيميائي»: زهراء فاضل'));
   await shot(admin, 'admin-sections-off-desktop');
 
@@ -67,6 +67,7 @@ const B = 'http://localhost:8788/';
   await sara.waitForSelector('text=أيام الإعطاء');
   ok('approved cycle not sent to mixing', !(await has(sara, 'وصل قسم المزج')) && !(await has(sara, 'المزج والإعطاء')));
   ok('day row says confirm', await has(sara, 'تأكيد الإعطاء'));
+  ok('no chart step while chart off', !(await has(sara, 'صورة الطبلة من الصيدلي')));
   const cycleUrl = sara.url();
   const cid = new URL(cycleUrl.replace('#/', '')).searchParams.get('id') || cycleUrl.split('id=')[1];
   await shot(sara, 'doctor-cycle-mixing-off');
@@ -75,6 +76,7 @@ const B = 'http://localhost:8788/';
 
   // ===== 3. الصيدلي السريري يؤكد «تم إعطاء الجرعة بالكامل» بلا تمريض
   const cp = await login('cp@test.iq');
+  ok('no chart task on pharmacist home', !(await has(cp, 'بانتظار صورة الطبلة منك')));
   await cp.goto(B + `#/administer?cycle=${cid}&day=1`);
   await cp.waitForSelector('text=تم إعطاء الجرعة بالكامل');
   ok('no administer buttons for anyone', (await cp.getByRole('button', { name: 'تسجيل الإعطاء' }).count()) === 0);

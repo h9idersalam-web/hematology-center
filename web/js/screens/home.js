@@ -229,7 +229,7 @@ async function renderAdminPanel(box) {
     ]);
   } catch (e) { /* تبقى الأرقام صفراً */ }
 
-  const offList = [on('mixing') ? null : 'المزج', on('nursing') ? null : 'التمريض'].filter(Boolean);
+  const offList = [on('mixing') ? null : 'المزج', on('nursing') ? null : 'التمريض', on('chart') ? null : 'صورة الطبلة'].filter(Boolean);
   const tile = (href, t, s, warn, brand) => h('a', { class: 'admin-tile' + (brand ? ' brand' : ''), href },
     h('span', { class: 't', text: t }), h('span', { class: 's' + (warn ? ' warn' : ''), text: s }));
 

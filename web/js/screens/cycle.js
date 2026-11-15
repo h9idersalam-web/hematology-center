@@ -107,8 +107,9 @@ function steps(c, orders) {
       h('b', { style: 'font-size: 15px', text: title }),
       h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: done ? `${by || ''} · ${fmtDate(at, { day: 'numeric', month: 'short' })} ${fmtTime(at)}` : waiting ? 'بانتظار' : 'لاحقاً' })));
   return h('div', { class: 'card steps' },
-    step(!!c.doctor_approved_at, 'اعتماد الطبيب ووصول الجرعة إلى المزج', c.doctor?.full_name, c.doctor_approved_at, !c.doctor_approved_at),
-    step(!!c.chart_at, 'صورة الطبلة من الصيدلي', c.charter?.full_name, c.chart_at, !!c.doctor_approved_at && !c.chart_at),
+    step(!!c.doctor_approved_at, on('mixing') ? 'اعتماد الطبيب ووصول الجرعة إلى المزج' : 'اعتماد الطبيب', c.doctor?.full_name, c.doctor_approved_at, !c.doctor_approved_at),
+    // صورة الطبلة موقوفة (الملف 48): لا خطوة ما لم تكن مرفقة من قبل
+    on('chart') || c.chart_at ? step(!!c.chart_at, 'صورة الطبلة من الصيدلي', c.charter?.full_name, c.chart_at, !!c.doctor_approved_at && !c.chart_at) : null,
     step(c.status === 'given', 'الإعطاء وإغلاق الجرعة', null, null, !!c.doctor_approved_at && c.status !== 'given'));
 }
 

@@ -3,6 +3,7 @@ import { sb, q, rpc } from '../api.js';
 import { terms } from '../terms.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDate, fmtTime, initials, count, confirmDialog, todayISO, fmtYMD } from '../ui.js';
 import { can } from '../perms.js';
+import { on } from '../features.js';
 import { state } from '../app.js';
 import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
 import { signedUrl, openFile, isImage } from '../files.js';
@@ -265,7 +266,7 @@ export async function listB(root, params) {
     const items = o.mixing_items.filter((it) => !it.cycle_doses.archived_at || it.sent_at);
     const allergy = o.patients.allergies && o.patients.allergies !== NKDA ? o.patients.allergies : null;
     const chips = h('div', { class: 'mxb-chips' },
-      o.cycles.chart_attachment_id ? h('span', { class: 'pill ok', text: 'وصلت صورة الطبلة' }) : h('span', { class: 'pill muted', text: 'بانتظار صورة الطبلة' }),
+      o.cycles.chart_attachment_id ? h('span', { class: 'pill ok', text: 'وصلت صورة الطبلة' }) : !on('chart') ? null : h('span', { class: 'pill muted', text: 'بانتظار صورة الطبلة' }),
       allergy ? h('span', { class: 'pill warn', text: 'حساسية: ' + allergy }) : null);
     const rowsEl = items.map((it) => {
       const d = it.cycle_doses;

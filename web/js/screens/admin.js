@@ -354,14 +354,14 @@ export async function render(root, params) {
     const card = (key) => {
       const f = FEATURE_INFO[key];
       const enabled = on(key);
-      const role = key === 'mixing' ? 'mixing_pharmacist' : 'nurse';
-      const holders = users.filter((u) => u.role === role && u.status === 'active' && !u.is_admin);
+      const role = { mixing: 'mixing_pharmacist', nursing: 'nurse' }[key];   // صورة الطبلة بلا دور
+      const holders = role ? users.filter((u) => u.role === role && u.status === 'active' && !u.is_admin) : [];
       const btn = h('button', { type: 'button', class: 'btn block ' + (enabled ? 'secondary' : 'primary') },
         icon(enabled ? 'lock' : 'check', 22, enabled ? 'currentColor' : '#fff'), enabled ? 'إيقاف القسم مؤقتاً' : 'تشغيل القسم');
       btn.addEventListener('click', async () => {
         const ok = await confirmDialog(enabled
-          ? { title: 'إيقاف ' + f.label, body: f.off + '\nيختفي القسم ودور «' + f.role + '» من التطبيق، وتُلغى أكواد التفعيل المفتوحة بهذا الدور. لا يُحذف شيء، ويعود كما كان عند تشغيله.', okText: 'إيقاف القسم', danger: true }
-          : { title: 'تشغيل ' + f.label, body: f.onText + '\nيظهر القسم ودور «' + f.role + '» من جديد.', okText: 'تشغيل القسم' });
+          ? { title: 'إيقاف ' + f.label, body: f.off + (f.role ? '\nيختفي القسم ودور «' + f.role + '» من التطبيق، وتُلغى أكواد التفعيل المفتوحة بهذا الدور.' : '') + '\nلا يُحذف شيء، ويعود كما كان عند تشغيله.', okText: 'إيقاف القسم', danger: true }
+          : { title: 'تشغيل ' + f.label, body: f.onText + (f.role ? '\nيظهر القسم ودور «' + f.role + '» من جديد.' : ''), okText: 'تشغيل القسم' });
         if (!ok) return;
         await busy(btn, async () => {
           try {
@@ -382,7 +382,7 @@ export async function render(root, params) {
     };
     body.replaceChildren(
       notice('info', 'info', h('p', { text: 'إيقاف القسم مؤقت ولا يحذف شيئاً: برمجته وشاشاته وبياناته وسجلاته تبقى محفوظة، ويعود كما كان فور تشغيله.' })),
-      card('mixing'), card('nursing'),
+      card('mixing'), card('nursing'), card('chart'),
       h('p', { class: 'hint', text: 'بقية الأقسام تعمل دائماً: المرضى، والبروتوكولات، وخطط العلاج، والتحاليل، وطلبات التعديل، والصيدلية الداخلية.' }));
   }
 

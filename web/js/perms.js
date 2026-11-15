@@ -36,7 +36,7 @@ const RULES = {
 export const role = () => state.profile?.role;
 
 // إجراءات قسم يمكن إيقافه (الملف 47): تختفي ما دام القسم موقوفاً
-const FEATURE_OF = { prepare: 'mixing', seeMixing: 'mixing', administer: 'nursing', seeNursing: 'nursing' };
+const FEATURE_OF = { prepare: 'mixing', seeMixing: 'mixing', administer: 'nursing', seeNursing: 'nursing', chart: 'chart' };
 
 export function can(action) {
   const p = state.profile;
