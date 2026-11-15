@@ -4,6 +4,7 @@ import { terms } from '../terms.js';
 import { h, mount, icon, topbar, bottomNav, notice, fmtDate, fmtDay, fmtTime, toast, confirmDialog, busy, daysUntil, count, ROLES } from '../ui.js';
 import { go } from '../app.js';
 import { can } from '../perms.js';
+import { on } from '../features.js';
 import { ROUTE_AR, OUT_UNITS, daysText, calcLine, num, instrLine, loadMixState, mixNote } from '../dose.js';
 import { NKDA } from './patient-form.js';
 import { postponeDialog } from './postpone.js';
@@ -134,20 +135,23 @@ function flowCard(c, doses, orders, live) {
   const days = [...new Set(doses.flatMap((d) => daysList(d.days)))].sort((a, b) => a - b);
   const ready = !!c.doctor_approved_at;
   const O = { incoming: 'وصل قسم المزج', in_progress: 'قيد التحضير', partially_sent: 'أُرسل جزء', sent: 'أُرسل كاملاً', held: 'معلّق' };
+  // القسمان قابلان للإيقاف (الملف 47): المزج الموقوف بلا حالة مزج، والتمريض الموقوف «تأكيد الإعطاء» بدل «الإعطاء»
+  const mixOn = on('mixing'), nurseOn = on('nursing');
   return h('section', { class: 'section' },
-    h('div', { class: 'section-head' }, h('h2', { text: 'المزج والإعطاء' })),
-    !ready ? notice('info', 'lock', h('p', { text: 'تصل الجرعة إلى المزج تلقائياً بعد اعتماد الطبيب، ويبدأ الإعطاء بعدها.' })) : null,
+    h('div', { class: 'section-head' }, h('h2', { text: mixOn ? 'المزج والإعطاء' : 'أيام الإعطاء' })),
+    !ready ? notice('info', 'lock', h('p', { text: mixOn ? 'تصل الجرعة إلى المزج تلقائياً بعد اعتماد الطبيب، ويبدأ الإعطاء بعدها.' : 'يبدأ الإعطاء بعد اعتماد الطبيب.' })) : null,
     h('div', { class: 'card flush' }, days.map((n) => {
       const mixed = doses.some((d) => d.is_mixed && daysList(d.days).includes(n));
       const o = orders.find((x) => x.day === n);
-      let mix;
-      if (!mixed) mix = h('span', { class: 'pill muted', text: 'بلا مزج' });
+      let mix = null;
+      if (!mixOn) mix = null;
+      else if (!mixed) mix = h('span', { class: 'pill muted', text: 'بلا مزج' });
       else if (o) mix = h('a', { class: 'pill ' + (o.status === 'held' ? 'warn' : 'info'), href: '#/mixing-order?id=' + o.id, style: 'text-decoration: none', text: O[o.status], title: terms(o.hold_reason) || '' });
       else mix = h('span', { class: 'pill muted', text: 'بعد الاعتماد' });
       return h('div', { class: 'row' },
         h('a', { href: `#/administer?cycle=${c.id}&day=${n}`, style: 'display: flex; flex-direction: column; flex: 1; text-decoration: none; color: inherit' },
           h('b', { style: 'font-size: 15px', text: `اليوم ${n}` }),
-          h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: fmtDay(addDays(c.planned_date, n - 1)) + ' · الإعطاء ›' })),
+          h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: fmtDay(addDays(c.planned_date, n - 1)) + (nurseOn ? ' · الإعطاء ›' : ' · تأكيد الإعطاء ›') })),
         mix);
     })));
 }
@@ -165,7 +169,7 @@ function chartCard(c, p, open, reload) {
     try {
       const aid = await uploadAttachment(p.id, input.files[0], { kind: 'chart', title: `طبلة Cycle ${c.cycle_no}` });
       await rpc('set_cycle_chart', { p_cycle: c.id, p_attachment: aid });
-      toast('أُرسلت صورة الطبلة إلى المزج'); reload();
+      toast(on('mixing') ? 'أُرسلت صورة الطبلة إلى المزج' : 'حُفظت صورة الطبلة'); reload();
     } catch (e) { status.textContent = e.message; }
   });
   const due = mine && !c.chart && c.doctor_approved_at;
@@ -174,8 +178,8 @@ function chartCard(c, p, open, reload) {
       h('h2', { text: 'صورة الجرعة من طبلة المريض' }),
       c.chart_at ? h('span', { style: 'font-size: 13px; color: var(--muted-2)', text: `${c.charter?.full_name || ''} · ${fmtDate(c.chart_at, { day: 'numeric', month: 'short' })}` }) : null),
     c.chart ? h('button', { type: 'button', class: 'file-tile', style: 'max-width: 220px', onclick: () => openFile(c.chart.file_path).catch((e) => toast(e.message, true)) }, img, h('span', { class: 'ft-t', text: 'فتح الصورة' })) : null,
-    due ? notice('warn', 'warn', h('p', { text: 'مطلوب منك: صوّر الجرعة من طبلة المريض وأرفقها. تصل إلى المزج للتحقق، ولا تؤخر التحضير.' }))
-      : !c.chart ? h('p', { class: 'hint', text: 'تُرفق بعد اعتماد الطبيب، وتصل إلى قسم المزج للتحقق.' }) : null,
+    due ? notice('warn', 'warn', h('p', { text: on('mixing') ? 'مطلوب منك: صوّر الجرعة من طبلة المريض وأرفقها. تصل إلى المزج للتحقق، ولا تؤخر التحضير.' : 'مطلوب منك: صوّر الجرعة من طبلة المريض وأرفقها لتُحفظ مع الجرعة.' }))
+      : !c.chart ? h('p', { class: 'hint', text: on('mixing') ? 'تُرفق بعد اعتماد الطبيب، وتصل إلى قسم المزج للتحقق.' : 'تُرفق بعد اعتماد الطبيب، وتُحفظ مع الجرعة.' }) : null,
     mine ? input : null,
     mine ? h('label', { for: 'chart-in', class: 'btn secondary block' }, icon('plus', 22), c.chart ? 'استبدال الصورة' : 'إرفاق صورة الطبلة') : null,
     status);

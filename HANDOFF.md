@@ -3,7 +3,9 @@
 هذا الملف يكفي وحده لمتابعة العمل على التطبيق من أي حساب Claude آخر.
 اقرأه كاملاً قبل أي تعديل، والتزم بالقواعد في القسم 3 دون استثناء.
 
-آخر تحديث: 2026-11-07 · نسخة التطبيق: `v29-2026-11-08-trial-themes` (حالة المرض لا تُحفظ حتى يُطبَّق الملف 32؛ الشاشة تتراجع تلقائياً)
+آخر تحديث: 2026-11-15 · نسخة التطبيق: `v53-2026-11-15-feature-switches`
+
+> **قسما المزج والتمريض موقوفان مؤقتاً بقرار صاحب المشروع (2026/11/15)**، ودورا «صيدلي المزج» و«ممرض» غير متاحين. برمجتهما وبياناتهما محفوظة كاملة؛ لا تحذف شيئاً منهما. يُشغَّلان من «لوحة المدير › الأقسام» (الملف 47). أي ميزة جديدة تمس المزج أو التمريض يجب أن تحترم الحالتين (يعمل/موقوف) وأن تُختبر في كلتيهما.
 
 ---
 
@@ -125,6 +127,7 @@ tests/                  اختبارات قاعدة البيانات (PostgreSQL
 | 21_lock_prepared_doses | الجرعة المحضّرة لا تُعدَّل ولا تُحذف حتى يزيل صيدلي المزج علامة التحضير |
 | 27_ice_protocols | بروتوكولا «ICE (مجزأ)» و«ICE» من ملفات المركز: Carboplatin 400 ملغ/م² بحد 800، Ifosfamide وMesna 1666 ملغ/م² الأيام 1–3 (طُبّق، غير معتمدين) |
 | 32_disease_status | حالة المرض treatments.disease_status (initial/relapse/maintenance)، وcreate_treatment بمعامل p_disease_status، و_apply_item يحفظها (✅ طُبّق) |
+| 47_feature_switches | **الأقسام القابلة للإيقاف مؤقتاً**: app_features (mixing, nursing) يبدآن موقوفين؛ get_features() للواجهة (والزائر قبل الدخول)؛ admin_set_feature(p_key, p_enabled) للمدير فقط (لوحة المدير › الأقسام). المزج موقوف: _sync_mixing لا ينشئ طلبات، ومشغّلات تمنع التحضير والإرسال وإنشاء طلب مزج، و_doses_changed لا يقفل الجرعات، وطلبات المزج المفتوحة محفوظة مجمّدة؛ التشغيل يزامن الجرعات المعتمدة المفتوحة. التمريض موقوف: مشغّل يمنع الإعطاء والتفاعلات، وcomplete_cycle_day يؤكده الطبيب والمقيم الأقدم ومسؤول الصيادلة والصيدلي السريري بلا سجلات إعطاء؛ وrecord_administration لا يشترط الإرسال من المزج إن كان المزج موقوفاً. دورا nurse وmixing_pharmacist لا يُسندان ما دام قسمهما موقوفاً (مشغّلات على profiles وuser_activation_codes)، وتُلغى أكوادهما المفتوحة عند الإيقاف، ولا تصلهما إشعارات (_notify_roles). الحسابات الموجودة بهذين الدورين لا تتغير تلقائياً. الواجهة: web/js/features.js (on/roleOn؛ قبل تطبيق الملف كل الأقسام تعمل)، والمسارات ذات feature، وcan()، وشاشة #/administer تصير «تأكيد إعطاء الجرعة» |
 | 46_protocol_course | create_plan_course (الواجهة تستدعيها بدل create_plan_at): «مرة إعطاء البروتوكول» عند إنشاء الخطة؛ المرة الثانية من بروتوكول من 3 ← total 6، وCycles 4–6 بأدوية محسوبة برقمها داخل المرة، وCycles 1–3 مُعطاة (المرة السابقة). p_first_cycle رقم مطلق (✅ طُبّق) |
 | 45_admin_delete_patient | admin_delete_patient(p_patient, p_reason): المدير حصراً يحذف مريضاً أُدخل بالخطأ نهائياً مع كل ما يتعلق به (الخطط، الـCycles، الجرعات، الإعطاء، تأكيدات الأيام، المزج، الطلبات، التحاليل، المرفقات، الإشعارات)؛ ملخص في audit_log (PATIENT_DELETED) ومشغّل التدقيق يحفظ كل صف محذوف. forbid_delete يسمح فقط داخلها (hc.allow_patient_delete). سياسة تخزين تسمح للمدير بحذف patients/<id>/ بعد حذف المريض. الواجهة: زر في ملف المريض بتأكيد رقم الملف (✅ طُبّق) |
 | 44_protocol_phases | مراحل البروتوكول: protocols.regimen (مثل UKALL14) وphase (induction/consolidation/interim_maintenance/intensification/maintenance/other) وphase_order (رقمان متساويان = بديلان). set_protocol_phase لمدير البروتوكولات (أيقونة القلم في صفحة البروتوكول)؛ next_phase_plan تنشئ خطة المرحلة التالية بعد انتهاء الحالية (بطاقة «المرحلة التالية» ومسار المراحل في ملف المريض). عُبّئت UKALL14/2011/60+ وAPL وVen + CLAD/LDAC وIBER (✅ طُبّق) |
@@ -286,7 +289,7 @@ tests/                  اختبارات قاعدة البيانات (PostgreSQL
 3. اختبر محلياً:
    ```bash
    # PostgreSQL 16 محلي
-   bash tests/run_all.sh            # يحمّل 00_stub ثم 01..22 ثم اختبارات 01..13 واختبار التزامن
+   bash tests/run_all.sh            # يحمّل 00_stub ثم كل ملفات supabase (يشغّل القسمين بعد 47) ثم الاختبارات حتى 17 واختبار التزامن
    node tests/pgrest-lite.mjs       # محاكي PostgREST على المنفذ 8788 يقدّم web/ مع القاعدة المحلية
    CHROME=/usr/bin/google-chrome node tests/ui-test-activation.cjs ./shots
    node tests/ui-test-step4.cjs ./shots
@@ -296,6 +299,7 @@ tests/                  اختبارات قاعدة البيانات (PostgreSQL
    node tests/ui-test-approval-chain.cjs ./shots
    node tests/ui-test-admin-roles.cjs ./shots
    node tests/ui-test-mixing-list.cjs ./shots
+   node tests/ui-test-sections.cjs ./shots    # إيقاف المزج والتمريض وتشغيلهما (UI_THEME=b للتصميم الرسمي)
    node tests/ui-test-lab-alert.cjs ./shots
    node tests/ui-test-sound-alerts.cjs ./shots
    node tests/ui-test-lab-ocr.cjs ./shots ./ocr-fixtures   # صور من tests/lab-ocr (analyzer-photo, cmm-photo, flags1-photo)

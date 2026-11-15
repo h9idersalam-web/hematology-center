@@ -1,6 +1,7 @@
 // إنشاء الحساب وتسجيل الدخول
 import { sb, errMsg } from '../api.js';
 import { h, mount, icon, field, notice, busy, ROLE_GROUPS, ROLES } from '../ui.js';
+import { loadFeatures, roleOn } from '../features.js';
 import { CENTER_NAME } from '../config.js';
 import { installButton } from '../install.js';
 import { state, go, loadProfile } from '../app.js';
@@ -56,7 +57,9 @@ export function login(root) {
 
 // ---------------------------------------------------------------- حساب جديد
 export function register(root) {
-  let group = ROLE_GROUPS[1];
+  // الأدوار التي قسمها موقوف (الملف 47) لا تظهر للتسجيل
+  const groups = () => ROLE_GROUPS.map((g) => ({ ...g, subs: g.subs.filter((x) => roleOn(x.role)) })).filter((g) => g.subs.length);
+  let group = groups().find((g) => g.id === 'pharm') || groups()[0];
   let role = group.subs[0].role;
 
   const groupBox = h('div', { class: 'grid-3' });
@@ -70,8 +73,8 @@ export function register(root) {
   const submit = h('button', { type: 'submit', class: 'btn primary block', text: 'إنشاء الحساب' });
 
   function drawGroups() {
-    groupBox.replaceChildren(...ROLE_GROUPS.map((g) => h('button', {
-      type: 'button', class: 'choice', 'aria-pressed': g === group ? 'true' : 'false', text: g.label,
+    groupBox.replaceChildren(...groups().map((g) => h('button', {
+      type: 'button', class: 'choice', 'aria-pressed': g.id === group.id ? 'true' : 'false', text: g.label,
       onclick: () => { group = g; role = g.subs[0].role; drawGroups(); drawSubs(); },
     })));
   }
@@ -122,5 +125,11 @@ export function register(root) {
 
   drawGroups(); drawSubs();
   mount(root, h('div', { class: 'screen' }, hero(), switcher('register'), h('div', { class: 'main' }, form)));
+  loadFeatures().then(() => {
+    const gs = groups();
+    group = gs.find((g) => g.id === group.id) || gs[0];
+    if (!group.subs.some((x) => x.role === role)) role = group.subs[0].role;
+    drawGroups(); drawSubs();
+  });
 }
 

@@ -3,6 +3,7 @@ import { sb, q, countOf, rpc } from '../api.js';
 import { h, mount, icon, roleLabel, ROLES, roleName, ROLE_GROUPS, fmtDay, todayISO, initials, bottomNav, empty, confirmDialog, fmtDate, daysUntil, toast, busy } from '../ui.js';
 import { state, logout, loadProfile } from '../app.js';
 import { can, onlyMine, mineCycles } from '../perms.js';
+import { on, roleOn } from '../features.js';
 import { APP_NAME } from '../config.js';
 import { soundAsked, enableSound, disableSound } from '../notify.js';
 import { installButton } from '../install.js';
@@ -205,7 +206,7 @@ function cycleRow(c) {
   const t = c.treatments; const pt = t.patients;
   let pill;
   if (c.status === 'held') pill = h('span', { class: 'pill warn', text: 'موقوفة' });
-  else if (c.doctor_approved_at) pill = h('span', { class: 'pill ok', text: 'في المزج' });
+  else if (c.doctor_approved_at) pill = h('span', { class: 'pill ok', text: on('mixing') ? 'في المزج' : 'معتمدة' });
   else pill = h('span', { class: 'pill muted', text: 'بانتظار اعتماد الطبيب' });
   return h('a', { class: 'row', href: '#/cycle?id=' + c.id },
     h('span', { class: 'avatar', text: initials(pt.full_name) }),
@@ -228,6 +229,7 @@ async function renderAdminPanel(box) {
     ]);
   } catch (e) { /* تبقى الأرقام صفراً */ }
 
+  const offList = [on('mixing') ? null : 'المزج', on('nursing') ? null : 'التمريض'].filter(Boolean);
   const tile = (href, t, s, warn, brand) => h('a', { class: 'admin-tile' + (brand ? ' brand' : ''), href },
     h('span', { class: 't', text: t }), h('span', { class: 's' + (warn ? ' warn' : ''), text: s }));
 
@@ -239,7 +241,8 @@ async function renderAdminPanel(box) {
       tile('#/admin?tab=users', 'إدارة المستخدمين', pending ? `${pending} بانتظار التفعيل` : `${total} مستخدماً مفعّلاً`, pending > 0),
       tile('#/admin?tab=permissions', 'الصلاحيات', '8 أنواع مستخدمين'),
       tile('#/admin?tab=subscriptions', 'الاشتراكات', expiring ? `${expiring} تنتهي خلال أسبوعين` : 'كلها سارية', expiring > 0),
-      tile('#/admin?tab=users', 'كود تفعيل', 'يُصدر لكل مستخدم من إدارة المستخدمين', false, true))));
+      tile('#/admin?tab=users', 'كود تفعيل', 'يُصدر لكل مستخدم من إدارة المستخدمين', false, true),
+      tile('#/admin?tab=sections', 'الأقسام', offList.length ? 'موقوف: ' + offList.join(' و') : 'كلها تعمل'))));
 }
 
 // المدير يختار الدور الذي يعمل به: يرى أقسامه ويعمل بصلاحياته الحقيقية، ويبقى مديراً
@@ -252,7 +255,7 @@ function roleSwitcher(root) {
     h('h2', { text: 'الدور الذي تعمل به' }),
     h('p', { style: 'color: var(--muted); font-size: 14px', text: 'تدخل أقسام الدور المختار وتعمل بصلاحياته، ويُسجَّل كل إجراء باسمك وبهذا الدور. تبقى مديراً في كل الأحوال.' }),
     h('p', { style: 'font-size: 14px; font-weight: 600', text: 'صفتك المسجّلة: ' + roleName(p.base_role) }),
-    h('div', { style: 'display: flex; flex-direction: column; gap: 6px' }, Object.entries(ROLES).map(([k, label]) =>
+    h('div', { style: 'display: flex; flex-direction: column; gap: 6px' }, Object.entries(ROLES).filter(([k]) => roleOn(k)).map(([k, label]) =>
       h('button', { type: 'button', class: 'option', 'aria-pressed': p.role === k ? 'true' : 'false', onclick: async (e) => {
         await busy(e.currentTarget, async () => {
           try {
@@ -356,7 +359,7 @@ async function renderB(root) {
     listBox.replaceChildren(...(rows.length ? rows.map((c) => {
       const t = c.treatments, pt = t.patients;
       const pill = c.status === 'held' ? h('span', { class: 'pill warn', text: 'موقوفة' })
-        : c.doctor_approved_at ? h('span', { class: 'pill info', text: 'في المزج' }) : h('span', { class: 'pill muted', text: 'بانتظار الطبيب' });
+        : c.doctor_approved_at ? h('span', { class: 'pill info', text: on('mixing') ? 'في المزج' : 'معتمدة' }) : h('span', { class: 'pill muted', text: 'بانتظار الطبيب' });
       return h('a', { class: 'hb-row', href: '#/cycle?id=' + c.id },
         h('span', { class: 'hb-av', text: initials(pt.full_name) }),
         h('span', { class: 'grow' }, h('b', { text: pt.full_name }), h('span', null, h('span', { class: 'ltr', text: t.protocol_name }), ` · Cycle ${c.cycle_no} of ${t.total_cycles}`)),

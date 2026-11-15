@@ -56,6 +56,8 @@ async function setup() {
     passwords[email] = PASSWORD;
   }
   if (fs.existsSync(path.join(ROOT, 'tests/seed_ui.sql'))) psql(path.join(ROOT, 'tests/seed_ui.sql'));
+  // الملف 47 يبدأ بقسمي المزج والتمريض موقوفين؛ الاختبارات تعمل والقسمان يعملان، وui-test-sections يوقفهما من لوحة المدير
+  await pool.query("update public.app_features set enabled = true").catch(() => {});
 }
 
 // ------------------------------------------------------------------ بنية المخطط

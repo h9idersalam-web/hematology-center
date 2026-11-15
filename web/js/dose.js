@@ -1,6 +1,7 @@
 // حساب الجرعات وعرضها. مطابق للدالة _calc_dose في قاعدة البيانات حرفياً،
 // والقاعدة هي المرجع: هذا للمعاينة قبل الحفظ فقط.
 import { h } from './ui.js';
+import { on } from './features.js';
 
 export const UNITS = {
   'mg/m2': 'ملغ/م²', 'mg/kg': 'ملغ/كغ', mg: 'ملغ', 'units/m2': 'وحدة/م²', units: 'وحدة',
@@ -75,7 +76,8 @@ export function doseBig(value, unit) {
 // الجرعة المحضّرة أو المرسلة غير المعطاة لا تُعدَّل (تمنعها القاعدة أيضاً، الملف 21)، ويظهر ذلك للجميع.
 export async function loadMixState(sb, q, doseIds) {
   const map = new Map();
-  if (!doseIds.length) return map;
+  // المزج موقوف (الملف 47): لا ملاحظات ولا قفل، كما في _doses_changed
+  if (!doseIds.length || !on('mixing')) return map;
   const [items, given] = await Promise.all([
     q(sb.from('mixing_items').select('cycle_dose_id, prepared_at, sent_at, mixing_orders!inner(day)').in('cycle_dose_id', doseIds)),
     q(sb.from('administrations').select('cycle_dose_id, day').in('cycle_dose_id', doseIds)),

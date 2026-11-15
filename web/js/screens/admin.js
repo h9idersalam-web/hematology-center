@@ -3,6 +3,7 @@ import { rpc, sb, q } from '../api.js';
 import { APP_NAME } from '../config.js';
 import { h, mount, icon, topbar, empty, ROLES, TITLES, roleName, fmtDate, fmtTime, daysUntil, toast, busy, field, notice, initials, confirmDialog, ROLE_GROUPS } from '../ui.js';
 import { state, go } from '../app.js';
+import { on, roleOn, loadFeatures, FEATURE_INFO } from '../features.js';
 
 const STATUS = { pending: ['بانتظار التفعيل', 'warn'], active: ['مفعّل', 'ok'], suspended: ['موقوف', 'muted'] };
 const MONTHS = [3, 6, 12];
@@ -22,7 +23,7 @@ export async function render(root, params) {
       stats),
     tabs, body));
 
-  const TABS = [['users', 'إدارة المستخدمين'], ['doctors', 'أطباء لم ينضموا'], ['subscriptions', 'الاشتراكات'], ['permissions', 'الصلاحيات']];
+  const TABS = [['users', 'إدارة المستخدمين'], ['doctors', 'أطباء لم ينضموا'], ['subscriptions', 'الاشتراكات'], ['permissions', 'الصلاحيات'], ['sections', 'الأقسام']];
   function drawTabs() {
     tabs.replaceChildren(...TABS.map(([id, label]) => h('button', {
       role: 'tab', 'aria-selected': tab === id ? 'true' : 'false',
@@ -46,6 +47,7 @@ export async function render(root, params) {
       if (tab === 'users') await drawUsers();
       else if (tab === 'doctors') await drawDoctors();
       else if (tab === 'subscriptions') await drawSubscriptions();
+      else if (tab === 'sections') await drawSections();
       else drawPermissions();
     } catch (e) {
       body.replaceChildren(notice('err', 'warn', h('p', { text: e.message })));
@@ -242,7 +244,9 @@ export async function render(root, params) {
   function userDialog(u) {
     const dlg = h('dialog', null);
     const close = () => { dlg.close(); dlg.remove(); };
-    const roleSel = h('select', { class: 'input' }, [...Object.entries(ROLES), ...(TITLES[u.role] ? [[u.role, TITLES[u.role]]] : [])].map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
+    const roleSel = h('select', { class: 'input' }, [...Object.entries(ROLES), ...(TITLES[u.role] ? [[u.role, TITLES[u.role]]] : [])]
+      .filter(([k]) => roleOn(k) || k === u.role)
+      .map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v + (roleOn(k) ? '' : ' (قسمه موقوف)') })));
     const desc = Object.fromEntries(ROLE_GROUPS.flatMap((g) => g.subs.map((x) => [x.role, x.desc])));
     const what = h('p', { class: 'hint' });
     const warn = h('div');
@@ -287,7 +291,10 @@ export async function render(root, params) {
     const dlg = h('dialog', null);
     const close = () => { dlg.close(); dlg.remove(); };
     let months = 6, hours = 72;
-    const roleSel = h('select', { class: 'input' }, [...Object.entries(ROLES), ...(TITLES[u.role] ? [[u.role, TITLES[u.role]]] : [])].map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
+    // دور قسم موقوف لا يُسند بكود (الملف 47): يُختار أول دور متاح ويُنبَّه المدير
+    const roleSel = h('select', { class: 'input' }, [...Object.entries(ROLES), ...(TITLES[u.role] ? [[u.role, TITLES[u.role]]] : [])]
+      .filter(([k]) => roleOn(k))
+      .map(([k, v]) => h('option', { value: k, selected: k === u.role, text: v })));
     const segM = h('div', { class: 'segmented' });
     const segH = h('div', { class: 'segmented' });
     const drawSeg = () => {
@@ -339,6 +346,46 @@ export async function render(root, params) {
       }) : empty('لا توجد اشتراكات مفعّلة بعد', 'calendar')));
   }
 
+  // ------------------------------------------------------------ الأقسام (الملف 47)
+  // إيقاف قسم مؤقتاً لا يحذف شيئاً: برمجته وشاشاته وبياناته وسجلاته تبقى، وتعود كما كانت عند تشغيله
+  async function drawSections() {
+    await loadFeatures(true);
+    if (!users.length) await loadUsers();
+    const card = (key) => {
+      const f = FEATURE_INFO[key];
+      const enabled = on(key);
+      const role = key === 'mixing' ? 'mixing_pharmacist' : 'nurse';
+      const holders = users.filter((u) => u.role === role && u.status === 'active' && !u.is_admin);
+      const btn = h('button', { type: 'button', class: 'btn block ' + (enabled ? 'secondary' : 'primary') },
+        icon(enabled ? 'lock' : 'check', 22, enabled ? 'currentColor' : '#fff'), enabled ? 'إيقاف القسم مؤقتاً' : 'تشغيل القسم');
+      btn.addEventListener('click', async () => {
+        const ok = await confirmDialog(enabled
+          ? { title: 'إيقاف ' + f.label, body: f.off + '\nيختفي القسم ودور «' + f.role + '» من التطبيق، وتُلغى أكواد التفعيل المفتوحة بهذا الدور. لا يُحذف شيء، ويعود كما كان عند تشغيله.', okText: 'إيقاف القسم', danger: true }
+          : { title: 'تشغيل ' + f.label, body: f.onText + '\nيظهر القسم ودور «' + f.role + '» من جديد.', okText: 'تشغيل القسم' });
+        if (!ok) return;
+        await busy(btn, async () => {
+          try {
+            const r = await rpc('admin_set_feature', { p_key: key, p_enabled: !enabled });
+            await loadFeatures(true);
+            toast(enabled ? 'أُوقف ' + f.label + (r.revoked_codes ? ` وأُلغي ${r.revoked_codes} كود` : '') : 'شُغّل ' + f.label + (r.synced_cycles ? ` ووصلت ${r.synced_cycles} جرعة معتمدة إلى المزج` : ''));
+            draw();
+          } catch (e) { toast(e.message, true); }
+        });
+      });
+      return h('article', { class: 'card', 'aria-label': f.label },
+        h('div', { style: 'display: flex; justify-content: space-between; align-items: center; gap: 8px' },
+          h('h2', { style: 'display: flex; gap: 8px; align-items: center; font-size: 18px' }, icon(f.icon, 22), h('span', { text: f.label })),
+          h('span', { class: 'pill ' + (enabled ? 'ok' : 'muted'), text: enabled ? 'يعمل' : 'موقوف' })),
+        h('p', { style: 'font-size: 15px; line-height: 1.7', text: enabled ? f.onText : f.off }),
+        !enabled && holders.length ? notice('warn', 'warn', h('p', { text: `${holders.length === 1 ? 'حساب مفعّل' : holders.length + ' حسابات مفعّلة'} بدور «${f.role}»: ${holders.map((u) => u.full_name).join('، ')}. لا يرى شيئاً من القسم الآن؛ غيّر دوره من «إدارة المستخدمين» إن أردت.` })) : null,
+        btn);
+    };
+    body.replaceChildren(
+      notice('info', 'info', h('p', { text: 'إيقاف القسم مؤقت ولا يحذف شيئاً: برمجته وشاشاته وبياناته وسجلاته تبقى محفوظة، ويعود كما كان فور تشغيله.' })),
+      card('mixing'), card('nursing'),
+      h('p', { class: 'hint', text: 'بقية الأقسام تعمل دائماً: المرضى، والبروتوكولات، وخطط العلاج، والتحاليل، وطلبات التعديل، والصيدلية الداخلية.' }));
+  }
+
   // ------------------------------------------------------------ الصلاحيات
   function drawPermissions() {
     const Y = (t) => h('span', { class: 'y', text: '✓ ' + t });
@@ -379,7 +426,7 @@ export async function render(root, params) {
         ['يطلب فقط', 'الجرعة الدوائية، والمحلول ومعدل التسريب، والأدوية الداعمة'],
         ['يقرّره', 'الطبيب المختص أو المقيم الأقدم أو مسؤول الصيادلة', true],
         ['مهمته الإلزامية', 'صورة الجرعة من طبلة المريض بعد اعتمادها، وتصل إلى المزج للتحقق']]),
-      card('صيدلي المزج الكيميائي', [Y('عرض'), P(), P(), N('حذف')], [
+      card('صيدلي المزج الكيميائي' + (on('mixing') ? '' : ' (القسم موقوف)'), [Y('عرض'), P(), P(), N('حذف')], [
         ['يستلم', 'الجرعة فور اعتماد الطبيب، دون انتظار صورة الطبلة'],
         ['يطلب فقط', 'تعديل الجرعات الدوائية، ويقرّره الطبيب المختص أو المقيم الأقدم، ثم يُعاد اعتماد الجرعة ويُعلَّق المزج حتى ذلك', true],
         ['التحضير', 'علامة صح لكل دواء، والإرسال بعد دواء واحد']]),
@@ -387,7 +434,7 @@ export async function render(root, params) {
         ['الصيدلية الداخلية', 'تبويب «الصيدلية» في الشريط السفلي: يرفع ملف الإكسل الأسبوعي، ويضيف الأدوية ويعدّلها ويحذفها. الكل يرى التقرير'],
         ['بقية التطبيق', 'عرض فقط']]),
       groupTitle('التمريض'),
-      card('ممرض', [Y('عرض'), P(), N('تعديل'), N('حذف')], [
+      card('ممرض' + (on('nursing') ? '' : ' (القسم موقوف)'), [Y('عرض'), P(), N('تعديل'), N('حذف')], [
         ['يضيف فقط', 'تسجيل الإعطاء والعلامات الحيوية ونقل الدم'],
         ['التفاعلات', 'أي تفاعل يسجّله يصل فوراً إلى كل مقدمي الرعاية'],
         ['لا يغلق الجرعة', 'الإغلاق للطبيب المختص والمقيم الأقدم ومسؤول الصيادلة']]));

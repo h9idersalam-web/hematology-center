@@ -4,6 +4,7 @@ import * as notifier from './notify.js';
 import './install.js';   // يلتقط نافذة التثبيت من كروم مبكراً
 import './theme.js';     // المظهر التجريبي (?theme=a أو b)
 import { sb, configured, q } from './api.js';
+import { loadFeatures, on as featureOn } from './features.js';
 import { h, mount, icon, notice } from './ui.js';
 import * as auth from './screens/auth.js';
 import * as activation from './screens/activation.js';
@@ -61,10 +62,12 @@ const ROUTES = {
   '/labs': { screen: labs.view },
   '/labs-new': { screen: labs.entry },
   '/lab-alert': { screen: labAlert.render },
-  '/transfer': { screen: mixing.transfer },
-  '/mixing': { screen: mixing.list },
-  '/mixing-order': { screen: mixing.order },
-  '/nursing': { screen: nursing.list },
+  // feature: القسم الموقوف من «لوحة المدير › الأقسام» يعيد إلى الرئيسية (الملف 47)
+  '/transfer': { screen: mixing.transfer, feature: 'mixing' },
+  '/mixing': { screen: mixing.list, feature: 'mixing' },
+  '/mixing-order': { screen: mixing.order, feature: 'mixing' },
+  '/nursing': { screen: nursing.list, feature: 'nursing' },
+  // تبقى متاحة والتمريض موقوف: منها يُؤكَّد «تم إعطاء الجرعة بالكامل» لكل يوم
   '/administer': { screen: nursing.administer },
   '/report-pharmacy': { screen: pharmacy.render },
 };
@@ -81,7 +84,10 @@ export function go(path) {
 
 export async function loadProfile() {
   if (!state.session) { state.profile = null; return null; }
-  const p = await q(sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle());
+  const [p] = await Promise.all([
+    q(sb.from('profiles').select('*').eq('id', state.session.user.id).maybeSingle()),
+    loadFeatures(true),
+  ]);
   // الرديف المفعّل يعمل بدور مسؤول الصيادلة في كل الشاشات (كما في my_role بالقاعدة)
   if (p) {
     p.base_role = p.role;
@@ -131,6 +137,7 @@ async function route() {
     if (st !== 'active' && !r.inactive) return go('/activate');
     if (st === 'active' && r.inactive) return go('/home');
     if (r.admin && !state.profile.is_admin) return go('/home');
+    if (r.feature && !featureOn(r.feature)) return go('/home');
     if (st === 'active') notifier.start();   // فحص الإشعارات الجديدة كل دقيقة (والتنبيه بالصوت إن فُعّل)
   }
 

@@ -2,6 +2,7 @@
 // الحماية الحقيقية في دوال قاعدة البيانات، وهي ترفض أي إجراء خارج الصلاحية.
 // state.profile.role هو الدور الفعلي: الرديف المفعّل يظهر هنا مسؤولاً للصيادلة.
 import { state } from './app.js';
+import { on, roleOn } from './features.js';
 
 const RULES = {
   editPatient: ['specialist', 'senior_resident', 'clinical_pharmacist', 'chief_clinical_pharmacist'],
@@ -34,9 +35,17 @@ const RULES = {
 
 export const role = () => state.profile?.role;
 
+// إجراءات قسم يمكن إيقافه (الملف 47): تختفي ما دام القسم موقوفاً
+const FEATURE_OF = { prepare: 'mixing', seeMixing: 'mixing', administer: 'nursing', seeNursing: 'nursing' };
+
 export function can(action) {
   const p = state.profile;
   if (!p) return false;
+  if (FEATURE_OF[action] && !on(FEATURE_OF[action])) return false;
+  // حساب بدور قسمه موقوف (ممرض أو صيدلي مزج): لا إجراءات حتى يغيّر المدير دوره أو يشغّل القسم
+  if (!roleOn(p.role)) return false;
+  // التمريض موقوف: يؤكد اليوم الطبيب والمقيم الأقدم ومسؤول الصيادلة والصيدلي السريري (كما في complete_cycle_day)
+  if (action === 'completeDay' && !on('nursing')) return ['specialist', 'senior_resident', 'chief_clinical_pharmacist', 'clinical_pharmacist'].includes(p.role);
   if ((action === 'manageProtocol' || action === 'editInventory') && p.is_admin) return true;
   // تفعيل صلاحيات الرديف: لمسؤول الصيادلة الأصلي فقط، لا للرديف نفسه
   if (action === 'toggleDeputy') return p.base_role === 'chief_clinical_pharmacist' || (p.is_admin && p.role === 'chief_clinical_pharmacist');

@@ -2,6 +2,7 @@
 import { sb, q, rpc } from '../api.js';
 import { h, mount, icon, topbar, bottomNav, notice, toast, busy, empty, fmtDay, fmtTime, todayISO, addDaysISO, initials, count, field, confirmDialog } from '../ui.js';
 import { can, mineCycles } from '../perms.js';
+import { on } from '../features.js';
 import { ROUTE_AR, OUT_UNITS, daysList, num, instrLine } from '../dose.js';
 import { NKDA } from './patient-form.js';
 
@@ -80,13 +81,15 @@ export async function administer(root, params) {
   const reload = () => administer(root, params);
   const allDays = [...new Set(c.cycle_doses.filter((d) => !d.archived_at).flatMap((d) => daysList(d.days)))];
   const lastDay = Math.max(...allDays);
-  const allGiven = doses.length && doses.every((d) => adm.some((a) => a.cycle_dose_id === d.id));
+  // التمريض موقوف (الملف 47): يُؤكَّد اليوم بلا سجلات إعطاء لكل دواء
+  const allGiven = doses.length && (!on('nursing') || doses.every((d) => adm.some((a) => a.cycle_dose_id === d.id)));
+  const backHref = on('nursing') ? '#/nursing' : '#/cycle?id=' + cid;
 
   const future = addDaysISO(c.planned_date, day - 1) > todayISO();
-  if (document.documentElement.dataset.theme === 'b') return administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future, completions, doneDays });
+  if (document.documentElement.dataset.theme === 'b') return administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future, completions, doneDays, backHref });
   const rows = doses.map((d) => {
     const a = adm.find((x) => x.cycle_dose_id === d.id);
-    const isSent = !d.is_mixed || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at);
+    const isSent = !d.is_mixed || !on('mixing') || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at);
     let right;
     if (a) right = h('span', { class: 'pill ok', text: 'أُعطي ' + fmtTime(a.given_at) });
     else if (future) right = h('span', { class: 'pill muted', text: 'لم يحن موعده' });
@@ -105,13 +108,13 @@ export async function administer(root, params) {
       right);
   });
 
-  const closeBtn = dayCompletion({ c, cid, day, live, allGiven, completions, doneDays, allDays, reload });
+  const closeBtn = dayCompletion({ c, cid, day, live, allGiven, approved, future, completions, doneDays, allDays, reload });
 
   const daysNav = allDays.length > 1 ? h('div', { class: 'segmented', style: 'grid-auto-columns: minmax(44px, 1fr); overflow-x: auto' },
     allDays.sort((a, b) => a - b).map((n) => h('a', { href: `#/administer?cycle=${cid}&day=${n}`, 'aria-current': n === day ? 'page' : null, 'aria-label': 'اليوم ' + n + (doneDays.has(n) ? '، اكتمل إعطاؤه' : ''), text: n + (doneDays.has(n) ? ' ✓' : '') }))) : null;
 
   mount(root, h('div', { class: 'screen' },
-    topbar({ title: p.full_name, sub: `${c.treatments.protocol_name} · Cycle ${c.cycle_no} · اليوم ${day}`, back: '#/nursing' }),
+    topbar({ title: p.full_name, sub: `${c.treatments.protocol_name} · Cycle ${c.cycle_no} · اليوم ${day}`, back: backHref }),
     h('main', { class: 'main with-nav' },
       h('div', { class: 'card', style: 'flex-direction: row; justify-content: space-between; align-items: center' },
         h('span', { style: 'display: flex; flex-direction: column' }, h('span', { class: 'tag', style: 'align-self: flex-start', text: p.file_no }),
@@ -130,7 +133,7 @@ export async function administer(root, params) {
 // --------------------------------------------------------------- التصميم 2: شاشة «إعطاء الجرعة»
 // العلامات الحيوية في الأعلى اختيارية: تُرفق بكل دواء يُسجَّل إعطاؤه إن كُتبت، ولا تمنع الإعطاء إن تُركت فارغة.
 const VITALS = [['bp', 'ضغط الدم', 'mmHg', '120/80', 'text'], ['hr', 'النبض', 'bpm', '78', 'numeric'], ['temp', 'الحرارة', '°C', '36.8', 'decimal'], ['spo2', 'الأكسجين', '% SpO₂', '98', 'numeric']];
-function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future, completions, doneDays }) {
+function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, reload, allDays, lastDay, allGiven, future, completions, doneDays, backHref }) {
   const last = adm.filter((a) => a.vitals && Object.keys(a.vitals).length).sort((a, b) => b.given_at.localeCompare(a.given_at))[0];
   const vin = {};
   const tiles = VITALS.map(([k, l, u, ph, mode]) => {
@@ -146,7 +149,7 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
   };
 
   const ready = (d) => !adm.some((a) => a.cycle_dose_id === d.id) && !future && approved && live && can('administer')
-    && (!d.is_mixed || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at));
+    && (!d.is_mixed || !on('mixing') || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at));
   async function give(d, btn, reaction = null) {
     const v = checkVitals(); if (!v) return false;
     if (!reaction && !await confirmDialog({ title: 'تسجيل إعطاء ' + d.drug_name, body: `${num(d.final_dose)} ${OUT_UNITS[d.final_unit] || d.final_unit} · ${p.full_name} · ${p.file_no}\nطابق اسم المريض ورقم ملفه مع ملصق الكيس.`, okText: 'تأكيد الإعطاء' })) return false;
@@ -163,7 +166,7 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
 
   const rows = doses.map((d) => {
     const a = adm.find((x) => x.cycle_dose_id === d.id);
-    const isSent = !d.is_mixed || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at);
+    const isSent = !d.is_mixed || !on('mixing') || sent.some((s) => s.cycle_dose_id === d.id && s.sent_at);
     let right;
     if (a) right = h('span', { class: 'pill ok', text: 'أُعطي' });
     else if (future) right = h('span', { class: 'pill muted', text: 'لم يحن موعده' });
@@ -180,7 +183,7 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
       right);
   });
 
-  const closeBtn = dayCompletion({ c, cid, day, live, allGiven, completions, doneDays, allDays, reload });
+  const closeBtn = dayCompletion({ c, cid, day, live, allGiven, approved, future, completions, doneDays, allDays, reload });
 
   // الإبلاغ عن تفاعل: لدواء أُعطي (يُضاف إلى سجله)، أو لدواء جاهز لم يُسجَّل بعد (يُسجَّل إعطاؤه مع التفاعل)
   const reactable = doses.filter((d) => adm.some((a) => a.cycle_dose_id === d.id) || ready(d));
@@ -213,14 +216,14 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
   mount(root, h('div', { class: 'screen adb' },
     h('header', { class: 'topbar adb-hero' },
       h('div', { class: 'adb-top' },
-        h('a', { class: 'icon-btn', href: '#/nursing', 'aria-label': 'رجوع' }, icon('back', 24, 'currentColor', 2)),
+        h('a', { class: 'icon-btn', href: backHref, 'aria-label': 'رجوع' }, icon('back', 24, 'currentColor', 2)),
         h('span', { class: 'adb-day', text: 'اليوم ' + day })),
-      h('div', { class: 'titles' }, h('h1', { text: 'إعطاء الجرعة' }),
+      h('div', { class: 'titles' }, h('h1', { text: on('nursing') ? 'إعطاء الجرعة' : 'تأكيد إعطاء الجرعة' }),
         h('p', { class: 'sub' }, h('span', { text: p.full_name }), ' · ', h('span', { class: 'ltr', style: 'display: inline-block', text: c.treatments.protocol_name })))),
     h('main', { class: 'main with-nav' },
-      h('section', { class: 'card adb-vitals', 'aria-label': 'العلامات الحيوية' },
+      on('nursing') ? h('section', { class: 'card adb-vitals', 'aria-label': 'العلامات الحيوية' },
         h('div', { class: 'adb-h' }, h('h2', { text: 'العلامات الحيوية' }), h('span', { class: 'adb-opt', text: last ? new Date(last.given_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'اختيارية' })),
-        h('div', { class: 'adb-grid' }, tiles), vErr),
+        h('div', { class: 'adb-grid' }, tiles), vErr) : null,
       p.allergies && p.allergies !== NKDA ? notice('err', 'alert', h('p', { style: 'font-weight: 700', text: 'حساسية دوائية: ' + p.allergies })) : null,
       !approved ? notice('warn', 'lock', h('p', { text: 'لا يُعطى أي دواء قبل اعتماد الطبيب.' })) : null,
       daysNav,
@@ -234,13 +237,13 @@ function administerB(root, { c, p, cid, day, doses, adm, sent, approved, live, r
 }
 
 // «تم إعطاء الجرعة بالكامل» لهذا اليوم (الملف 41): يظهر بعد إعطاء كل أدوية اليوم، وآخر يوم يُغلق الجرعة كلها
-function dayCompletion({ c, cid, day, live, allGiven, completions, doneDays, allDays, reload }) {
+function dayCompletion({ c, cid, day, live, allGiven, approved, future, completions, doneDays, allDays, reload }) {
   const rec = completions.find((x) => x.day === day);
   if (rec) {
     return notice('ok', 'check', h('p', { style: 'font-weight: 600', text: `تم إعطاء الجرعة بالكامل لليوم ${day}` }),
       h('p', { style: 'font-size: 13px', text: [rec.by?.full_name, fmtDay(rec.completed_at), fmtTime(rec.completed_at)].filter(Boolean).join(' · ') }));
   }
-  if (!(live && allGiven && can('completeDay'))) return null;
+  if (!(live && allGiven && approved && !future && can('completeDay'))) return null;
   const remaining = allDays.filter((n) => n !== day && !doneDays.has(n));
   const btn = h('button', { type: 'button', class: 'btn ok block' }, icon('check', 22, '#fff', 2.2),
     allDays.length > 1 ? `تم إعطاء الجرعة بالكامل لليوم ${day}` : 'تم إعطاء الجرعة بالكامل');
